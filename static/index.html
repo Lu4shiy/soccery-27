@@ -75,6 +75,13 @@
             font-size: 20px;
             text-transform: uppercase;
         }
+        .logo-large {
+            width: 80px !important;
+            height: 80px !important;
+            margin: 0 auto 16px auto !important;
+            font-size: 36px !important;
+            padding: 8px !important;
+        }
 
         /* Сетка для лиг */
         .leagues-grid {
@@ -170,14 +177,13 @@
     <div id="screen-confirm" class="screen hidden">
         <h2 style="text-align:center;">✅ Готово!</h2>
         <div class="card" style="text-align:center;">
-            <div class="logo-container" style="width:80px; height:80px; margin: 0 auto 16px auto;" id="confirm-logo-container">
-                <!-- Сюда вставится логотип -->
-            </div>
+            <div id="confirm-logo"></div>
             <p>Твой клуб:</p>
             <h2 id="confirm-club" style="color:#52a8ff;"></h2>
             <p id="confirm-league"></p>
         </div>
-        <button class="btn" id="btn-continue">Продолжить</button>
+        <button class="btn" id="btn-continue" style="margin-bottom: 10px;">Продолжить</button>
+        <button class="btn" id="btn-reset" style="background-color: #a82929;">Сменить клуб</button>
     </div>
 
     <script>
@@ -191,10 +197,8 @@
         document.getElementById("user-name").innerText = `Привет, ${userName}!`;
 
         let allClubs = [];
-        let selectedLeague = "";
 
-        // Функция создания безопасного имени файла
-        // Умная функция создания безопасного имени файла
+        // Умная функция создания безопасного имени файла (для картинок)
         function slugify(text) {
             if (!text) return "";
             return text
@@ -209,13 +213,13 @@
         }
 
         // Функция получения HTML для логотипа с заглушкой
-        function getLogoHTML(type, name) {
+        function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
             const src = `/static/logos/${type}/${slug}.png`;
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
-                <div class="logo-container">
+                <div class="logo-container ${sizeClass}">
                     <img src="${src}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="${name}">
                     <div class="logo-fallback" style="display:none;">${fallbackChar}</div>
                 </div>
@@ -279,7 +283,6 @@
         }
 
         function openLeague(league) {
-            selectedLeague = league;
             document.getElementById("selected-league-title").innerText = league;
             
             // Фильтруем клубы по лиге и сортируем по рейтингу
@@ -340,8 +343,8 @@
             document.getElementById("confirm-club").innerText = clubName;
             document.getElementById("confirm-league").innerText = league;
             
-            // Вставляем логотип на экран подтверждения
-            document.getElementById("confirm-logo-container").outerHTML = getLogoHTML('clubs', clubName).replace('width: 44px; height: 44px;', 'width: 80px; height: 80px; margin: 0 auto 16px auto;').replace('margin-right: 12px;', '');
+            // Вставляем большой логотип на экран подтверждения
+            document.getElementById("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
             
             document.getElementById("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
@@ -359,6 +362,24 @@
 
         document.getElementById("btn-continue").onclick = () => {
             tg.showAlert("Карьера сохранена! Следующий экран в разработке.");
+        };
+
+        // Кнопка сброса клуба
+        document.getElementById("btn-reset").onclick = () => {
+            tg.showConfirm("Ты уверен, что хочешь сбросить клуб и выбрать заново?", async (ok) => {
+                if (!ok) return;
+                try {
+                    const res = await fetch(`${API_BASE}/api/reset-club/${userId}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        // Перезагружаем страницу, чтобы вернуться на экран выбора
+                        window.location.reload();
+                    } else {
+                        tg.showAlert("Ошибка при сбросе");
+                    }
+                } catch (e) {
+                    tg.showAlert("Сетевая ошибка");
+                }
+            });
         };
     </script>
 </body>

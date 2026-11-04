@@ -193,6 +193,17 @@ def select_club(req: SelectClubRequest):
     finally:
         db.close()
 
+@app.delete("/api/reset-club/{telegram_id}")
+def reset_club(telegram_id: str):
+    db = Session(engine)
+    try:
+        manager = db.query(Manager).filter_by(telegram_id=telegram_id).first()
+        if manager:
+            db.delete(manager)
+            db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
 
 # ============ TELEGRAM БОТ ============
 
