@@ -2,6 +2,11 @@ import os
 import secrets
 import subprocess
 import sys
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
@@ -80,3 +85,33 @@ def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCreden
     
     background_tasks.add_task(run_seed_script)
     return {"message": "Загрузка данных из FC27 запущена. Проверьте логи."}
+
+# --- НАСТРОЙКА TELEGRAM БОТА ---
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    # Создаем кнопку, которая открывает Mini App (используем URL нашего Render)
+    web_app = types.WebAppInfo(url="https://soccery-27.onrender.com/app") 
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=[[types.KeyboardButton(text="⚽️ Открыть Soccery 27", web_app=web_app)]],
+        resize_keyboard=True
+    )
+    await message.answer("Добро пожаловать в Soccery 27! Нажми на кнопку ниже, чтобы начать.", reply_markup=keyboard)
+
+# Запуск бота в фоне
+async def start_bot():
+    await dp.start_polling(bot)
+
+@app.on_event("startup")
+async def on_startup():
+    asyncio.create_task(start_bot())
+
+# --- РАЗДАЧА ФРОНТЕНДА ---
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/app")
+def read_index():
+    return FileResponse("static/index.html")
