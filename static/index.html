@@ -208,15 +208,29 @@
                 .replace(/-+/g, '-');            // Убираем двойные дефисы
         }
 
-        // Обновленная функция логотипа: добавлен ?v=3 (это сбрасывает кэш Телеграма)
+        // Функция для обработки ошибок загрузки картинки (сначала пробуем PNG, потом SVG, потом букву)
+        function handleImgError(img, type, slug, fallbackChar) {
+            if (img.src.indexOf('.svg') === -1) {
+                // Если PNG не загрузился, пробуем SVG
+                img.src = `/static/logos/${type}/${slug}.svg?v=6`;
+            } else {
+                // Если и SVG нет, показываем букву
+                img.style.display = 'none';
+                img.nextElementSibling.style.display = 'block';
+            }
+        }
+
+        // Функция получения HTML для логотипа
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=3`; 
+            const src = `/static/logos/${type}/${slug}.png?v=6`; // Сначала ищем PNG
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
                 <div class="logo-container ${sizeClass}">
-                    <img src="${src}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="${name}">
+                    <img src="${src}" class="logo-img" 
+                         onerror="handleImgError(this, '${type}', '${slug}', '${fallbackChar}')" 
+                         alt="${name}">
                     <div class="logo-fallback" style="display:none;">${fallbackChar}</div>
                 </div>
             `;
