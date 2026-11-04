@@ -15,9 +15,9 @@
             padding: 16px;
             min-height: 100vh;
         }
-        h1 { color: #52a8ff; margin: 0 0 4px; }
+        h1 { color: #52a8ff; margin: 0 0 4px; text-align: center;}
         h2 { margin: 8px 0; }
-        p  { color: #8e9eb5; margin: 4px 0; }
+        p { color: #8e9eb5; margin: 4px 0; }
         .hidden { display: none !important; }
         .card {
             background-color: #232e3c;
@@ -39,42 +39,77 @@
             cursor: pointer;
         }
         .btn:active { background-color: #3b82c4; }
-
-        #search {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #2f3b4d;
-            background: #232e3c;
-            color: white;
-            font-size: 15px;
+        .btn-back {
+            background-color: transparent;
+            color: #52a8ff;
+            border: 1px solid #52a8ff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
             margin-bottom: 12px;
-        }
-
-        #league-tabs {
-            display: flex;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            gap: 8px;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-        }
-        .tab {
-            white-space: nowrap;
-            background: #232e3c;
-            color: #8e9eb5;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 13px;
             cursor: pointer;
         }
-        .tab.active { background: #52a8ff; color: white; }
 
+        /* Стили для заглушек логотипов */
+        .logo-container {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: #17212b;
+            margin-right: 12px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 4px;
+        }
+        .logo-fallback {
+            font-weight: bold;
+            color: #52a8ff;
+            font-size: 20px;
+            text-transform: uppercase;
+        }
+
+        /* Сетка для лиг */
+        .leagues-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .league-card {
+            background: #232e3c;
+            border-radius: 12px;
+            padding: 16px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+        .league-card:active { border-color: #52a8ff; }
+        .league-card .logo-container {
+            width: 60px;
+            height: 60px;
+            margin: 0 0 10px 0;
+            background-color: #17212b;
+        }
+        .league-card .logo-fallback { font-size: 28px; }
+        .league-name { font-size: 13px; font-weight: bold; line-height: 1.2; }
+
+        /* Список клубов */
         .club-card {
             background: #232e3c;
             border-radius: 12px;
-            padding: 14px;
+            padding: 12px 16px;
             margin-bottom: 8px;
             display: flex;
             align-items: center;
@@ -83,6 +118,7 @@
             border: 1px solid transparent;
         }
         .club-card:active { border-color: #52a8ff; }
+        .club-info { display: flex; align-items: center; }
         .club-name { font-weight: bold; font-size: 15px; }
         .club-meta { color: #8e9eb5; font-size: 12px; margin-top: 2px; }
         .club-ovr {
@@ -101,7 +137,7 @@
     <!-- ЭКРАН 1: Приветствие -->
     <div id="screen-welcome" class="screen">
         <h1>Soccery 27</h1>
-        <p>Футбольный менеджер нового поколения</p>
+        <p style="text-align:center;">Футбольный менеджер нового поколения</p>
         <div class="card">
             <h2 id="user-name">Привет, Игрок!</h2>
             <p id="user-status">Твой клуб ждет тебя. Пора начинать карьеру.</p>
@@ -112,24 +148,31 @@
     <!-- ЭКРАН 2: Загрузка -->
     <div id="screen-loading" class="screen hidden">
         <div class="card">
-            <h2>⏳ Загружаем клубы...</h2>
+            <h2>⏳ Загружаем данные...</h2>
             <p>Первый запрос после «сна» сервера может занять до минуты.</p>
         </div>
     </div>
 
-    <!-- ЭКРАН 3: Выбор клуба -->
-    <div id="screen-clubs" class="screen hidden">
-        <h2>Выбери свой клуб</h2>
-        <p id="clubs-counter"></p>
-        <input id="search" placeholder="🔍 Поиск клуба..." />
-        <div id="league-tabs"></div>
-        <div id="clubs-list"></div>
+    <!-- ЭКРАН 3: Выбор лиги -->
+    <div id="screen-leagues" class="screen hidden">
+        <h2>Выбери лигу</h2>
+        <div id="leagues-grid" class="leagues-grid"></div>
     </div>
 
-    <!-- ЭКРАН 4: Подтверждение -->
+    <!-- ЭКРАН 4: Выбор клуба -->
+    <div id="screen-clubs" class="screen hidden">
+        <button class="btn-back" id="btn-back-leagues">← Назад к лигам</button>
+        <h2 id="selected-league-title">Клубы</h2>
+        <div id="clubs-list" style="margin-top: 16px;"></div>
+    </div>
+
+    <!-- ЭКРАН 5: Подтверждение -->
     <div id="screen-confirm" class="screen hidden">
-        <h2>✅ Готово!</h2>
-        <div class="card">
+        <h2 style="text-align:center;">✅ Готово!</h2>
+        <div class="card" style="text-align:center;">
+            <div class="logo-container" style="width:80px; height:80px; margin: 0 auto 16px auto;" id="confirm-logo-container">
+                <!-- Сюда вставится логотип -->
+            </div>
             <p>Твой клуб:</p>
             <h2 id="confirm-club" style="color:#52a8ff;"></h2>
             <p id="confirm-league"></p>
@@ -148,7 +191,27 @@
         document.getElementById("user-name").innerText = `Привет, ${userName}!`;
 
         let allClubs = [];
-        let currentLeague = null;
+        let selectedLeague = "";
+
+        // Функция создания безопасного имени файла
+        function slugify(text) {
+            if (!text) return "";
+            return text.toLowerCase().replace(/\s+/g, '-');
+        }
+
+        // Функция получения HTML для логотипа с заглушкой
+        function getLogoHTML(type, name) {
+            const slug = slugify(name);
+            const src = `/static/logos/${type}/${slug}.png`;
+            const fallbackChar = name ? name.charAt(0) : "?";
+            
+            return `
+                <div class="logo-container">
+                    <img src="${src}" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="${name}">
+                    <div class="logo-fallback" style="display:none;">${fallbackChar}</div>
+                </div>
+            `;
+        }
 
         function showScreen(name) {
             document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
@@ -163,74 +226,66 @@
                     showConfirm(data.club_name, data.league, false);
                     return true;
                 }
-            } catch (e) {
-                console.error("checkManager error:", e);
-            }
+            } catch (e) { console.error(e); }
             return false;
         }
 
-        async function loadClubs() {
+        async function loadData() {
             showScreen("loading");
             try {
                 const res = await fetch(`${API_BASE}/api/clubs`);
                 if (!res.ok) throw new Error("HTTP " + res.status);
                 allClubs = await res.json();
+                
                 if (!allClubs.length) {
-                    tg.showAlert("Клубы не загружены. Попроси администратора выполнить /admin/seed.");
+                    tg.showAlert("Клубы не загружены. Выполните /admin/seed.");
                     showScreen("welcome");
                     return;
                 }
-                renderLeagueTabs();
-                renderClubs();
-                showScreen("clubs");
+                
+                renderLeagues();
+                showScreen("leagues");
             } catch (e) {
-                tg.showAlert("Не удалось загрузить клубы: " + e.message);
+                tg.showAlert("Ошибка загрузки: " + e.message);
                 showScreen("welcome");
             }
         }
 
-        function renderLeagueTabs() {
-            const container = document.getElementById("league-tabs");
-            container.innerHTML = "";
-            const leagues = [...new Set(allClubs.map(c => c.league))].sort();
+        function renderLeagues() {
+            // Получаем уникальные лиги
+            const uniqueLeagues = [...new Set(allClubs.map(c => c.league))].filter(l => l).sort();
+            const grid = document.getElementById("leagues-grid");
+            grid.innerHTML = "";
 
-            const allBtn = document.createElement("button");
-            allBtn.className = "tab" + (currentLeague === null ? " active" : "");
-            allBtn.textContent = "Все";
-            allBtn.onclick = () => { currentLeague = null; renderLeagueTabs(); renderClubs(); };
-            container.appendChild(allBtn);
-
-            leagues.forEach(l => {
-                const btn = document.createElement("button");
-                btn.className = "tab" + (currentLeague === l ? " active" : "");
-                btn.textContent = l;
-                btn.onclick = () => { currentLeague = l; renderLeagueTabs(); renderClubs(); };
-                container.appendChild(btn);
+            uniqueLeagues.forEach(league => {
+                const card = document.createElement("div");
+                card.className = "league-card";
+                card.innerHTML = `
+                    ${getLogoHTML('leagues', league)}
+                    <div class="league-name">${league}</div>
+                `;
+                card.onclick = () => openLeague(league);
+                grid.appendChild(card);
             });
         }
 
-        function renderClubs() {
-            const search = (document.getElementById("search").value || "").toLowerCase();
-            let filtered = allClubs;
-
-            if (currentLeague) filtered = filtered.filter(c => c.league === currentLeague);
-            if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search));
-            filtered = filtered.slice().sort((a, b) => (b.avg_ovr || 0) - (a.avg_ovr || 0));
-
-            document.getElementById("clubs-counter").innerText =
-                `Найдено клубов: ${filtered.length}`;
+        function openLeague(league) {
+            selectedLeague = league;
+            document.getElementById("selected-league-title").innerText = league;
+            
+            // Фильтруем клубы по лиге и сортируем по рейтингу
+            let filtered = allClubs.filter(c => c.league === league);
+            filtered.sort((a, b) => (b.avg_ovr || 0) - (a.avg_ovr || 0));
 
             const list = document.getElementById("clubs-list");
-            if (!filtered.length) {
-                list.innerHTML = `<div class="card"><p>Ничего не найдено</p></div>`;
-                return;
-            }
-
             list.innerHTML = filtered.map(c => `
                 <div class="club-card" data-id="${c.id}" data-name="${c.name}" data-league="${c.league}">
-                    <div>
-                        <div class="club-name">${c.name}</div>
-                        <div class="club-meta">${c.league} · ${c.players} игроков</div>
+                    <div class="club-info">
+                        ${getLogoHTML('clubs', c.name)}
+                        <div>
+                            <div class="club-name">${c.name}</div>
+                            <div class="club-meta">${c.players} игроков</div>
+                        </div>
                     </div>
                     <div class="club-ovr">${c.avg_ovr || "—"}</div>
                 </div>
@@ -246,6 +301,8 @@
                     });
                 };
             });
+
+            showScreen("clubs");
         }
 
         async function selectClub(clubId, clubName, league) {
@@ -261,7 +318,7 @@
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    tg.showAlert(data.detail || "Ошибка при выборе клуба");
+                    tg.showAlert(data.detail || "Ошибка при выборе");
                     return;
                 }
                 showConfirm(data.club_name, data.league, true);
@@ -273,19 +330,26 @@
         function showConfirm(clubName, league, isNew) {
             document.getElementById("confirm-club").innerText = clubName;
             document.getElementById("confirm-league").innerText = league;
+            
+            // Вставляем логотип на экран подтверждения
+            document.getElementById("confirm-logo-container").outerHTML = getLogoHTML('clubs', clubName).replace('width: 44px; height: 44px;', 'width: 80px; height: 80px; margin: 0 auto 16px auto;').replace('margin-right: 12px;', '');
+            
             document.getElementById("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
         }
 
+        // Кнопки навигации
         document.getElementById("btn-start").onclick = async () => {
             const hasClub = await checkManager();
-            if (!hasClub) await loadClubs();
+            if (!hasClub) await loadData();
         };
 
-        document.getElementById("search").oninput = renderClubs;
+        document.getElementById("btn-back-leagues").onclick = () => {
+            showScreen("leagues");
+        };
 
         document.getElementById("btn-continue").onclick = () => {
-            tg.showAlert("Карьера сохранена! Следующий экран (состав команды) — в разработке.");
+            tg.showAlert("Карьера сохранена! Следующий экран в разработке.");
         };
     </script>
 </body>
