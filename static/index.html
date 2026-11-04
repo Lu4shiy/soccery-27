@@ -218,9 +218,9 @@
             let nextSrc = '';
             
             if (currentExt === 'png') {
-                nextSrc = `/static/logos/${type}/${slug}.svg?v=7`;
+                nextSrc = `/static/logos/${type}/${slug}.svg?v=8`;
             } else if (currentExt === 'svg') {
-                nextSrc = `/static/logos/${type}/${slug}.webp?v=7`;
+                nextSrc = `/static/logos/${type}/${slug}.webp?v=8`;
             } else {
                 // Если ничего не нашли — показываем букву
                 img.style.display = 'none';
@@ -233,7 +233,7 @@
         // 3. Генерация HTML логотипа
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=7`; // Всегда начинаем с PNG
+            const src = `/static/logos/${type}/${slug}.png?v=8`; // Всегда начинаем с PNG
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
