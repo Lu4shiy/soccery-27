@@ -9,8 +9,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Небольшая хитрость: Neon иногда выдает ссылку, начинающуюся с postgres://, 
 # а SQLAlchemy требует postgresql://. Эта строчка исправляет это на лету.
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # Создаем движок базы данных
 engine = create_engine(DATABASE_URL)
