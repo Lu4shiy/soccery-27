@@ -13,11 +13,28 @@ HEADERS = {"X-Auth-Token": API_TOKEN}
 
 # Словарь: ID турнира на football-data.org -> Название для нашей базы
 COMPETITIONS = {
+    # Топ-5 (уже загружены)
     "PL": "English Premier League",
     "PD": "Spanish La Liga",
     "SA": "Italian Serie A",
     "BL1": "German Bundesliga",
-    "FL1": "French Ligue 1"
+    "FL1": "French Ligue 1",
+    
+    # Новые европейские лиги
+    "PPL": "Portuguese Liga",       # Португалия
+    "DED": "Dutch Eredivisie",      # Нидерланды
+    "BSA": "Belgian Pro League",    # Бельгия
+    "TR1": "Turkish Süper Lig",     # Турция
+    
+    # Вторые дивизионы (Все лиги Англии, Испании, Италии, Германии, Франции)
+    "ELC": "English Championship",  # Англия (2-й дивизион)
+    "SP2": "Spanish Segunda",       # Испания (2-й дивизион)
+    "SB": "Italian Serie B",        # Италия (2-й дивизион)
+    "BL2": "German 2. Bundesliga",  # Германия (2-й дивизион)
+    "FL2": "French Ligue 2",        # Франция (2-й дивизион)
+    
+    # Америка
+    "MLS": "Major League Soccer"    # США
 }
 
 def get_teams_from_competition(competition_code: str):
