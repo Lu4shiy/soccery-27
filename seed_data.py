@@ -1,116 +1,104 @@
-import os
-import time
-import requests
-from dotenv import load_dotenv
+import pandas as pd
+from datetime import datetime
 from sqlalchemy.orm import Session
 from main import engine, Base, Club, Player
 
-# Загружаем ключ из файла .env
-load_dotenv()
-API_TOKEN = os.getenv("FOOTBALL_DATA_TOKEN")
-BASE_URL = "https://api.football-data.org/v4"
-HEADERS = {"X-Auth-Token": API_TOKEN}
-
-# Словарь: ID турнира на football-data.org -> Название для нашей базы
-COMPETITIONS = {
-    # Топ-5 (уже загружены)
-    "PL": "English Premier League",
-    "PD": "Spanish La Liga",
-    "SA": "Italian Serie A",
-    "BL1": "German Bundesliga",
-    "FL1": "French Ligue 1",
-    
-    # Новые европейские лиги
-    "PPL": "Portuguese Liga",       # Португалия
-    "DED": "Dutch Eredivisie",      # Нидерланды
-    "BSA": "Belgian Pro League",    # Бельгия
-    "TR1": "Turkish Süper Lig",     # Турция
-    
-    # Вторые дивизионы (Все лиги Англии, Испании, Италии, Германии, Франции)
-    "ELC": "English Championship",  # Англия (2-й дивизион)
-    "SP2": "Spanish Segunda",       # Испания (2-й дивизион)
-    "SB": "Italian Serie B",        # Италия (2-й дивизион)
-    "BL2": "German 2. Bundesliga",  # Германия (2-й дивизион)
-    "FL2": "French Ligue 2",        # Франция (2-й дивизион)
-    
-    # Америка
-    "MLS": "Major League Soccer"    # США
-}
-
-def get_teams_from_competition(competition_code: str):
-    """Получает все команды для указанного турнира."""
-    url = f"{BASE_URL}/competitions/{competition_code}/teams"
-    response = requests.get(url, headers=HEADERS)
-    
-    if response.status_code != 200:
-        print(f"Ошибка при загрузке команд для {competition_code}: {response.status_code}")
-        print(response.text)
-        return []
-    
-    return response.json().get('teams', [])
-
-def get_players_from_team(team_id: int):
-    """Получает состав команды по её ID."""
-    url = f"{BASE_URL}/teams/{team_id}"
-    response = requests.get(url, headers=HEADERS)
-    
-    if response.status_code != 200:
-        return []
-    
-    team_data = response.json()
-    return team_data.get('squad', [])
-
-def seed_database():
+def seed_from_csv():
     db = Session(engine)
     
-    for comp_code, comp_name in COMPETITIONS.items():
-        print(f"\n--- Загрузка данных для: {comp_name} ---")
-        teams = get_teams_from_competition(comp_code)
-        
-        for team_data in teams:
-            team_name = team_data.get('name')
-            team_id = team_data.get('id')
-            if not team_name or not team_id:
-                continue
-            
-            # Проверяем, есть ли уже такой клуб в базе
-            existing_club = db.query(Club).filter_by(name=team_name).first()
-            if not existing_club:
-                new_club = Club(name=team_name, league=comp_name)
-                db.add(new_club)
-                db.commit()
-                db.refresh(new_club)
-                print(f"  Добавлен клуб: {new_club.name}")
-                
-                # Загружаем игроков
-                players = get_players_from_team(team_id)
-                for player_data in players:
-                    player_name = player_data.get('name')
-                    if not player_name:
-                        continue
-                    
-                    existing_player = db.query(Player).filter_by(name=player_name).first()
-                    if not existing_player:
-                        new_player = Player(
-                            name=player_name,
-                            position=player_data.get('position', 'Unknown'),
-                            rating=70, # У football-data.org нет рейтинга в бесплатной версии, ставим базовый
-                            club_id=new_club.id
-                        )
-                        db.add(new_player)
-                        print(f"    Добавлен игрок: {new_player.name}")
-                
-                db.commit()
-                
-                # ВАЖНО: Пауза 6.5 секунд, чтобы не превысить лимит 10 запросов в минуту
-                print("  Ожидание 6.5 секунд (лимит API)...")
-                time.sleep(6.5)
-            else:
-                print(f"  Клуб {team_name} уже есть в базе, пропускаем.")
+    print("Чтение players.csv...")
+    df = pd.read_csv("players.csv")
     
+    # 1. Фильтр: только мужской футбол
+    df = df[df['gender'] == "Men's Football"]
+    
+    # 2. Исключаем ЛЧ и турниры сборных (на случай, если они там есть)
+    exclude_leagues = ['UEFA Champions League', 'FIFA World Cup', 'European Championship']
+    df = df[~df['league'].isin(exclude_leagues)]
+    
+    print("Создание клубов и лиг...")
+    # Создаем клубы, чтобы у них были ID
+    clubs_data = df[['club', 'league']].drop_duplicates()
+    club_map = {}
+    
+    for _, row in clubs_data.iterrows():
+        if pd.isna(row['club']): continue
+        club_name = str(row['club']).strip()
+        league_name = str(row['league']).strip()
+        
+        existing = db.query(Club).filter_by(name=club_name).first()
+        if not existing:
+            new_club = Club(name=club_name, league=league_name)
+            db.add(new_club)
+            db.commit()
+            db.refresh(new_club)
+            club_map[club_name] = new_club.id
+        else:
+            club_map[club_name] = existing.id
+            
+    print(f"Добавлено клубов: {len(club_map)}")
+    
+    print("Добавление игроков (это займет около минуты)...")
+    count = 0
+    for _, row in df.iterrows():
+        if pd.isna(row['club']): continue
+        club_name = str(row['club']).strip()
+        club_id = club_map.get(club_name)
+        if not club_id: continue
+        
+        # Имя (используем common_name, если есть, иначе имя+фамилия)
+        if pd.notna(row['common_name']):
+            name = str(row['common_name']).strip()
+        else:
+            name = f"{row['first_name']} {row['last_name']}".strip()
+            
+        # Считаем возраст из даты рождения (формат DD-MM-YYYY)
+        birthdate_str = row.get('birthdate')
+        age = 0
+        if pd.notna(birthdate_str):
+            try:
+                birthdate = datetime.strptime(birthdate_str, '%d-%m-%Y')
+                age = 2026 - birthdate.year # Считаем возраст на текущий год игры
+            except:
+                pass
+        
+        # Безопасное извлечение характеристик (чтобы не было ошибок, если ячейка пустая)
+        def get_val(col):
+            val = row.get(col)
+            return int(val) if pd.notna(val) else 0
+
+        new_player = Player(
+            player_id=int(row['player_id']),
+            name=name,
+            position=str(row['position']),
+            overall_rating=int(row['overall_rating']),
+            age=age,
+            nationality=str(row['nationality']),
+            club_id=club_id,
+            preferred_foot=str(row['preferred_foot']),
+            pace=get_val('pace'),
+            shooting=get_val('shooting'),
+            passing=get_val('passing'),
+            dribbling=get_val('dribbling'),
+            defending=get_val('defending'),
+            physicality=get_val('physicality'),
+            gk_diving=get_val('goalkeeping_diving'),
+            gk_handling=get_val('goalkeeping_handling'),
+            gk_kicking=get_val('goalkeeping_kicking'),
+            gk_positioning=get_val('goalkeeping_positioning'),
+            gk_reflexes=get_val('goalkeeping_reflexes')
+        )
+        db.add(new_player)
+        count += 1
+        
+        # Сохраняем пачками по 1000, чтобы не перегружать память
+        if count % 1000 == 0:
+            db.commit()
+            print(f"Добавлено {count} игроков...")
+    
+    db.commit()
     db.close()
-    print("\nЗагрузка данных завершена!")
+    print(f"ГОТОВО! Успешно загружено {count} игроков и {len(club_map)} клубов.")
 
 if __name__ == "__main__":
-    Base.metadata.create_all(bind=engine)
-    seed_database()
+    seed_from_csv()
