@@ -65,3 +65,24 @@ def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCreden
     
     background_tasks.add_task(run_seed_script)
     return {"message": "Загрузка данных запущена в фоновом режиме. Проверьте логи через пару минут."}
+
+# ... (ваш существующий код выше) ...
+
+def run_update_ratings():
+    print("Запуск скрипта update_ratings.py в фоне...")
+    result = subprocess.run([sys.executable, "update_ratings.py"], capture_output=True, text=True)
+    print("Скрипт обновления рейтингов завершён.")
+    print("Вывод (stdout):", result.stdout)
+    if result.stderr:
+        print("Ошибки (stderr):", result.stderr)
+
+@app.post("/admin/update-ratings")
+def trigger_update_ratings(background_tasks: BackgroundTasks, credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, "admin")
+    correct_password = secrets.compare_digest(credentials.password, "soccery_secret_2026")
+    
+    if not (correct_username and correct_password):
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+    
+    background_tasks.add_task(run_update_ratings)
+    return {"message": "Обновление рейтингов запущено в фоне. Проверьте логи."}
