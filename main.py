@@ -1,47 +1,33 @@
-import os
-from fastapi import FastAPI
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
+import subprocess
+import sys
 
-# 1. Подключаемся к базе данных
-# Берем ссылку, которую вы сохранили на Neon, из настроек Render (Environment Variables)
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# ... (ваш существующий код) ...
 
-# Небольшая хитрость: Neon иногда выдает ссылку, начинающуюся с postgres://, 
-# а SQLAlchemy требует postgresql://. Эта строчка исправляет это на лету.
-if DATABASE_URL:
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
-    elif DATABASE_URL.startswith("postgresql://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+# Добавляем в самый конец файла
+security = HTTPBasic()
 
-# Создаем движок базы данных
-engine = create_engine(DATABASE_URL)
+def run_seed_script():
+    """Запускает наш скрипт seed_data.py в фоне."""
+    print("Запуск скрипта seed_data.py в фоне...")
+    # Используем sys.executable, чтобы взять тот же Python из виртуального окружения
+    result = subprocess.run([sys.executable, "seed_data.py"], capture_output=True, text=True)
+    print("Скрипт завершён.")
+    print("Вывод (stdout):", result.stdout)
+    if result.stderr:
+        print("Ошибки (stderr):", result.stderr)
 
-# Создаем базовый класс для наших таблиц
-Base = declarative_base()
-
-# 2. Описываем наши первые таблицы (Модели)
-class Club(Base):
-    __tablename__ = "clubs"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    league = Column(String)
-
-class Player(Base):
-    __tablename__ = "players"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    position = Column(String)
-    rating = Column(Integer)
-    club_id = Column(Integer, ForeignKey("clubs.id")) # Привязка игрока к клубу
-
-# 3. Создаем таблицы в базе данных (если их еще нет)
-Base.metadata.create_all(bind=engine)
-
-# 4. Запускаем сам сервер
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Soccery 27: База данных подключена и таблицы созданы!"}
+@app.post("/admin/seed")
+def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCredentials = Depends(security)):
+    # Простая защита, чтобы никто посторонний не мог запустить скрипт
+    # В реальном проекте используйте более сложный пароль
+    correct_username = secrets.compare_digest(credentials.username, "admin")
+    correct_password = secrets.compare_digest(credentials.password, "soccery_secret_2026")
+    
+    if not (correct_username and correct_password):
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+    
+    background_tasks.add_task(run_seed_script)
+    return {"message": "Загрузка данных запущена в фоновом режиме. Проверьте логи на Render и данные в Neon через несколько минут."}
