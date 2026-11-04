@@ -16,12 +16,14 @@ charset-normalizer==3.5.2
 click==8.5.0
 colorama==0.4.6
 comm==0.2.3
+curl_cffi==0.17.0
 debugpy==1.8.22
 defusedxml==0.7.1
 executing==2.3.0
 fastapi==0.162.0
 fastjsonschema==2.22.2
 fqdn==1.6.0
+GetFootballData==0.2.0
 gitdb==4.0.12
 GitPython==3.2.1
 h11==0.16.0
@@ -60,8 +62,10 @@ nbdime==4.0.4
 nbformat==5.11.1
 nest-asyncio2==1.7.4
 notebook_shim==0.2.4
+numpy==2.5.4
 opentelemetry-api==1.45.2
 packaging==26.3
+pandas==3.1.0
 pandocfilters==1.5.1
 parso==0.8.7
 pexpect==4.9.0
@@ -96,6 +100,7 @@ starlette==1.10.0
 terminado==0.18.1
 tinycss2==1.5.1
 tornado==6.6
+tqdm==4.70.1
 traitlets==5.16.1
 typing-inspection==0.4.4
 typing_extensions==4.16.0
