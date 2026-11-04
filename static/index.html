@@ -198,24 +198,20 @@
 
         let allClubs = [];
 
-        // Умная функция создания безопасного имени файла (для картинок)
+        // Обновленная функция: сохраняет спецбуквы (ö, ü, ú), убирает только точки и апострофы
         function slugify(text) {
             if (!text) return "";
             return text
                 .toLowerCase()                   // Все буквы маленькие
-                .normalize("NFD")                // Разбиваем спецбуквы (ü, é)
-                .replace(/[\u0300-\u036f]/g, "") // Убираем хвостики от спецбукв (ü -> u, é -> e)
-                .replace(/['’]/g, '')            // Удаляем апострофы (McDonald's -> mcdonalds)
-                .replace(/[^a-z0-9\s-]/g, '')    // Удаляем точки и прочие символы
-                .trim()                          // Убираем пробелы по краям
-                .replace(/[\s_]+/g, '-')         // Пробелы меняем на дефисы
+                .replace(/['’\.]/g, '')          // Удаляем точки и апострофы (3. Liga -> 3 liga)
+                .replace(/\s+/g, '-')            // Пробелы меняем на дефисы
                 .replace(/-+/g, '-');            // Убираем двойные дефисы
         }
 
-        // Функция получения HTML для логотипа с заглушкой
+        // Обновленная функция логотипа: добавлен ?v=3 (это сбрасывает кэш Телеграма)
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png`;
+            const src = `/static/logos/${type}/${slug}.png?v=3`; 
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
