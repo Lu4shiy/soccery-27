@@ -198,32 +198,42 @@
 
         let allClubs = [];
 
-        // Обновленная функция: сохраняет спецбуквы (ö, ü, ú), убирает только точки и апострофы
+        // 1. Строгая функция: убирает ВСЕ спецсимволы, точки, апострофы и ударения (ö -> o, ú -> u)
         function slugify(text) {
             if (!text) return "";
             return text
-                .toLowerCase()                   // Все буквы маленькие
-                .replace(/['’\.]/g, '')          // Удаляем точки и апострофы (3. Liga -> 3 liga)
-                .replace(/\s+/g, '-')            // Пробелы меняем на дефисы
-                .replace(/-+/g, '-');            // Убираем двойные дефисы
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // Убирает умлауты и акценты
+                .replace(/['’\.]/g, '')          // Убирает точки и апострофы
+                .replace(/[^a-z0-9\s-]/g, '')    // Оставляет только буквы, цифры, пробелы и дефисы
+                .trim()
+                .replace(/[\s_]+/g, '-')         // Пробелы -> дефисы
+                .replace(/-+/g, '-');            // Убирает двойные дефисы
         }
 
-        // Функция для обработки ошибок загрузки картинки (сначала пробуем PNG, потом SVG, потом букву)
+        // 2. Умная проверка форматов: если нет PNG, ищем SVG, если нет SVG, ищем WEBP
         function handleImgError(img, type, slug, fallbackChar) {
-            if (img.src.indexOf('.svg') === -1) {
-                // Если PNG не загрузился, пробуем SVG
-                img.src = `/static/logos/${type}/${slug}.svg?v=6`;
+            const currentExt = img.src.split('.').pop().split('?')[0];
+            let nextSrc = '';
+            
+            if (currentExt === 'png') {
+                nextSrc = `/static/logos/${type}/${slug}.svg?v=7`;
+            } else if (currentExt === 'svg') {
+                nextSrc = `/static/logos/${type}/${slug}.webp?v=7`;
             } else {
-                // Если и SVG нет, показываем букву
+                // Если ничего не нашли — показываем букву
                 img.style.display = 'none';
                 img.nextElementSibling.style.display = 'block';
+                return;
             }
+            img.src = nextSrc;
         }
 
-        // Функция получения HTML для логотипа
+        // 3. Генерация HTML логотипа
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=6`; // Сначала ищем PNG
+            const src = `/static/logos/${type}/${slug}.png?v=7`; // Всегда начинаем с PNG
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
