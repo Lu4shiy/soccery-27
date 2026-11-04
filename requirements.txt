@@ -6,3 +6,4 @@ requests
 beautifulsoup4
 GetFootballData
 python-dotenv
+aiogram==3.15.0
