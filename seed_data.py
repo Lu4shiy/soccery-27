@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
@@ -55,6 +56,7 @@ def seed_database():
             if not team_name or not team_id:
                 continue
             
+            # Проверяем, есть ли уже такой клуб в базе
             existing_club = db.query(Club).filter_by(name=team_name).first()
             if not existing_club:
                 new_club = Club(name=team_name, league=comp_name)
@@ -80,8 +82,14 @@ def seed_database():
                         )
                         db.add(new_player)
                         print(f"    Добавлен игрок: {new_player.name}")
-        
-        db.commit()
+                
+                db.commit()
+                
+                # ВАЖНО: Пауза 6.5 секунд, чтобы не превысить лимит 10 запросов в минуту
+                print("  Ожидание 6.5 секунд (лимит API)...")
+                time.sleep(6.5)
+            else:
+                print(f"  Клуб {team_name} уже есть в базе, пропускаем.")
     
     db.close()
     print("\nЗагрузка данных завершена!")
