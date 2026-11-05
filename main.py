@@ -29,14 +29,12 @@ if DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-
 class Club(Base):
     __tablename__ = "clubs"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     league = Column(String, index=True)
     stars = Column(Float, default=3.0)
-
 
 class Player(Base):
     __tablename__ = "players"
@@ -49,7 +47,11 @@ class Player(Base):
     nationality = Column(String)
     club_id = Column(Integer, ForeignKey("clubs.id"))
     preferred_foot = Column(String)
-    market_value = Column(Integer, default=1000000)
+    
+    # ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ (чтобы не было ошибки 500)
+    market_value = Column(Integer, default=0)
+    wage = Column(Integer, default=0)
+    contract_until = Column(String, nullable=True)
 
     pace = Column(Integer)
     shooting = Column(Integer)
@@ -64,7 +66,6 @@ class Player(Base):
     gk_positioning = Column(Integer)
     gk_reflexes = Column(Integer)
 
-
 class Manager(Base):
     __tablename__ = "managers"
     id = Column(Integer, primary_key=True, index=True)
@@ -72,7 +73,6 @@ class Manager(Base):
     first_name = Column(String)
     club_id = Column(Integer, ForeignKey("clubs.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     coach_name = Column(String, nullable=True)
     coach_nationality = Column(String, nullable=True)
     coach_age = Column(Integer, nullable=True)
@@ -80,17 +80,14 @@ class Manager(Base):
     extra_budget = Column(Integer, nullable=True)
     is_setup_complete = Column(Integer, default=0)
 
-
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 security = HTTPBasic()
 
-
 def run_seed_script():
     result = subprocess.run([sys.executable, "seed_data.py"], capture_output=True, text=True)
     print("Вывод (stdout):", result.stdout)
-
 
 @app.get("/")
 def read_root():
@@ -102,7 +99,6 @@ def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCreden
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     background_tasks.add_task(run_seed_script)
     return {"message": "Загрузка данных запущена."}
-
 
 @app.get("/api/clubs")
 def get_clubs():
@@ -122,14 +118,12 @@ def get_clubs():
         return [
             {
                 "id": r.id, "name": r.name, "league": r.league, "stars": r.stars or 3.0,
-                "players": int(r.players or 0),
-                "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0,
+                "players": int(r.players or 0), "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0,
             }
             for r in rows
         ]
     finally:
         db.close()
-
 
 @app.get("/api/manager/{telegram_id}")
 def get_manager(telegram_id: str):
@@ -147,7 +141,6 @@ def get_manager(telegram_id: str):
     finally:
         db.close()
 
-
 class SelectClubRequest(BaseModel):
     telegram_id: str
     first_name: Optional[str] = None
@@ -161,7 +154,6 @@ def select_club(req: SelectClubRequest):
         if not club: raise HTTPException(status_code=404, detail="Клуб не найден")
         taken = db.query(Manager).filter(Manager.club_id == req.club_id, Manager.telegram_id != req.telegram_id).first()
         if taken: raise HTTPException(status_code=409, detail="Клуб занят")
-
         existing = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
         if existing:
             existing.club_id = req.club_id
@@ -173,7 +165,6 @@ def select_club(req: SelectClubRequest):
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
         db.close()
-
 
 class SaveSettingsRequest(BaseModel):
     telegram_id: str
@@ -200,7 +191,6 @@ def save_settings(req: SaveSettingsRequest):
     finally:
         db.close()
 
-
 @app.delete("/api/reset-club/{telegram_id}")
 def reset_club(telegram_id: str):
     db = Session(engine)
@@ -213,7 +203,6 @@ def reset_club(telegram_id: str):
     finally:
         db.close()
 
-
 @app.get("/api/clubs/{club_id}/players")
 def get_club_players(club_id: int):
     db = Session(engine)
@@ -221,22 +210,14 @@ def get_club_players(club_id: int):
         players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
         result = []
         for p in players:
-            # Если данных нет, ставим дефолтные значения
-            wage = p.wage if p.wage else 0
-            contract_until = p.contract_until if p.contract_until else None
-            
             result.append({
                 "id": p.id, "name": p.name, "position": p.position, "age": p.age,
                 "overall": p.overall_rating, "nationality": p.nationality,
                 "market_value": p.market_value or 0,
-                "wage": wage,
-                "contract_until": contract_until,
-                
-                # Статы полевых
+                "wage": p.wage or 0,
+                "contract_until": p.contract_until,
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
                 "dribbling": p.dribbling or 50, "defending": p.defending or 50, "physicality": p.physicality or 50,
-                
-                # Статы вратарей
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10, 
                 "gk_kicking": p.gk_kicking or 10, "gk_positioning": p.gk_positioning or 10, 
                 "gk_reflexes": p.gk_reflexes or 10
@@ -244,7 +225,6 @@ def get_club_players(club_id: int):
         return result
     finally:
         db.close()
-
 
 # --- TELEGRAM БОТ ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")

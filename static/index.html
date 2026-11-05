@@ -693,8 +693,12 @@
 
             try {
                 const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(`Сервер ответил: ${res.status}. ${errorText.substring(0, 30)}...`);
+                }
                 const players = await res.json();
-                if (!players.length) {
+                if (!players || !players.length) {
                     listContainer.innerHTML = `<p style="text-align:center;">Нет игроков.</p>`; return;
                 }
 
