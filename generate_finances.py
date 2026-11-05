@@ -1,5 +1,5 @@
 import random
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, Session
 
 # --- НАСТРОЙКА БАЗЫ ДАННЫХ ---
@@ -12,6 +12,12 @@ elif DATABASE_URL.startswith("postgresql://"):
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
+class Club(Base):
+    __tablename__ = "clubs"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    league = Column(String)
+
 class Player(Base):
     __tablename__ = "players"
     id = Column(Integer, primary_key=True)
@@ -19,75 +25,96 @@ class Player(Base):
     position = Column(String)
     overall_rating = Column(Integer)
     age = Column(Integer)
+    club_id = Column(Integer, ForeignKey("clubs.id"))
     market_value = Column(Integer)
     wage = Column(Integer)
     contract_until = Column(String)
 
+def get_league_multiplier(league_name):
+    """Коэффициент престижа лиги"""
+    if not league_name: return 0.15
+    l = league_name.lower()
+    if "premier league" in l or "laliga" in l or "la liga" in l:
+        return 1.5   # АПЛ и ЛаЛига (самые богатые)
+    elif "bundesliga" in l or "serie a" in l or "ligue 1" in l:
+        return 1.1   # Топ-5
+    elif "championship" in l or "eredivisie" in l or "portugal" in l or "mls" in l or "saudi" in l:
+        return 0.7   # Средние лиги
+    else:
+        return 0.15  # Остальные (Индия, Австралия и т.д.)
+
 def generate_finances():
     db = Session(engine)
-    players = db.query(Player).all()
-    print(f"📊 Найдено {len(players)} игроков. Генерируем реалистичные финансы...")
+    # Загружаем игроков вместе с информацией об их лиге
+    players_with_clubs = db.query(Player, Club).join(Club, Player.club_id == Club.id).all()
+    print(f"📊 Найдено {len(players_with_clubs)} игроков. Генерируем реалистичные финансы...")
 
     current_year = 2026
     updated = 0
 
-    for p in players:
+    for p, club in players_with_clubs:
         ovr = p.overall_rating or 50
         age = p.age or 25
         pos = p.position or ""
-
-        # 1. РАСЧЕТ СТОИМОСТИ (Market Value)
-        # Степень 4 делает топов нереально дорогими (OVR 91 = ~130млн базы)
-        base_value = ((ovr - 40) ** 4) * 20 
         
+        # 1. РАСЧЕТ СТОИМОСТИ (Market Value)
+        # Экспоненциальная кривая: 59 OVR ~ 20к, 75 OVR ~ 3.5млн, 91 OVR ~ 90млн
+        base_value = 2000 * (1.3 ** (ovr - 50))
+        
+        # Коэффициент лиги
+        league_mult = get_league_multiplier(club.league)
+
         # Коэффициент позиции
         if "Goalkeeper" in pos:
-            pos_mult = 0.4  # Вратари дешевле
+            pos_mult = 0.4
         elif "Back" in pos:
-            pos_mult = 0.8  # Защитники
+            pos_mult = 0.8
         elif "Midfield" in pos:
-            pos_mult = 1.0  # Полузащита
+            pos_mult = 1.0
         else:
-            pos_mult = 1.25 # Нападающие и Вингеры (самые дорогие)
+            pos_mult = 1.2 # Нападающие
 
         # Возрастной коэффициент
         if age <= 20:
-            age_mult = 1.6   # Огромный потенциал (молодые дороже)
+            age_mult = 1.5
         elif age <= 23:
-            age_mult = 1.3   
+            age_mult = 1.2
         elif age <= 27:
-            age_mult = 1.0   # Пик
+            age_mult = 1.0
         elif age <= 30:
-            age_mult = 0.6   # Начало спада
+            age_mult = 0.6
         elif age <= 33:
-            age_mult = 0.3   
+            age_mult = 0.3
         else:
-            age_mult = 0.1   # Ветераны
+            age_mult = 0.1
 
-        market_value = int(base_value * age_mult * pos_mult)
+        market_value = int(base_value * league_mult * pos_mult * age_mult)
         
-        # Минимальная цена 50к, чтобы не было нулей
-        if market_value < 50000: market_value = 50000
-        # Округляем до 100 тысяч
-        market_value = round(market_value / 100000) * 100000
+        # Ограничения (минимум 10к, максимум 250кк)
+        if market_value < 10000: market_value = 10000
+        if market_value > 250000000: market_value = 250000000
+        # Округляем до 10 тысяч
+        market_value = round(market_value / 10000) * 10000
 
         # 2. РАСЧЕТ ЗАРПЛАТЫ (Wage в неделю, в долларах)
-        # Берем рейтинг в степени 3.5 и делим на 30
-        random.seed(p.id) # Чтобы разброс был стабильным при перезапуске
-        base_wage = (ovr ** 3.5) / 30
-        # Добавляем разброс от 0.85 до 1.15 (чтобы у игроков с одинаковым рейтингом была разная ЗП)
-        wage = int(base_wage * random.uniform(0.85, 1.15))
+        # База от рейтинга в кубе
+        random.seed(p.id) # Стабильный рандом
+        base_wage = ((ovr - 40) ** 3) * 1.5
+        wage = int(base_wage * random.uniform(0.8, 1.2))
         
-        # Минималка 2к в неделю
-        wage = max(2000, wage)
-        # Округляем до 1000
-        wage = round(wage / 1000) * 1000
+        # Минималка 1000$, округляем до 500
+        wage = max(1000, wage)
+        wage = round(wage / 500) * 500
 
         # 3. РАСЧЕТ КОНТРАКТА
-        if age <= 23:
-            years_left = random.randint(3, 5)
-        elif age <= 29:
+        if age <= 20:
+            years_left = random.randint(4, 5)
+        elif age <= 23:
+            years_left = random.randint(3, 4)
+        elif age <= 27:
             years_left = random.randint(2, 4)
+        elif age <= 30:
+            years_left = random.randint(2, 3)
         else:
             years_left = random.randint(1, 2)
             
