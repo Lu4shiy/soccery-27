@@ -748,7 +748,10 @@
             document.getElementById("pd-age").innerText = p.age + " лет";
             document.getElementById("pd-nat").innerHTML = `${getPlayerFlagImg(p.nationality)} ${p.nationality}`;
             document.getElementById("pd-value").innerText = formatMoney(p.market_value);
-            document.getElementById("pd-wage").innerText = formatMoney(p.wage) + " / нед.";
+            
+            // Форматируем ЗП (в тыс $)
+            const wageK = p.wage ? (p.wage / 1000).toFixed(0) + " тыс. $" : "Неизвестно";
+            document.getElementById("pd-wage").innerText = wageK + " / нед.";
 
             // Логика контракта (отсчет от 1 августа 2026)
             let contractText = "Неизвестно";
@@ -757,7 +760,6 @@
                 const endDate = new Date(p.contract_until);
                 
                 if (endDate > startDate) {
-                    // Считаем разницу в месяцах
                     let months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
                     months -= startDate.getMonth();
                     months += endDate.getMonth();
@@ -778,9 +780,6 @@
             }
             document.getElementById("pd-contract").innerText = contractText;
 
-            // Зарплата теперь отображается как есть (в неделю)
-            document.getElementById("pd-wage").innerText = p.wage > 0 ? formatMoney(p.wage) + " / нед." : "Неизвестно";
-            
             // Логика статов (Вратари vs Полевые)
             const isGK = p.position.includes("Goalkeeper") || p.position === "GK";
             let stats = [];
