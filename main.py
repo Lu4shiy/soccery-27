@@ -63,7 +63,6 @@ class Player(Base):
     gk_reflexes = Column(Integer)
 
 
-# НОВОЕ: таблица менеджеров (кто какой клуб взял)
 class Manager(Base):
     __tablename__ = "managers"
     id = Column(Integer, primary_key=True, index=True)
@@ -71,6 +70,14 @@ class Manager(Base):
     first_name = Column(String)
     club_id = Column(Integer, ForeignKey("clubs.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Новые поля
+    coach_name = Column(String, nullable=True)
+    coach_nationality = Column(String, nullable=True)
+    coach_age = Column(Integer, nullable=True)
+    negotiation_difficulty = Column(String, nullable=True)
+    extra_budget = Column(Integer, nullable=True)
+    is_setup_complete = Column(Integer, default=0)
 
 
 Base.metadata.create_all(bind=engine)
@@ -103,11 +110,23 @@ def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCreden
     return {"message": "Загрузка данных из FC27 запущена. Проверьте логи."}
 
 
-# ============ НОВЫЕ API ДЛЯ ФРОНТЕНДА ============
+# Функция расчета звезд на основе среднего рейтинга
+def calc_stars(avg_ovr):
+    if not avg_ovr: return 0.5
+    if avg_ovr >= 79: return 5.0
+    if avg_ovr >= 77: return 4.5
+    if avg_ovr >= 75: return 4.0
+    if avg_ovr >= 73: return 3.5
+    if avg_ovr >= 71: return 3.0
+    if avg_ovr >= 69: return 2.5
+    if avg_ovr >= 67: return 2.0
+    if avg_ovr >= 65: return 1.5
+    if avg_ovr >= 63: return 1.0
+    return 0.5
+
 
 @app.get("/api/clubs")
 def get_clubs():
-    """Возвращает все клубы + количество игроков и средний рейтинг."""
     db = Session(engine)
     try:
         rows = (
@@ -128,6 +147,7 @@ def get_clubs():
                 "league": r.league,
                 "players": int(r.players or 0),
                 "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0,
+                "stars": calc_stars(float(r.avg_ovr) if r.avg_ovr else 0)
             }
             for r in rows
         ]
@@ -137,7 +157,6 @@ def get_clubs():
 
 @app.get("/api/manager/{telegram_id}")
 def get_manager(telegram_id: str):
-    """Есть ли у пользователя уже выбранный клуб."""
     db = Session(engine)
     try:
         m = db.query(Manager).filter_by(telegram_id=telegram_id).first()
@@ -151,9 +170,92 @@ def get_manager(telegram_id: str):
             "club_id": club.id,
             "club_name": club.name,
             "league": club.league,
+            "is_setup_complete": bool(m.is_setup_complete),
+            "coach_name": m.coach_name
         }
     finally:
         db.close()
+
+
+class SelectClubRequest(BaseModel):
+    telegram_id: str
+    first_name: Optional[str] = None
+    club_id: int
+
+
+@app.post("/api/select-club")
+def select_club(req: SelectClubRequest):
+    db = Session(engine)
+    try:
+        club = db.query(Club).filter_by(id=req.club_id).first()
+        if not club:
+            raise HTTPException(status_code=404, detail="Клуб не найден")
+
+        taken = db.query(Manager).filter(
+            Manager.club_id == req.club_id,
+            Manager.telegram_id != req.telegram_id,
+        ).first()
+        if taken:
+            raise HTTPException(status_code=409, detail="Этот клуб уже занят другим менеджером")
+
+        existing = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
+        if existing:
+            existing.club_id = req.club_id
+            existing.first_name = req.first_name or existing.first_name
+            existing.is_setup_complete = 0 # Сбрасываем настройки при смене клуба
+        else:
+            db.add(Manager(
+                telegram_id=req.telegram_id,
+                first_name=req.first_name or "",
+                club_id=req.club_id,
+                is_setup_complete=0
+            ))
+        db.commit()
+        return {"status": "ok", "club_name": club.name, "league": club.league}
+    finally:
+        db.close()
+
+
+class SaveSettingsRequest(BaseModel):
+    telegram_id: str
+    coach_name: str
+    coach_nationality: str
+    coach_age: int
+    negotiation_difficulty: str
+    extra_budget: int
+
+@app.post("/api/save-settings")
+def save_settings(req: SaveSettingsRequest):
+    db = Session(engine)
+    try:
+        m = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
+        if not m:
+            raise HTTPException(status_code=404, detail="Менеджер не найден")
+        
+        m.coach_name = req.coach_name
+        m.coach_nationality = req.coach_nationality
+        m.coach_age = req.coach_age
+        m.negotiation_difficulty = req.negotiation_difficulty
+        m.extra_budget = req.extra_budget
+        m.is_setup_complete = 1
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+@app.delete("/api/reset-club/{telegram_id}")
+def reset_club(telegram_id: str):
+    db = Session(engine)
+    try:
+        manager = db.query(Manager).filter_by(telegram_id=telegram_id).first()
+        if manager:
+            db.delete(manager)
+            db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
 
 @app.get("/api/clubs/{club_id}/players")
 def get_club_players(club_id: int):
@@ -174,82 +276,11 @@ def get_club_players(club_id: int):
     finally:
         db.close()
 
-class SelectClubRequest(BaseModel):
-    telegram_id: str
-    first_name: Optional[str] = None
-    club_id: int
-
-
-@app.post("/api/select-club")
-def select_club(req: SelectClubRequest):
-    """Сохраняет выбор клуба за менеджером."""
-    db = Session(engine)
-    try:
-        club = db.query(Club).filter_by(id=req.club_id).first()
-        if not club:
-            raise HTTPException(status_code=404, detail="Клуб не найден")
-
-        taken = db.query(Manager).filter(
-            Manager.club_id == req.club_id,
-            Manager.telegram_id != req.telegram_id,
-        ).first()
-        if taken:
-            raise HTTPException(status_code=409, detail="Этот клуб уже занят другим менеджером")
-
-        existing = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
-        if existing:
-            existing.club_id = req.club_id
-            existing.first_name = req.first_name or existing.first_name
-        else:
-            db.add(Manager(
-                telegram_id=req.telegram_id,
-                first_name=req.first_name or "",
-                club_id=req.club_id,
-            ))
-        db.commit()
-        return {"status": "ok", "club_name": club.name, "league": club.league}
-    finally:
-        db.close()
-
-@app.delete("/api/reset-club/{telegram_id}")
-def reset_club(telegram_id: str):
-    db = Session(engine)
-    try:
-        manager = db.query(Manager).filter_by(telegram_id=telegram_id).first()
-        if manager:
-            db.delete(manager)
-            db.commit()
-        return {"status": "ok"}
-    finally:
-        db.close()
-
-@app.get("/api/clubs/{club_id}/players")
-def get_club_players(club_id: int):
-    """Возвращает состав клуба, отсортированный по рейтингу."""
-    db = Session(engine)
-    try:
-        players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
-        
-        result = []
-        for p in players:
-            result.append({
-                "id": p.id,
-                "name": p.name,
-                "position": p.position,
-                "age": p.age,
-                "overall": p.overall_rating,
-                "nationality": p.nationality
-            })
-        return result
-    finally:
-        db.close()
 
 # ============ TELEGRAM БОТ ============
-
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -263,20 +294,15 @@ async def cmd_start(message: types.Message):
         reply_markup=keyboard,
     )
 
-
 async def start_bot():
     await dp.start_polling(bot)
-
 
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(start_bot())
 
-
 # ============ РАЗДАЧА ФРОНТЕНДА ============
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 @app.get("/app")
 def read_index():
