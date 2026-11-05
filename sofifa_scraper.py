@@ -41,9 +41,7 @@ def parse_contract(contract_text):
 async def scrape_team_playwright(team_name):
     print(f"\n🔍 Запускаем браузер для клуба: '{team_name}'...")
     
-    # Используем новый синтаксис Stealth
     async with Stealth().use_async(async_playwright()) as p:
-        # Запускаем браузер с реалистичным User-Agent и скрытием автоматизации
         browser = await p.chromium.launch(
             headless=True,
             args=["--disable-blink-features=AutomationControlled"]
@@ -53,7 +51,6 @@ async def scrape_team_playwright(team_name):
             viewport={"width": 1920, "height": 1080}
         )
         page = await context.new_page()
-        
         print("🛡️ Stealth-режим активирован.")
 
         search_url = f"https://sofifa.com/teams?keyword={team_name}"
@@ -63,7 +60,6 @@ async def scrape_team_playwright(team_name):
             await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
             print("⏳ Ждем прохождения защиты Cloudflare (5 сек)...")
             await page.wait_for_timeout(5000) 
-            
             await page.wait_for_selector('table tbody tr', timeout=15000)
         except Exception as e:
             print(f"❌ Таблица поиска не появилась. Cloudflare снова блокирует. Ошибка: {e}")
@@ -93,7 +89,14 @@ async def scrape_team_playwright(team_name):
         if not rows:
             rows = await page.query_selector_all('table tbody tr')
 
-        print(f"📊 Найдено {len(rows)} строк. Сверяем с базой...")
+        print(f"📊 Найдено {len(rows)} строк. Выводим HTML первой строки для отладки...")
+        
+        # --- ОТЛАДОЧНЫЙ ВЫВОД HTML ПЕРВОЙ СТРОКИ ---
+        if rows:
+            first_row_html = await rows[0].inner_html()
+            print("\n--- HTML ПЕРВОЙ СТРОКИ ---")
+            print(first_row_html[:2000])  # Выводим первые 2000 символов
+            print("--------------------------\n")
         
         db = Session(engine)
         db_players = db.query(Player).all()
@@ -102,19 +105,36 @@ async def scrape_team_playwright(team_name):
 
         for row in rows:
             try:
+                # Пробуем несколько вариантов селекторов для имени
                 name_el = await row.query_selector('td.col-name a')
-                if not name_el: continue
+                if not name_el:
+                    name_el = await row.query_selector('td.col-name')
+                if not name_el:
+                    name_el = await row.query_selector('a[href*="/player/"]')
+                if not name_el: 
+                    print("  ⚠️ Не удалось найти элемент с именем в строке")
+                    continue
                 sofifa_name = (await name_el.inner_text()).strip()
                 if not sofifa_name: continue
 
+                # Пробуем несколько вариантов для цены, зарплаты, контракта
                 val_el = await row.query_selector('td[data-col="vl"]')
+                if not val_el: val_el = await row.query_selector('td.col-vl')
+                if not val_el: val_el = await row.query_selector('td[data-col="value"]')
+                
                 wage_el = await row.query_selector('td[data-col="wg"]')
+                if not wage_el: wage_el = await row.query_selector('td.col-wg')
+                if not wage_el: wage_el = await row.query_selector('td[data-col="wage"]')
+                
                 ct_el = await row.query_selector('td[data-col="tt"]')
+                if not ct_el: ct_el = await row.query_selector('td.col-tt')
+                if not ct_el: ct_el = await row.query_selector('td[data-col="ct"]')
 
                 value_text = (await val_el.inner_text()).strip() if val_el else ""
                 wage_text = (await wage_el.inner_text()).strip() if wage_el else ""
                 contract_text = (await ct_el.inner_text()).strip() if ct_el else ""
 
+                # Сопоставление имен
                 player = None
                 for p in db_players:
                     if sofifa_name.lower() in p.name.lower() or p.name.lower() in sofifa_name.lower():
@@ -138,7 +158,7 @@ async def scrape_team_playwright(team_name):
                 else:
                     print(f"  ❌ Нет в базе: '{sofifa_name}'")
             except Exception as e:
-                pass
+                print(f"  ⚠️ Ошибка обработки строки: {e}")
 
         db.commit()
         db.close()
