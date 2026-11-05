@@ -1,11 +1,12 @@
 import os
+import json
 import secrets
 import subprocess
 import sys
 import asyncio
 import random
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -47,8 +48,7 @@ class Player(Base):
     nationality = Column(String)
     club_id = Column(Integer, ForeignKey("clubs.id"))
     preferred_foot = Column(String)
-    
-    # ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ (чтобы не было ошибки 500)
+
     market_value = Column(Integer, default=0)
     wage = Column(Integer, default=0)
     contract_until = Column(String, nullable=True)
@@ -79,6 +79,19 @@ class Manager(Base):
     negotiation_difficulty = Column(String, nullable=True)
     extra_budget = Column(Integer, nullable=True)
     is_setup_complete = Column(Integer, default=0)
+
+# === НОВАЯ ТАБЛИЦА ДЛЯ ТАКТИКИ ===
+class Tactic(Base):
+    __tablename__ = "tactics"
+    id = Column(Integer, primary_key=True, index=True)
+    manager_id = Column(Integer, ForeignKey("managers.id"), index=True, unique=True)
+    formation = Column(String, default="4-3-3")
+    starting_xi = Column(String, default="[]")  # JSON-массив из 11 player_id (возможно null)
+    captain_id = Column(Integer, nullable=True)
+    free_kick_taker_id = Column(Integer, nullable=True)
+    corner_taker_id = Column(Integer, nullable=True)
+    penalty_taker_id = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
@@ -197,6 +210,8 @@ def reset_club(telegram_id: str):
     try:
         manager = db.query(Manager).filter_by(telegram_id=telegram_id).first()
         if manager:
+            # Удаляем тактику при удалении менеджера
+            db.query(Tactic).filter_by(manager_id=manager.id).delete()
             db.delete(manager)
             db.commit()
         return {"status": "ok"}
@@ -223,6 +238,71 @@ def get_club_players(club_id: int):
                 "gk_reflexes": p.gk_reflexes or 10
             })
         return result
+    finally:
+        db.close()
+
+# === ЭНДПОИНТЫ ТАКТИКИ ===
+
+@app.get("/api/tactics/{telegram_id}")
+def get_tactics(telegram_id: str):
+    db = Session(engine)
+    try:
+        m = db.query(Manager).filter_by(telegram_id=telegram_id).first()
+        if not m:
+            raise HTTPException(status_code=404, detail="Менеджер не найден")
+        t = db.query(Tactic).filter_by(manager_id=m.id).first()
+        if not t:
+            return {
+                "formation": "4-3-3",
+                "starting_xi": [],
+                "captain_id": None,
+                "free_kick_taker_id": None,
+                "corner_taker_id": None,
+                "penalty_taker_id": None,
+            }
+        try:
+            xi = json.loads(t.starting_xi or "[]")
+        except Exception:
+            xi = []
+        return {
+            "formation": t.formation or "4-3-3",
+            "starting_xi": xi,
+            "captain_id": t.captain_id,
+            "free_kick_taker_id": t.free_kick_taker_id,
+            "corner_taker_id": t.corner_taker_id,
+            "penalty_taker_id": t.penalty_taker_id,
+        }
+    finally:
+        db.close()
+
+class SaveTacticsRequest(BaseModel):
+    telegram_id: str
+    formation: str
+    starting_xi: List[Optional[int]]
+    captain_id: Optional[int] = None
+    free_kick_taker_id: Optional[int] = None
+    corner_taker_id: Optional[int] = None
+    penalty_taker_id: Optional[int] = None
+
+@app.post("/api/tactics")
+def save_tactics(req: SaveTacticsRequest):
+    db = Session(engine)
+    try:
+        m = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
+        if not m:
+            raise HTTPException(status_code=404, detail="Менеджер не найден")
+        t = db.query(Tactic).filter_by(manager_id=m.id).first()
+        if not t:
+            t = Tactic(manager_id=m.id)
+            db.add(t)
+        t.formation = req.formation
+        t.starting_xi = json.dumps(req.starting_xi)
+        t.captain_id = req.captain_id
+        t.free_kick_taker_id = req.free_kick_taker_id
+        t.corner_taker_id = req.corner_taker_id
+        t.penalty_taker_id = req.penalty_taker_id
+        db.commit()
+        return {"status": "ok"}
     finally:
         db.close()
 

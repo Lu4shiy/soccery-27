@@ -2,18 +2,19 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Soccery 27</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { touch-action: manipulation; }
         body {
-            font-family: -apple-system, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             background-color: #17212b;
             color: white;
             margin: 0;
             padding: 16px;
-            padding-bottom: 80px;
+            padding-bottom: 90px;
             min-height: 100vh;
         }
         h1 { color: #52a8ff; margin: 0 0 4px; text-align: center;}
@@ -39,6 +40,7 @@
             font-weight: bold;
             margin-top: 16px;
             cursor: pointer;
+            transition: background-color 0.15s;
         }
         .btn:active { background-color: #3b82c4; }
         .btn-back {
@@ -51,6 +53,18 @@
             margin-bottom: 12px;
             cursor: pointer;
         }
+        .btn-secondary {
+            background: #232e3c;
+            color: #52a8ff;
+            border: 1px solid #2f3b4d;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .btn-secondary:active { background: #2f3b4d; }
 
         /* --- НИЖНЕЕ МЕНЮ --- */
         .bottom-nav {
@@ -72,6 +86,8 @@
             flex-direction: column;
             align-items: center;
             gap: 4px;
+            flex: 1;
+            padding: 4px 0;
         }
         .nav-item.active { color: #52a8ff; font-weight: bold; }
         .nav-icon { font-size: 20px; }
@@ -175,6 +191,295 @@
         .detail-value { font-weight: bold; font-size: 14px; }
         .stat-bar-container { background: #17212b; height: 8px; border-radius: 4px; margin-top: 4px; overflow: hidden; }
         .stat-bar { background: #52a8ff; height: 100%; }
+
+        /* ============================= */
+        /* ===== ВКЛАДКА «СОСТАВ» ====== */
+        /* ============================= */
+        .tactics-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .tactics-topbar h2 { margin: 0; font-size: 20px; }
+        .formation-select {
+            background: #232e3c;
+            color: #fff;
+            border: 1px solid #52a8ff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3l3 3 3-3' stroke='%2352a8ff' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 26px;
+        }
+        .tactics-hint {
+            font-size: 11px;
+            color: #8e9eb5;
+            text-align: center;
+            margin: 0 0 10px;
+            min-height: 14px;
+            transition: color 0.2s;
+        }
+        .tactics-hint.active { color: #52a8ff; font-weight: bold; }
+
+        .pitch-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 3 / 4;
+            margin: 0 auto;
+            border-radius: 14px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #1f5130 0%, #2b6d3f 50%, #1f5130 100%);
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.35);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .pitch-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(180deg, transparent 0, transparent 9.09%, rgba(0,0,0,0.07) 9.09%, rgba(0,0,0,0.07) 18.18%);
+            pointer-events: none;
+        }
+        .pitch-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .pitch-center-circle {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 24%;
+            aspect-ratio: 1;
+            transform: translate(-50%, -50%);
+            border: 1.5px solid rgba(255,255,255,0.22);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .pitch-slot {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            z-index: 2;
+            transition: transform 0.15s;
+        }
+        .pitch-slot:active { transform: translate(-50%, -50%) scale(0.94); }
+
+        .slot-card {
+            width: clamp(38px, 11vw, 48px);
+            height: clamp(38px, 11vw, 48px);
+            border-radius: 50%;
+            background: rgba(23, 33, 43, 0.9);
+            border: 2px solid rgba(255,255,255,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 15px;
+            color: #fff;
+            position: relative;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .slot-card.empty {
+            background: rgba(23, 33, 43, 0.55);
+            border-style: dashed;
+            border-color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.6);
+            font-size: 22px;
+            font-weight: normal;
+        }
+        .slot-card.selected {
+            border-color: #52a8ff;
+            box-shadow: 0 0 0 3px rgba(82,168,255,0.5), 0 2px 8px rgba(0,0,0,0.5);
+            animation: slotPulse 1.2s ease-in-out infinite;
+        }
+        @keyframes slotPulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(82,168,255,0.4), 0 2px 8px rgba(0,0,0,0.5); }
+            50% { box-shadow: 0 0 0 5px rgba(82,168,255,0.15), 0 2px 8px rgba(0,0,0,0.5); }
+        }
+
+        .slot-ovr-badge {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #52a8ff;
+            color: #fff;
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: bold;
+            border: 1.5px solid #17212b;
+            min-width: 22px;
+            text-align: center;
+        }
+        .slot-ovr-badge.gold { background: #e6c544; color: #1a1a1a; }
+        .slot-ovr-badge.silver { background: #a3a3a3; color: #1a1a1a; }
+        .slot-ovr-badge.bronze { background: #b87d4b; color: #1a1a1a; }
+
+        .slot-role {
+            position: absolute;
+            top: -9px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            background: #52a8ff;
+            color: #fff;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: bold;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        .slot-name {
+            margin-top: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(23, 33, 43, 0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            max-width: 78px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+        .slot-name.empty { color: rgba(255,255,255,0.5); font-weight: normal; font-style: italic; }
+
+        .slot-captain-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #e6c544;
+            color: #1a1a1a;
+            font-size: 9px;
+            font-weight: bold;
+            padding: 1px 5px;
+            border-radius: 6px;
+            border: 1.5px solid #17212b;
+        }
+
+        /* Скамейка */
+        .bench-section { margin-top: 16px; }
+        .bench-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #8e9eb5;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .bench-title .bench-hint {
+            font-size: 11px;
+            color: #52a8ff;
+            font-weight: normal;
+        }
+        .bench-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 6px;
+        }
+        .bench-card {
+            background: #232e3c;
+            border-radius: 8px;
+            padding: 7px 9px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .bench-card:active { transform: scale(0.97); }
+        .bench-card.selected {
+            border-color: #52a8ff;
+            background: #2f3b4d;
+        }
+        .bench-card .ovr-mini {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 4px;
+            min-width: 24px;
+            text-align: center;
+        }
+        .bench-card .bench-name {
+            font-size: 12px;
+            font-weight: bold;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .bench-card .bench-pos {
+            font-size: 10px;
+            color: #8e9eb5;
+            background: #17212b;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        /* Стандарты */
+        .roles-section {
+            margin-top: 16px;
+            background: #232e3c;
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+        .roles-section h3 {
+            margin: 0 0 6px;
+            font-size: 14px;
+            color: #52a8ff;
+        }
+        .role-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #17212b;
+            gap: 10px;
+        }
+        .role-row:last-child { border-bottom: none; }
+        .role-label {
+            font-size: 13px;
+            color: #b9c5d4;
+            flex-shrink: 0;
+        }
+        .role-select {
+            background: #17212b;
+            color: #fff;
+            border: 1px solid #2f3b4d;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 12px;
+            max-width: 60%;
+            flex-shrink: 1;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3l3 3 3-3' stroke='%238e9eb5' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            padding-right: 22px;
+        }
+        .role-select:focus { border-color: #52a8ff; }
     </style>
 </head>
 <body>
@@ -336,9 +641,70 @@
         <h2>Спортивный центр</h2>
         <div class="card"><p>Новости, календарь и матчи появятся здесь.</p></div>
     </div>
+
+    <!-- ЭКРАН 10: СОСТАВ / ТАКТИКА -->
     <div id="screen-tactics" class="screen hidden">
-        <h2>Состав и Тактика</h2>
-        <div class="card"><p>Перетаскивание карточек, схемы и выбор капитана будут здесь.</p></div>
+        <div class="tactics-topbar">
+            <h2>📋 Состав</h2>
+            <select id="formation-select" class="formation-select">
+                <option value="4-3-3">4-3-3</option>
+                <option value="4-2-3-1">4-2-3-1</option>
+                <option value="4-4-2">4-4-2</option>
+                <option value="3-5-2">3-5-2</option>
+                <option value="5-3-2">5-3-2</option>
+                <option value="4-1-4-1">4-1-4-1</option>
+                <option value="4-3-1-2">4-3-1-2</option>
+            </select>
+        </div>
+
+        <div id="tactics-hint" class="tactics-hint">Нажмите на слот на поле или на игрока в запасе</div>
+
+        <div class="pitch-wrapper" id="pitch-wrapper">
+            <svg class="pitch-svg" viewBox="0 0 100 133" preserveAspectRatio="none">
+                <line x1="0" y1="66.5" x2="100" y2="66.5" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>
+                <rect x="20" y="0" width="60" height="20" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>
+                <rect x="37" y="0" width="26" height="7" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>
+                <rect x="20" y="113" width="60" height="20" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>
+                <rect x="37" y="126" width="26" height="7" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>
+            </svg>
+            <div class="pitch-center-circle"></div>
+            <div id="pitch-slots"></div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn-secondary" id="btn-auto-tactics" style="flex:1;">🤖 Авто-состав</button>
+            <button class="btn-secondary" id="btn-reset-tactics" style="flex:1;">↺ Сбросить</button>
+        </div>
+
+        <div class="bench-section">
+            <div class="bench-title">
+                <span>Запасные</span>
+                <span class="bench-hint" id="bench-count">0</span>
+            </div>
+            <div id="bench-list" class="bench-grid"></div>
+        </div>
+
+        <div class="roles-section">
+            <h3>🎯 Стандарты и капитан</h3>
+            <div class="role-row">
+                <span class="role-label">Капитан</span>
+                <select id="role-captain" class="role-select"></select>
+            </div>
+            <div class="role-row">
+                <span class="role-label">Штрафные</span>
+                <select id="role-fk" class="role-select"></select>
+            </div>
+            <div class="role-row">
+                <span class="role-label">Угловые</span>
+                <select id="role-corner" class="role-select"></select>
+            </div>
+            <div class="role-row">
+                <span class="role-label">Пенальти</span>
+                <select id="role-penalty" class="role-select"></select>
+            </div>
+        </div>
+
+        <button class="btn" id="btn-save-tactics">💾 Сохранить состав</button>
     </div>
 
     <!-- НИЖНЕЕ МЕНЮ -->
@@ -364,6 +730,7 @@
         let currentStars = 0.5;
         let leaguesScrollPos = 0;
         let selectedNationality = "Россия";
+        let managerSetupComplete = false; // ← фикс бага
 
         const countriesList = [
             { n: "Австралия", c: "au" }, { n: "Австрия", c: "at" }, { n: "Азербайджан", c: "az" }, { n: "Албания", c: "al" },
@@ -534,6 +901,7 @@
                     currentClubName = data.club_name;
                     currentLeague = data.league;
                     currentStars = data.stars;
+                    managerSetupComplete = !!data.is_setup_complete; // ← запомнили статус
                     showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
                     return true;
                 }
@@ -572,8 +940,6 @@
             leaguesScrollPos = window.scrollY;
             document.getElementById("selected-league-title").innerText = league;
             let filtered = allClubs.filter(c => c.league === league);
-            
-            // СОРТИРОВКА ПО АЛФАВИТУ
             filtered.sort((a, b) => a.name.localeCompare(b.name));
 
             const list = document.getElementById("clubs-list");
@@ -615,6 +981,7 @@
                 });
                 const data = await res.json();
                 if (!res.ok) { tg.showAlert(data.detail || "Ошибка при выборе"); return; }
+                managerSetupComplete = false;
                 showConfirm(data.club_name, data.league, stars, true, parseInt(clubId, 10));
             } catch (e) { tg.showAlert("Сетевая ошибка"); }
         }
@@ -679,12 +1046,23 @@
                     })
                 });
                 if (res.ok) {
+                    managerSetupComplete = true;
                     document.getElementById("bottom-nav").classList.remove("hidden");
                     loadSquad();
                 } else tg.showAlert("Ошибка сохранения");
             } catch(e) { tg.showAlert("Сетевая ошибка"); }
         }
 
+        // === ОБЩАЯ ЗАГРУЗКА ИГРОКОВ ===
+        async function ensurePlayersLoaded() {
+            if (window.currentPlayers && window.currentPlayers.length) return window.currentPlayers;
+            const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
+            const players = await res.json();
+            window.currentPlayers = players;
+            return players;
+        }
+
+        // === ОФИС ===
         async function loadSquad() {
             const listContainer = document.getElementById("squad-list");
             listContainer.innerHTML = `<p style="text-align:center;">⏳ Загружаем игроков...</p>`;
@@ -692,13 +1070,11 @@
             switchTab('office');
 
             try {
-                const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
-                const players = await res.json();
+                const players = await ensurePlayersLoaded();
                 if (!players || !players.length) {
                     listContainer.innerHTML = `<p style="text-align:center;">Нет игроков.</p>`; return;
                 }
 
-                // --- СОРТИРОВКА ПО ПОЗИЦИЯМ ---
                 const order = {
                     "Goalkeeper": 1, "GK": 1,
                     "Left Back": 2, "LWB": 2, "LB": 2,
@@ -739,9 +1115,8 @@
                     const wA = getPosWeight(a.position);
                     const wB = getPosWeight(b.position);
                     if (wA !== wB) return wA - wB;
-                    return b.overall - a.overall; // От лучшего к худшему внутри позиции
+                    return b.overall - a.overall;
                 });
-                // ------------------------------
 
                 listContainer.innerHTML = players.map(p => {
                     let ovrClass = "ovr-bronze";
@@ -771,8 +1146,6 @@
                         </div>
                     `;
                 }).join("");
-                
-                window.currentPlayers = players;
             } catch (e) {
                 listContainer.innerHTML = `<p style="text-align:center; color:#ff6b6b;">Ошибка: ${e.message}</p>`;
             }
@@ -790,11 +1163,9 @@
             document.getElementById("pd-nat").innerHTML = `${getPlayerFlagImg(p.nationality)} ${p.nationality}`;
             document.getElementById("pd-value").innerText = formatMoney(p.market_value);
             
-            // Форматируем ЗП (в тыс $)
             const wageK = p.wage ? (p.wage / 1000).toFixed(0) + " тыс. $" : "Неизвестно";
-            document.getElementById("pd-wage").innerText = wageK + " / мес.";
+            document.getElementById("pd-wage").innerText = wageK + " / нед.";
 
-            // Логика контракта (отсчет от 1 августа 2026)
             let contractText = "Неизвестно";
             if (p.contract_until) {
                 const startDate = new Date('2026-08-01');
@@ -821,7 +1192,6 @@
             }
             document.getElementById("pd-contract").innerText = contractText;
 
-            // Логика статов (Вратари vs Полевые)
             const isGK = p.position.includes("Goalkeeper") || p.position === "GK";
             let stats = [];
 
@@ -864,9 +1234,504 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById('nav-' + tabId).classList.add('active');
             showScreen(tabId);
+            if (tabId === 'tactics') {
+                loadTactics();
+            }
             window.scrollTo(0, 0);
         }
 
+        // ========================================
+        // ============ ВКЛАДКА «СОСТАВ» ==========
+        // ========================================
+        const FORMATIONS = {
+            "4-3-3": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LB",  x: 12, y: 76 },
+                { role: "CB",  x: 35, y: 78 },
+                { role: "CB",  x: 65, y: 78 },
+                { role: "RB",  x: 88, y: 76 },
+                { role: "CM",  x: 30, y: 55 },
+                { role: "CM",  x: 50, y: 55 },
+                { role: "CM",  x: 70, y: 55 },
+                { role: "LW",  x: 20, y: 28 },
+                { role: "ST",  x: 50, y: 22 },
+                { role: "RW",  x: 80, y: 28 },
+            ],
+            "4-2-3-1": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LB",  x: 12, y: 78 },
+                { role: "CB",  x: 35, y: 80 },
+                { role: "CB",  x: 65, y: 80 },
+                { role: "RB",  x: 88, y: 78 },
+                { role: "CDM", x: 35, y: 62 },
+                { role: "CDM", x: 65, y: 62 },
+                { role: "LM",  x: 20, y: 42 },
+                { role: "CAM", x: 50, y: 42 },
+                { role: "RM",  x: 80, y: 42 },
+                { role: "ST",  x: 50, y: 22 },
+            ],
+            "4-4-2": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LB",  x: 12, y: 78 },
+                { role: "CB",  x: 35, y: 80 },
+                { role: "CB",  x: 65, y: 80 },
+                { role: "RB",  x: 88, y: 78 },
+                { role: "LM",  x: 15, y: 52 },
+                { role: "CM",  x: 38, y: 52 },
+                { role: "CM",  x: 62, y: 52 },
+                { role: "RM",  x: 85, y: 52 },
+                { role: "ST",  x: 35, y: 24 },
+                { role: "ST",  x: 65, y: 24 },
+            ],
+            "3-5-2": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "CB",  x: 28, y: 80 },
+                { role: "CB",  x: 50, y: 82 },
+                { role: "CB",  x: 72, y: 80 },
+                { role: "LWB", x: 10, y: 58 },
+                { role: "CM",  x: 33, y: 58 },
+                { role: "CM",  x: 50, y: 60 },
+                { role: "CM",  x: 67, y: 58 },
+                { role: "RWB", x: 90, y: 58 },
+                { role: "ST",  x: 35, y: 24 },
+                { role: "ST",  x: 65, y: 24 },
+            ],
+            "5-3-2": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LWB", x: 8,  y: 76 },
+                { role: "CB",  x: 28, y: 80 },
+                { role: "CB",  x: 50, y: 82 },
+                { role: "CB",  x: 72, y: 80 },
+                { role: "RWB", x: 92, y: 76 },
+                { role: "CM",  x: 30, y: 54 },
+                { role: "CM",  x: 50, y: 56 },
+                { role: "CM",  x: 70, y: 54 },
+                { role: "ST",  x: 35, y: 24 },
+                { role: "ST",  x: 65, y: 24 },
+            ],
+            "4-1-4-1": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LB",  x: 12, y: 78 },
+                { role: "CB",  x: 35, y: 80 },
+                { role: "CB",  x: 65, y: 80 },
+                { role: "RB",  x: 88, y: 78 },
+                { role: "CDM", x: 50, y: 62 },
+                { role: "LM",  x: 15, y: 44 },
+                { role: "CM",  x: 38, y: 44 },
+                { role: "CM",  x: 62, y: 44 },
+                { role: "RM",  x: 85, y: 44 },
+                { role: "ST",  x: 50, y: 22 },
+            ],
+            "4-3-1-2": [
+                { role: "GK",  x: 50, y: 92 },
+                { role: "LB",  x: 12, y: 78 },
+                { role: "CB",  x: 35, y: 80 },
+                { role: "CB",  x: 65, y: 80 },
+                { role: "RB",  x: 88, y: 78 },
+                { role: "CM",  x: 30, y: 60 },
+                { role: "CM",  x: 50, y: 62 },
+                { role: "CM",  x: 70, y: 60 },
+                { role: "CAM", x: 50, y: 42 },
+                { role: "ST",  x: 35, y: 24 },
+                { role: "ST",  x: 65, y: 24 },
+            ],
+        };
+
+        let tacticsState = {
+            formation: "4-3-3",
+            starting_xi: [], // массив из 11 player_id (или null)
+            captain_id: null,
+            free_kick_taker_id: null,
+            corner_taker_id: null,
+            penalty_taker_id: null,
+        };
+        let tacticsLoaded = false;
+        let selectedSlotIndex = null;
+        let selectedBenchPlayerId = null;
+
+        function getPlayerById(id) {
+            if (!window.currentPlayers) return null;
+            return window.currentPlayers.find(p => p.id === id);
+        }
+
+        function shortPosOf(pos) {
+            if (!pos) return "—";
+            const p = pos.toLowerCase();
+            if (p.includes("goalkeeper") || p === "gk") return "GK";
+            if (p.includes("left back") || p === "lb" || p.includes("left wing back")) return "LB";
+            if (p.includes("right back") || p === "rb" || p.includes("right wing back")) return "RB";
+            if (p.includes("centre-back") || p.includes("center-back") || p === "cb") return "CB";
+            if (p.includes("defensive mid") || p === "cdm") return "CDM";
+            if (p.includes("attacking mid") || p === "cam") return "CAM";
+            if (p.includes("left mid") || p === "lm") return "LM";
+            if (p.includes("right mid") || p === "rm") return "RM";
+            if (p.includes("central mid") || p === "cm") return "CM";
+            if (p.includes("left wing") || p === "lw") return "LW";
+            if (p.includes("right wing") || p === "rw") return "RW";
+            if (p.includes("striker") || p === "st") return "ST";
+            if (p.includes("forward") || p === "cf") return "CF";
+            return pos.slice(0, 3).toUpperCase();
+        }
+
+        function ovrClass(ovr) {
+            if (ovr >= 75) return "gold";
+            if (ovr >= 65) return "silver";
+            return "bronze";
+        }
+
+        function positionFitScore(playerPos, slotRole) {
+            const p = (playerPos || "").toLowerCase();
+            const r = (slotRole || "").toUpperCase();
+            const direct = () => {
+                if (r === "GK")  return p.includes("goalkeeper") || p === "gk";
+                if (r === "CB")  return p.includes("centre-back") || p.includes("center-back") || p === "cb";
+                if (r === "LB")  return p.includes("left back") || p === "lb" || p.includes("left wing back");
+                if (r === "RB")  return p.includes("right back") || p === "rb" || p.includes("right wing back");
+                if (r === "LWB") return p.includes("left wing back") || p.includes("left back") || p === "lwb" || p === "lb";
+                if (r === "RWB") return p.includes("right wing back") || p.includes("right back") || p === "rwb" || p === "rb";
+                if (r === "CDM") return p.includes("defensive mid") || p === "cdm";
+                if (r === "CM")  return (p.includes("central midfield") && !p.includes("attacking") && !p.includes("defensive")) || p === "cm";
+                if (r === "CAM") return p.includes("attacking mid") || p === "cam";
+                if (r === "LM")  return p.includes("left mid") || p === "lm";
+                if (r === "RM")  return p.includes("right mid") || p === "rm";
+                if (r === "LW")  return p.includes("left wing") || p === "lw";
+                if (r === "RW")  return p.includes("right wing") || p === "rw";
+                if (r === "ST")  return p.includes("striker") || p.includes("forward") || p === "st" || p === "cf";
+                return false;
+            };
+            if (direct()) return 100;
+
+            const familyOf = (pp) => {
+                if (pp.includes("goalkeeper") || pp === "gk") return "GK";
+                if (pp.includes("back") || pp === "cb" || pp === "lb" || pp === "rb" || pp.includes("wing back")) return "DEF";
+                if (pp.includes("midfield") || pp === "cm" || pp === "cdm" || pp === "cam" || pp === "lm" || pp === "rm") return "MID";
+                return "ATT";
+            };
+            const slotFamily = {
+                GK:"GK", CB:"DEF", LB:"DEF", RB:"DEF", LWB:"DEF", RWB:"DEF",
+                CDM:"MID", CM:"MID", CAM:"MID", LM:"MID", RM:"MID",
+                LW:"ATT", RW:"ATT", ST:"ATT"
+            }[r];
+            // частичное совпадение: LW совместим с LM, ST с CAM и т.д.
+            if (r === "LW" && (p.includes("left mid") || p === "lm")) return 70;
+            if (r === "RW" && (p.includes("right mid") || p === "rm")) return 70;
+            if (r === "LM" && (p.includes("left wing") || p === "lw")) return 70;
+            if (r === "RM" && (p.includes("right wing") || p === "rw")) return 70;
+            if (r === "CAM" && (p === "cm" || p === "cf" || p === "st")) return 60;
+            if (r === "CM" && (p === "cam" || p === "cdm")) return 60;
+            if (r === "CDM" && p === "cm") return 60;
+            if (r === "CB" && (p === "lb" || p === "rb" || p.includes("defensive mid"))) return 40;
+            if (r === "ST" && p === "cam") return 50;
+
+            return familyOf(p) === slotFamily ? 40 : 0;
+        }
+
+        function autoAssignStartingXI(players) {
+            const formation = FORMATIONS[tacticsState.formation];
+            const availablePlayers = [...players].sort((a, b) => b.overall - a.overall);
+            const assigned = new Set();
+            const newXI = [];
+
+            for (const slot of formation) {
+                let best = null;
+                let bestScore = -1;
+                for (const p of availablePlayers) {
+                    if (assigned.has(p.id)) continue;
+                    const fit = positionFitScore(p.position, slot.role);
+                    const score = fit * 1000 + (p.overall || 0);
+                    if (score > bestScore) { bestScore = score; best = p; }
+                }
+                if (best) {
+                    newXI.push(best.id);
+                    assigned.add(best.id);
+                } else {
+                    newXI.push(null);
+                }
+            }
+            tacticsState.starting_xi = newXI;
+        }
+
+        async function loadTactics() {
+            if (!currentClubId) return;
+            try {
+                const players = await ensurePlayersLoaded();
+                if (!tacticsLoaded) {
+                    const res = await fetch(`${API_BASE}/api/tactics/${userId}`);
+                    let data = {};
+                    if (res.ok) data = await res.json();
+                    tacticsState.formation = data.formation || "4-3-3";
+                    tacticsState.starting_xi = Array.isArray(data.starting_xi) ? data.starting_xi : [];
+                    tacticsState.captain_id = data.captain_id || null;
+                    tacticsState.free_kick_taker_id = data.free_kick_taker_id || null;
+                    tacticsState.corner_taker_id = data.corner_taker_id || null;
+                    tacticsState.penalty_taker_id = data.penalty_taker_id || null;
+
+                    // Если XI пустой или неполный — авто-состав
+                    const filled = tacticsState.starting_xi.filter(x => x != null).length;
+                    if (filled < 11) {
+                        autoAssignStartingXI(players);
+                    }
+                    // Выровнять длину под текущую схему
+                    const needed = FORMATIONS[tacticsState.formation].length;
+                    while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
+                    while (tacticsState.starting_xi.length > needed) tacticsState.starting_xi.pop();
+
+                    tacticsLoaded = true;
+                }
+                document.getElementById("formation-select").value = tacticsState.formation;
+                renderTactics();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderTactics() {
+            renderPitch();
+            renderBench();
+            renderRoleSelects();
+            updateHint();
+        }
+
+        function renderPitch() {
+            const container = document.getElementById("pitch-slots");
+            const formation = FORMATIONS[tacticsState.formation];
+            container.innerHTML = "";
+            formation.forEach((slot, idx) => {
+                const playerId = tacticsState.starting_xi[idx];
+                const player = playerId != null ? getPlayerById(playerId) : null;
+                const isSelected = selectedSlotIndex === idx;
+
+                let cardInner = "";
+                if (player) {
+                    const oc = ovrClass(player.overall);
+                    cardInner = `
+                        <span style="font-size:13px; line-height:1;">${shortPosOf(player.position)}</span>
+                        <div class="slot-ovr-badge ${oc}">${player.overall}</div>
+                        ${tacticsState.captain_id === player.id ? '<div class="slot-captain-badge">C</div>' : ''}
+                    `;
+                } else {
+                    cardInner = `<span>+</span>`;
+                }
+
+                const nameLabel = player
+                    ? player.name.split(" ").slice(-1)[0]
+                    : "—";
+
+                const div = document.createElement("div");
+                div.className = "pitch-slot";
+                div.style.left = slot.x + "%";
+                div.style.top = slot.y + "%";
+                div.dataset.idx = idx;
+                div.innerHTML = `
+                    <div class="slot-role">${slot.role}</div>
+                    <div class="slot-card ${!player ? 'empty' : ''} ${isSelected ? 'selected' : ''}">
+                        ${cardInner}
+                    </div>
+                    <div class="slot-name ${!player ? 'empty' : ''}">${nameLabel}</div>
+                `;
+                div.onclick = () => onSlotClick(idx);
+                container.appendChild(div);
+            });
+        }
+
+        function renderBench() {
+            const benchList = document.getElementById("bench-list");
+            const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
+            const all = window.currentPlayers || [];
+            const bench = all.filter(p => !xiSet.has(p.id));
+
+            // Сортировка: сначала GK, потом DEF/MID/ATT, внутри — по OVR
+            const getFamilyOrder = (pos) => {
+                const p = (pos || "").toLowerCase();
+                if (p.includes("goalkeeper") || p === "gk") return 1;
+                if (p.includes("back") || p === "cb" || p === "lb" || p === "rb" || p.includes("wing back")) return 2;
+                if (p.includes("mid") || p === "cm" || p === "cdm" || p === "cam" || p === "lm" || p === "rm") return 3;
+                return 4;
+            };
+            bench.sort((a, b) => {
+                const fa = getFamilyOrder(a.position), fb = getFamilyOrder(b.position);
+                if (fa !== fb) return fa - fb;
+                return b.overall - a.overall;
+            });
+
+            document.getElementById("bench-count").innerText = `${bench.length} чел.`;
+            benchList.innerHTML = bench.map(p => {
+                const oc = ovrClass(p.overall);
+                const isSel = selectedBenchPlayerId === p.id;
+                return `
+                    <div class="bench-card ${isSel ? 'selected' : ''}" onclick="onBenchPlayerClick(${p.id})">
+                        <div class="ovr-mini ${p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze'}">${p.overall}</div>
+                        <div class="bench-name">${p.name}</div>
+                        <div class="bench-pos">${shortPosOf(p.position)}</div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function renderRoleSelects() {
+            const xiPlayers = tacticsState.starting_xi
+                .filter(x => x != null)
+                .map(id => getPlayerById(id))
+                .filter(Boolean);
+
+            const fill = (selectId, currentVal) => {
+                const sel = document.getElementById(selectId);
+                const prev = currentVal ?? (sel.value ? parseInt(sel.value) : null);
+                sel.innerHTML = '<option value="">—</option>';
+                xiPlayers.forEach(p => {
+                    const opt = document.createElement("option");
+                    opt.value = p.id;
+                    opt.textContent = `${p.name} (${p.overall})`;
+                    if (prev === p.id) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            };
+
+            fill("role-captain", tacticsState.captain_id);
+            fill("role-fk", tacticsState.free_kick_taker_id);
+            fill("role-corner", tacticsState.corner_taker_id);
+            fill("role-penalty", tacticsState.penalty_taker_id);
+        }
+
+        function updateHint() {
+            const hint = document.getElementById("tactics-hint");
+            hint.classList.remove("active");
+            if (selectedSlotIndex !== null) {
+                const slot = FORMATIONS[tacticsState.formation][selectedSlotIndex];
+                hint.textContent = `Слот "${slot.role}" выбран. Нажмите другую позицию или игрока в запасе`;
+                hint.classList.add("active");
+            } else if (selectedBenchPlayerId !== null) {
+                const p = getPlayerById(selectedBenchPlayerId);
+                hint.textContent = `${p ? p.name : ""} выбран. Нажмите позицию на поле`;
+                hint.classList.add("active");
+            } else {
+                hint.textContent = "Нажмите на слот на поле или на игрока в запасе";
+            }
+        }
+
+        function onSlotClick(idx) {
+            // Если выбран игрок с лавки — ставим его в этот слот
+            if (selectedBenchPlayerId !== null) {
+                placeBenchPlayerIntoSlot(selectedBenchPlayerId, idx);
+                selectedBenchPlayerId = null;
+                selectedSlotIndex = null;
+                renderTactics();
+                return;
+            }
+
+            if (selectedSlotIndex === null) {
+                selectedSlotIndex = idx;
+            } else if (selectedSlotIndex === idx) {
+                selectedSlotIndex = null;
+            } else {
+                // Свап
+                const tmp = tacticsState.starting_xi[selectedSlotIndex];
+                tacticsState.starting_xi[selectedSlotIndex] = tacticsState.starting_xi[idx];
+                tacticsState.starting_xi[idx] = tmp;
+                selectedSlotIndex = null;
+            }
+            renderTactics();
+        }
+
+        function onBenchPlayerClick(playerId) {
+            if (selectedSlotIndex !== null) {
+                placeBenchPlayerIntoSlot(playerId, selectedSlotIndex);
+                selectedSlotIndex = null;
+                selectedBenchPlayerId = null;
+            } else if (selectedBenchPlayerId === playerId) {
+                selectedBenchPlayerId = null;
+            } else {
+                selectedBenchPlayerId = playerId;
+            }
+            renderTactics();
+        }
+
+        function placeBenchPlayerIntoSlot(benchPlayerId, slotIdx) {
+            // Если benchPlayerId уже в XI — не допускаем дубль
+            const existingIdx = tacticsState.starting_xi.indexOf(benchPlayerId);
+            if (existingIdx >= 0 && existingIdx !== slotIdx) {
+                // поменяем местами
+                const tmp = tacticsState.starting_xi[slotIdx];
+                tacticsState.starting_xi[slotIdx] = benchPlayerId;
+                tacticsState.starting_xi[existingIdx] = tmp;
+                return;
+            }
+            // Игрок с лавки (не в XI) — просто кладём в слот
+            tacticsState.starting_xi[slotIdx] = benchPlayerId;
+        }
+
+        // Навешиваем обработчики для тактики
+        document.getElementById("formation-select").onchange = (e) => {
+            tacticsState.formation = e.target.value;
+            const needed = FORMATIONS[tacticsState.formation].length;
+            while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
+            while (tacticsState.starting_xi.length > needed) tacticsState.starting_xi.pop();
+            selectedSlotIndex = null;
+            selectedBenchPlayerId = null;
+            renderTactics();
+        };
+
+        document.getElementById("btn-auto-tactics").onclick = () => {
+            if (!window.currentPlayers) return;
+            autoAssignStartingXI(window.currentPlayers);
+            selectedSlotIndex = null;
+            selectedBenchPlayerId = null;
+            renderTactics();
+        };
+
+        document.getElementById("btn-reset-tactics").onclick = () => {
+            tacticsState.starting_xi = [];
+            tacticsState.captain_id = null;
+            tacticsState.free_kick_taker_id = null;
+            tacticsState.corner_taker_id = null;
+            tacticsState.penalty_taker_id = null;
+            autoAssignStartingXI(window.currentPlayers || []);
+            selectedSlotIndex = null;
+            selectedBenchPlayerId = null;
+            renderTactics();
+        };
+
+        document.getElementById("role-captain").onchange = (e) => {
+            tacticsState.captain_id = e.target.value ? parseInt(e.target.value) : null;
+            renderPitch();
+        };
+        document.getElementById("role-fk").onchange = (e) => {
+            tacticsState.free_kick_taker_id = e.target.value ? parseInt(e.target.value) : null;
+        };
+        document.getElementById("role-corner").onchange = (e) => {
+            tacticsState.corner_taker_id = e.target.value ? parseInt(e.target.value) : null;
+        };
+        document.getElementById("role-penalty").onchange = (e) => {
+            tacticsState.penalty_taker_id = e.target.value ? parseInt(e.target.value) : null;
+        };
+
+        document.getElementById("btn-save-tactics").onclick = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/tactics`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        telegram_id: userId,
+                        formation: tacticsState.formation,
+                        starting_xi: tacticsState.starting_xi,
+                        captain_id: tacticsState.captain_id,
+                        free_kick_taker_id: tacticsState.free_kick_taker_id,
+                        corner_taker_id: tacticsState.corner_taker_id,
+                        penalty_taker_id: tacticsState.penalty_taker_id,
+                    })
+                });
+                if (res.ok) {
+                    tg.showAlert("✅ Состав сохранён!");
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    tg.showAlert("Ошибка сохранения: " + (err.detail || res.status));
+                }
+            } catch (e) {
+                tg.showAlert("Сетевая ошибка: " + e.message);
+            }
+        };
+
+        // === НАВИГАЦИЯ ===
         document.getElementById("btn-start").onclick = async () => {
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
@@ -877,7 +1742,15 @@
             setTimeout(() => window.scrollTo(0, leaguesScrollPos), 10);
         };
         
-        document.getElementById("btn-continue").onclick = goToCoachSetup;
+        // ← ФИКС: если карьера уже настроена — сразу в офис, иначе в настройку тренера
+        document.getElementById("btn-continue").onclick = () => {
+            if (managerSetupComplete) {
+                document.getElementById("bottom-nav").classList.remove("hidden");
+                loadSquad();
+            } else {
+                goToCoachSetup();
+            }
+        };
         document.getElementById("btn-back-to-confirm").onclick = () => showScreen("confirm");
         document.getElementById("btn-next-club-setup").onclick = goToClubSetup;
         document.getElementById("btn-back-to-coach").onclick = () => showScreen("coach");
