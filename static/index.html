@@ -693,14 +693,55 @@
 
             try {
                 const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error(`Сервер ответил: ${res.status}. ${errorText.substring(0, 30)}...`);
-                }
                 const players = await res.json();
                 if (!players || !players.length) {
                     listContainer.innerHTML = `<p style="text-align:center;">Нет игроков.</p>`; return;
                 }
+
+                // --- СОРТИРОВКА ПО ПОЗИЦИЯМ ---
+                const order = {
+                    "Goalkeeper": 1, "GK": 1,
+                    "Left Back": 2, "LWB": 2, "LB": 2,
+                    "Centre-Back": 3, "Center-Back": 3, "CB": 3,
+                    "Right Back": 4, "RWB": 4, "RB": 4,
+                    "Left Midfield": 5, "LM": 5,
+                    "Central Defensive Midfield": 6, "CDM": 6,
+                    "Central Midfield": 7, "CM": 7,
+                    "Central Attacking Midfield": 8, "CAM": 8,
+                    "Right Midfield": 9, "RM": 9,
+                    "Left Wing": 10, "LW": 10,
+                    "Centre-Forward": 11, "CF": 11,
+                    "Striker": 12, "ST": 12,
+                    "Right Wing": 13, "RW": 13
+                };
+
+                const getPosWeight = (pos) => {
+                    if (!pos) return 99;
+                    if (order[pos]) return order[pos];
+                    const p = pos.toLowerCase();
+                    if (p.includes("goalkeeper") || p === "gk") return 1;
+                    if (p.includes("left back") || p === "lb" || p.includes("left wing back")) return 2;
+                    if (p.includes("back") || p === "cb") return 3;
+                    if (p.includes("right back") || p === "rb" || p.includes("right wing back")) return 4;
+                    if (p.includes("left mid") || p === "lm") return 5;
+                    if (p.includes("defensive") || p === "cdm") return 6;
+                    if (p.includes("midfield") || p === "cm") return 7;
+                    if (p.includes("attacking mid") || p === "cam") return 8;
+                    if (p.includes("right mid") || p === "rm") return 9;
+                    if (p.includes("left wing") || p === "lw") return 10;
+                    if (p.includes("forward") || p === "cf") return 11;
+                    if (p.includes("striker") || p === "st") return 12;
+                    if (p.includes("right wing") || p === "rw") return 13;
+                    return 15;
+                };
+
+                players.sort((a, b) => {
+                    const wA = getPosWeight(a.position);
+                    const wB = getPosWeight(b.position);
+                    if (wA !== wB) return wA - wB;
+                    return b.overall - a.overall; // От лучшего к худшему внутри позиции
+                });
+                // ------------------------------
 
                 listContainer.innerHTML = players.map(p => {
                     let ovrClass = "ovr-bronze";
