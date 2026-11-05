@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 # --- НАСТРОЙКА БАЗЫ ДАННЫХ ---
 # ВСТАВЬ СВОЮ ССЫЛКУ ИЗ NEON ВМЕСТО ТЕКСТА В КАВЫЧКАХ:
-DATABASE_URL = "postgresql://neondb_owner:пароль@ep-сервер.neon.tech/neondb?sslmode=require"
+DATABASE_URL = "postgresql://neondb_owner:npg_KpNaC4uhstX3@ep-purple-rice-b9sdria3-pooler.c-7.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
