@@ -1,11 +1,31 @@
+import os
+import re
+import time
 import cloudscraper
 from bs4 import BeautifulSoup
-import time
-import re
-from sqlalchemy.orm import Session
-from main import engine, Player
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, Session
 
-# Создаем сессию
+# --- НАСТРОЙКА БАЗЫ ДАННЫХ (Автономно от main.py) ---
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+engine = create_engine(DATABASE_URL)
+Base = declarative_base()
+
+class Player(Base):
+    __tablename__ = "players"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    market_value = Column(Integer)
+    wage = Column(Integer)
+    contract_until = Column(String)
+# ---------------------------------------------------
+
 scraper = cloudscraper.create_scraper()
 
 def parse_money(text):
@@ -70,7 +90,6 @@ def scrape_team(team_name):
                 wage_text = wage_tag.text.strip() if wage_tag else ""
                 contract_text = ct_tag.text.strip() if ct_tag else ""
                 
-                # Ищем игрока в Neon
                 player = db.query(Player).filter(Player.name.ilike(f"%{player_name}%")).first()
                 
                 if player:
