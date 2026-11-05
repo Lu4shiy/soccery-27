@@ -14,7 +14,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from sqlalchemy import (
-    create_engine, Column, Integer, String, ForeignKey, DateTime, func
+    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float
 )
 from sqlalchemy.orm import declarative_base, Session
 
@@ -34,6 +34,7 @@ class Club(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     league = Column(String, index=True)
+    stars = Column(Float, default=3.0) # Новое поле для ручных звезд
 
 
 class Player(Base):
@@ -48,6 +49,8 @@ class Player(Base):
     nationality = Column(String)
     club_id = Column(Integer, ForeignKey("clubs.id"))
     preferred_foot = Column(String)
+    
+    market_value = Column(Integer, default=1000000) # Новое поле
 
     pace = Column(Integer)
     shooting = Column(Integer)
@@ -71,7 +74,6 @@ class Manager(Base):
     club_id = Column(Integer, ForeignKey("clubs.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Новые поля
     coach_name = Column(String, nullable=True)
     coach_nationality = Column(String, nullable=True)
     coach_age = Column(Integer, nullable=True)
@@ -87,42 +89,20 @@ security = HTTPBasic()
 
 
 def run_seed_script():
-    print("Запуск скрипта seed_data.py в фоне...")
     result = subprocess.run([sys.executable, "seed_data.py"], capture_output=True, text=True)
-    print("Скрипт завершён.")
     print("Вывод (stdout):", result.stdout)
-    if result.stderr:
-        print("Ошибки (stderr):", result.stderr)
 
 
 @app.get("/")
 def read_root():
-    return {"message": "Soccery 27: База данных готова к загрузке!"}
-
+    return {"message": "Soccery 27 API"}
 
 @app.post("/admin/seed")
 def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCredentials = Depends(security)):
-    correct_username = secrets.compare_digest(credentials.username, "admin")
-    correct_password = secrets.compare_digest(credentials.password, "soccery_secret_2026")
-    if not (correct_username and correct_password):
+    if not (secrets.compare_digest(credentials.username, "admin") and secrets.compare_digest(credentials.password, "soccery_secret_2026")):
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
     background_tasks.add_task(run_seed_script)
-    return {"message": "Загрузка данных из FC27 запущена. Проверьте логи."}
-
-
-# Функция расчета звезд на основе среднего рейтинга
-def calc_stars(avg_ovr):
-    if not avg_ovr: return 0.5
-    if avg_ovr >= 79: return 5.0
-    if avg_ovr >= 77: return 4.5
-    if avg_ovr >= 75: return 4.0
-    if avg_ovr >= 73: return 3.5
-    if avg_ovr >= 71: return 3.0
-    if avg_ovr >= 69: return 2.5
-    if avg_ovr >= 67: return 2.0
-    if avg_ovr >= 65: return 1.5
-    if avg_ovr >= 63: return 1.0
-    return 0.5
+    return {"message": "Загрузка данных запущена."}
 
 
 @app.get("/api/clubs")
@@ -131,7 +111,7 @@ def get_clubs():
     try:
         rows = (
             db.query(
-                Club.id, Club.name, Club.league,
+                Club.id, Club.name, Club.league, Club.stars,
                 func.count(Player.id).label("players"),
                 func.avg(Player.overall_rating).label("avg_ovr"),
             )
@@ -142,12 +122,9 @@ def get_clubs():
         )
         return [
             {
-                "id": r.id,
-                "name": r.name,
-                "league": r.league,
+                "id": r.id, "name": r.name, "league": r.league, "stars": r.stars or 3.0,
                 "players": int(r.players or 0),
                 "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0,
-                "stars": calc_stars(float(r.avg_ovr) if r.avg_ovr else 0)
             }
             for r in rows
         ]
@@ -160,18 +137,13 @@ def get_manager(telegram_id: str):
     db = Session(engine)
     try:
         m = db.query(Manager).filter_by(telegram_id=telegram_id).first()
-        if not m:
-            return {"has_club": False}
+        if not m: return {"has_club": False}
         club = db.query(Club).filter_by(id=m.club_id).first()
-        if not club:
-            return {"has_club": False}
+        if not club: return {"has_club": False}
         return {
-            "has_club": True,
-            "club_id": club.id,
-            "club_name": club.name,
-            "league": club.league,
-            "is_setup_complete": bool(m.is_setup_complete),
-            "coach_name": m.coach_name
+            "has_club": True, "club_id": club.id, "club_name": club.name, 
+            "league": club.league, "stars": club.stars or 3.0,
+            "is_setup_complete": bool(m.is_setup_complete)
         }
     finally:
         db.close()
@@ -182,34 +154,22 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
-
 @app.post("/api/select-club")
 def select_club(req: SelectClubRequest):
     db = Session(engine)
     try:
         club = db.query(Club).filter_by(id=req.club_id).first()
-        if not club:
-            raise HTTPException(status_code=404, detail="Клуб не найден")
-
-        taken = db.query(Manager).filter(
-            Manager.club_id == req.club_id,
-            Manager.telegram_id != req.telegram_id,
-        ).first()
-        if taken:
-            raise HTTPException(status_code=409, detail="Этот клуб уже занят другим менеджером")
+        if not club: raise HTTPException(status_code=404, detail="Клуб не найден")
+        taken = db.query(Manager).filter(Manager.club_id == req.club_id, Manager.telegram_id != req.telegram_id).first()
+        if taken: raise HTTPException(status_code=409, detail="Клуб занят")
 
         existing = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
         if existing:
             existing.club_id = req.club_id
             existing.first_name = req.first_name or existing.first_name
-            existing.is_setup_complete = 0 # Сбрасываем настройки при смене клуба
+            existing.is_setup_complete = 0
         else:
-            db.add(Manager(
-                telegram_id=req.telegram_id,
-                first_name=req.first_name or "",
-                club_id=req.club_id,
-                is_setup_complete=0
-            ))
+            db.add(Manager(telegram_id=req.telegram_id, first_name=req.first_name or "", club_id=req.club_id, is_setup_complete=0))
         db.commit()
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
@@ -229,9 +189,7 @@ def save_settings(req: SaveSettingsRequest):
     db = Session(engine)
     try:
         m = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
-        if not m:
-            raise HTTPException(status_code=404, detail="Менеджер не найден")
-        
+        if not m: raise HTTPException(status_code=404, detail="Менеджер не найден")
         m.coach_name = req.coach_name
         m.coach_nationality = req.coach_nationality
         m.coach_age = req.coach_age
@@ -264,12 +222,9 @@ def get_club_players(club_id: int):
         players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
         return [
             {
-                "id": p.id,
-                "name": p.name,
-                "position": p.position,
-                "age": p.age,
-                "overall": p.overall_rating,
-                "nationality": p.nationality
+                "id": p.id, "name": p.name, "position": p.position, "age": p.age,
+                "overall": p.overall_rating, "nationality": p.nationality,
+                "market_value": p.market_value or 1000000
             }
             for p in players
         ]
@@ -277,7 +232,7 @@ def get_club_players(club_id: int):
         db.close()
 
 
-# ============ TELEGRAM БОТ ============
+# --- TELEGRAM БОТ ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -285,14 +240,8 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     web_app = types.WebAppInfo(url="https://soccery-27.onrender.com/app")
-    keyboard = types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text="⚽️ Открыть Soccery 27", web_app=web_app)]],
-        resize_keyboard=True,
-    )
-    await message.answer(
-        "Добро пожаловать в Soccery 27! Нажми на кнопку ниже, чтобы начать.",
-        reply_markup=keyboard,
-    )
+    keyboard = types.ReplyKeyboardMarkup(keyboard=[[types.KeyboardButton(text="⚽️ Открыть Soccery 27", web_app=web_app)]], resize_keyboard=True)
+    await message.answer("Добро пожаловать в Soccery 27!", reply_markup=keyboard)
 
 async def start_bot():
     await dp.start_polling(bot)
@@ -301,7 +250,7 @@ async def start_bot():
 async def on_startup():
     asyncio.create_task(start_bot())
 
-# ============ РАЗДАЧА ФРОНТЕНДА ============
+# --- РАЗДАЧА ---
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/app")

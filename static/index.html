@@ -13,6 +13,7 @@
             color: white;
             margin: 0;
             padding: 16px;
+            padding-bottom: 80px; /* Место для нижнего меню */
             min-height: 100vh;
         }
         h1 { color: #52a8ff; margin: 0 0 4px; text-align: center;}
@@ -51,83 +52,64 @@
             cursor: pointer;
         }
 
+        /* --- НИЖНЕЕ МЕНЮ --- */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #232e3c;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .nav-item {
+            color: #8e9eb5;
+            text-align: center;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .nav-item.active { color: #52a8ff; font-weight: bold; }
+        .nav-icon { font-size: 20px; }
+
         /* Поля ввода */
         .form-group { margin-bottom: 16px; position: relative; }
         .form-group label { display: block; color: #8e9eb5; font-size: 13px; margin-bottom: 6px; }
         .form-control {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #2f3b4d;
-            background: #17212b;
-            color: white;
-            font-size: 15px;
-            outline: none;
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #2f3b4d;
+            background: #17212b; color: white; font-size: 15px; outline: none;
         }
         .form-control:focus { border-color: #52a8ff; }
 
         /* Кастомный выпадающий список */
         .custom-select { position: relative; width: 100%; }
         .custom-select-trigger {
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #2f3b4d;
-            background: #17212b;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 15px;
+            padding: 12px; border-radius: 8px; border: 1px solid #2f3b4d;
+            background: #17212b; color: white; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center; font-size: 15px;
         }
         .custom-options {
-            position: absolute;
-            top: 105%;
-            left: 0;
-            right: 0;
-            background: #232e3c;
-            border: 1px solid #52a8ff;
-            border-radius: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 100;
-            display: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: absolute; top: 105%; left: 0; right: 0; background: #232e3c;
+            border: 1px solid #52a8ff; border-radius: 8px; max-height: 200px;
+            overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
         .custom-options.show { display: block; }
-        .custom-option {
-            padding: 10px 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            font-size: 14px;
-            border-bottom: 1px solid #17212b;
-        }
+        .custom-option { padding: 10px 12px; cursor: pointer; display: flex; align-items: center; font-size: 14px; border-bottom: 1px solid #17212b; }
         .custom-option:hover { background: #2f3b4d; }
 
-        /* Стили для флагов-картинок */
-        .flag-icon {
-            width: 20px;
-            height: 14px;
-            object-fit: cover;
-            border-radius: 2px;
-            margin-right: 8px;
-            vertical-align: middle;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+        .flag-icon { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; margin-right: 8px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.1); }
 
-        /* Стили для заглушек логотипов */
+        /* КВАДРАТНЫЕ БЕЛЫЕ ЛОГОТИПЫ */
         .logo-container {
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background-color: #17212b;
-            margin-right: 12px;
-            flex-shrink: 0;
-            overflow: hidden;
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; /* Квадрат с закругленными углами */
+            background-color: #ffffff; /* Белый фон */
+            margin-right: 12px; flex-shrink: 0; overflow: hidden;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
         .logo-img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
         .logo-fallback { font-weight: bold; color: #52a8ff; font-size: 20px; text-transform: uppercase; }
@@ -141,7 +123,7 @@
             cursor: pointer; text-align: center; border: 1px solid transparent; transition: 0.2s;
         }
         .league-card:active { border-color: #52a8ff; }
-        .league-card .logo-container { width: 60px; height: 60px; margin: 0 0 10px 0; background-color: #17212b; }
+        .league-card .logo-container { width: 60px; height: 60px; margin: 0 0 10px 0; }
         .league-card .logo-fallback { font-size: 28px; }
         .league-name { font-size: 13px; font-weight: bold; line-height: 1.2; }
 
@@ -164,24 +146,13 @@
         }
 
         /* Половинка звезды */
-        .star-half {
-            position: relative;
-            display: inline-block;
-            color: #4e5d78;
-        }
-        .star-half::before {
-            content: '★';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 50%;
-            overflow: hidden;
-            color: #e6c544;
-        }
+        .star-half { position: relative; display: inline-block; color: #4e5d78; }
+        .star-half::before { content: '★'; position: absolute; left: 0; top: 0; width: 50%; overflow: hidden; color: #e6c544; }
 
-        /* Список игроков (Состав) */
+        /* Список игроков */
         .squad-container { display: flex; flex-direction: column; gap: 8px; }
-        .player-row { background: #232e3c; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; }
+        .player-row { background: #232e3c; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .player-row:active { background: #2f3b4d; }
         .player-info { display: flex; align-items: center; gap: 12px; }
         .player-ovr { font-size: 18px; font-weight: bold; width: 36px; text-align: center; padding: 4px 0; border-radius: 6px; }
         .ovr-gold { background: #e6c544; color: #1a1a1a; }
@@ -191,13 +162,21 @@
         .player-name { font-weight: bold; font-size: 14px; }
         .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
         .player-pos { background: #17212b; color: #52a8ff; font-weight: bold; font-size: 12px; padding: 4px 6px; border-radius: 4px; width: 38px; text-align: center; }
+        
+        .player-val { font-weight: bold; color: #2ecc71; font-size: 13px; text-align: right; }
 
         /* Бюджет */
-        .budget-display {
-            font-size: 24px; font-weight: bold; color: #2ecc71;
-            text-align: center; margin: 16px 0;
-            background: #17212b; padding: 12px; border-radius: 10px;
-        }
+        .budget-display { font-size: 24px; font-weight: bold; color: #2ecc71; text-align: center; margin: 16px 0; background: #17212b; padding: 12px; border-radius: 10px; }
+
+        /* Детали игрока */
+        .player-detail-header { text-align: center; margin-bottom: 20px; }
+        .player-detail-ovr { font-size: 48px; font-weight: bold; margin: 0; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .detail-item { background: #17212b; padding: 10px; border-radius: 8px; }
+        .detail-label { color: #8e9eb5; font-size: 11px; margin-bottom: 2px; }
+        .detail-value { font-weight: bold; font-size: 14px; }
+        .stat-bar-container { background: #17212b; height: 8px; border-radius: 4px; margin-top: 4px; overflow: hidden; }
+        .stat-bar { background: #52a8ff; height: 100%; }
     </style>
 </head>
 <body>
@@ -214,26 +193,23 @@
 
     <!-- ЭКРАН 2: Загрузка -->
     <div id="screen-loading" class="screen hidden">
-        <div class="card">
-            <h2>⏳ Загружаем данные...</h2>
-            <p>Первый запрос после «сна» сервера может занять до минуты.</p>
-        </div>
+        <div class="card"><h2>⏳ Загружаем данные...</h2></div>
     </div>
 
-    <!-- ЭКРАН 3: Выбор лиги -->
+    <!-- ЭКРАН 3: Лиги -->
     <div id="screen-leagues" class="screen hidden">
         <h2>Выбери лигу</h2>
         <div id="leagues-grid" class="leagues-grid"></div>
     </div>
 
-    <!-- ЭКРАН 4: Выбор клуба -->
+    <!-- ЭКРАН 4: Клубы -->
     <div id="screen-clubs" class="screen hidden">
         <button class="btn-back" id="btn-back-leagues">← Назад к лигам</button>
         <h2 id="selected-league-title">Клубы</h2>
         <div id="clubs-list" style="margin-top: 16px;"></div>
     </div>
 
-    <!-- ЭКРАН 5: Подтверждение клуба -->
+    <!-- ЭКРАН 5: Подтверждение -->
     <div id="screen-confirm" class="screen hidden">
         <h2 style="text-align:center;">Выбранный клуб</h2>
         <div class="card" style="text-align:center;">
@@ -250,32 +226,24 @@
     <div id="screen-coach" class="screen hidden">
         <button class="btn-back" id="btn-back-to-confirm">← Назад</button>
         <h2>Создание тренера</h2>
-        <p>Настрой своего менеджера</p>
         <div class="card">
             <div class="form-group">
                 <label>Имя и Фамилия</label>
-                <input type="text" id="inp-coach-name" class="form-control" placeholder="Например: Жозе Моуринью" value="">
+                <input type="text" id="inp-coach-name" class="form-control" value="">
             </div>
-            
-            <!-- КАСТОМНЫЙ ВЫПАДАЮЩИЙ СПИСОК -->
             <div class="form-group">
                 <label>Национальность</label>
                 <div class="custom-select">
                     <div class="custom-select-trigger" id="nat-trigger">
-                        <div style="display:flex; align-items:center;" id="selected-nat-display">
-                            <span>Выберите страну</span>
-                        </div>
+                        <div style="display:flex; align-items:center;" id="selected-nat-display"><span>Выберите страну</span></div>
                         <span style="font-size: 10px;">▼</span>
                     </div>
-                    <div class="custom-options" id="nat-options">
-                        <!-- Заполняется через JS -->
-                    </div>
+                    <div class="custom-options" id="nat-options"></div>
                 </div>
             </div>
-
             <div class="form-group">
                 <label>Возраст</label>
-                <input type="number" id="inp-coach-age" class="form-control" placeholder="Например: 35" min="18" max="99" value="35">
+                <input type="number" id="inp-coach-age" class="form-control" value="35" min="18" max="99">
             </div>
         </div>
         <button class="btn" id="btn-next-club-setup">Далее</button>
@@ -286,7 +254,6 @@
         <button class="btn-back" id="btn-back-to-coach">← Назад</button>
         <h2>Настройка клуба</h2>
         <p id="setup-club-name" style="color:#52a8ff; font-weight:bold;"></p>
-        
         <div class="card">
             <div class="form-group">
                 <label>Сложность переговоров</label>
@@ -312,25 +279,84 @@
                 </select>
             </div>
         </div>
-
-        <div class="budget-display" id="display-budget">
-            Бюджет: 0 млн $
-        </div>
-
+        <div class="budget-display" id="display-budget">Бюджет: 0 млн $</div>
         <button class="btn" id="btn-finish-setup">Завершить настройку</button>
     </div>
 
-    <!-- ЭКРАН 8: Состав команды -->
-    <div id="screen-squad" class="screen hidden">
-        <button class="btn-back" id="btn-back-to-setup">← Назад</button>
-        <h2 id="squad-title" style="margin-bottom: 16px;">Состав команды</h2>
+    <!-- ЭКРАН 8: ОФИС (Список игроков) -->
+    <div id="screen-office" class="screen hidden">
+        <h2 id="squad-title">Офис: Состав команды</h2>
+        <p style="margin-bottom: 12px;">Нажми на игрока для просмотра деталей</p>
         <div id="squad-list" class="squad-container"></div>
+    </div>
+
+    <!-- ЭКРАН 9: ДЕТАЛИ ИГРОКА -->
+    <div id="screen-player" class="screen hidden">
+        <button class="btn-back" id="btn-back-to-office">← Назад в офис</button>
+        <div class="card">
+            <div class="player-detail-header">
+                <h2 id="pd-name">Имя</h2>
+                <p id="pd-club">Клуб</p>
+                <div id="pd-ovr" class="player-detail-ovr">--</div>
+                <p id="pd-pos" style="color:#52a8ff; font-weight:bold;">POS</p>
+            </div>
+            
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="detail-label">Возраст</div>
+                    <div class="detail-value" id="pd-age">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Национальность</div>
+                    <div class="detail-value" id="pd-nat">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Стоимость</div>
+                    <div class="detail-value" style="color:#2ecc71;" id="pd-value">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Зарплата</div>
+                    <div class="detail-value" id="pd-wage">--</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px;">Характеристики</h3>
+            <div id="pd-stats-container">
+                <!-- Заполняется через JS -->
+            </div>
+            
+            <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px;">Контракт и статус</h3>
+            <div class="detail-item" style="margin-bottom:8px;">
+                <div class="detail-label">Контракт</div>
+                <div class="detail-value">Действует еще 3 года</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">Травмы / Дисквалификации</div>
+                <div class="detail-value" style="color:#2ecc71;">Здоров</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Заглушки для других вкладок -->
+    <div id="screen-center" class="screen hidden">
+        <h2>Спортивный центр</h2>
+        <div class="card"><p>Новости, календарь и матчи появятся здесь.</p></div>
+    </div>
+    <div id="screen-tactics" class="screen hidden">
+        <h2>Состав и Тактика</h2>
+        <div class="card"><p>Перетаскивание карточек, схемы и выбор капитана будут здесь.</p></div>
+    </div>
+
+    <!-- НИЖНЕЕ МЕНЮ -->
+    <div id="bottom-nav" class="bottom-nav hidden">
+        <div class="nav-item" onclick="switchTab('office')" id="nav-office"><div class="nav-icon">💼</div>Офис</div>
+        <div class="nav-item" onclick="switchTab('center')" id="nav-center"><div class="nav-icon">🏟</div>Спортцентр</div>
+        <div class="nav-item" onclick="switchTab('tactics')" id="nav-tactics"><div class="nav-icon">📋</div>Состав</div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-
         const API_BASE = window.location.origin;
         const userId = tg.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : "dev_user";
         const userName = tg.initDataUnsafe?.user?.first_name || "Игрок";
@@ -343,9 +369,8 @@
         let currentLeague = "";
         let currentStars = 0.5;
         let leaguesScrollPos = 0;
-        let selectedNationality = "Россия"; // По умолчанию
+        let selectedNationality = "Россия";
 
-        // ОГРОМНЫЙ список стран с ISO-кодами
         const countriesList = [
             { n: "Австралия", c: "au" }, { n: "Австрия", c: "at" }, { n: "Азербайджан", c: "az" }, { n: "Албания", c: "al" },
             { n: "Алжир", c: "dz" }, { n: "Англия", c: "gb-eng" }, { n: "Ангола", c: "ao" }, { n: "Андорра", c: "ad" },
@@ -396,11 +421,10 @@
             { n: "Тайвань", c: "tw" }
         ].sort((a, b) => a.n.localeCompare(b.n));
 
-        // СУПЕР-ПОДРОБНЫЙ словарь для игроков из FC27
         const playerFlagMap = {
             "England": "gb-eng", "Scotland": "gb-sct", "Wales": "gb-wls", "Northern Ireland": "gb-nir",
             "Russia": "ru", "Spain": "es", "Italy": "it", "Germany": "de", "France": "fr",
-            "Portugal": "pt", "Brazil": "br", "Argentina": "ar", "Netherlands": "nl",
+            "Portugal": "pt", "Brazil": "br", "Argentina": "ar", "Netherlands": "nl", "Holland": "nl",
             "Belgium": "be", "Croatia": "hr", "Uruguay": "uy", "Colombia": "co",
             "Mexico": "mx", "USA": "us", "United States": "us", "Canada": "ca",
             "Japan": "jp", "South Korea": "kr", "Korea Republic": "kr",
@@ -421,37 +445,20 @@
             "Costa Rica": "cr", "Panama": "pa", "Honduras": "hn", "Jamaica": "jm",
             "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn",
-            "Mali": "ml", "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd",
-            "Central African Republic": "cf", "Equatorial Guinea": "gq", "Benin": "bj",
-            "Togo": "tg", "Niger": "ne", "Chad": "td", "Sudan": "sd", "South Sudan": "ss",
-            "Eritrea": "er", "Djibouti": "dj", "Somalia": "so", "Comoros": "km",
-            "Madagascar": "mg", "Mauritius": "mu", "Seychelles": "sc", "Mozambique": "mz",
-            "Zambia": "zm", "Zimbabwe": "zw", "Angola": "ao", "Namibia": "na",
-            "Botswana": "bw", "Lesotho": "ls", "Eswatini": "sz", "Gambia": "gm",
-            "Liberia": "lr", "Sierra Leone": "sl", "Cape Verde": "cv", "Sao Tome and Principe": "st",
-            "Mauritania": "mr", "Libya": "ly", "Tunisia": "tn", "Kenya": "ke",
-            "Uganda": "ug", "Tanzania": "tz", "Rwanda": "rw", "Burundi": "bi",
-            "Ethiopia": "et", "India": "in", "Thailand": "th", "Vietnam": "vn",
-            "Malaysia": "my", "Indonesia": "id", "Philippines": "ph", "Singapore": "sg",
-            "China PR": "cn", "China": "cn", "Taiwan": "tw" // Если вдруг вылезет Китай (исключение)
+            "Mali": "ml", "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw"
         };
 
         function getPlayerFlagImg(nationality) {
             const code = playerFlagMap[nationality];
-            if (!code) {
-                // Если страны нет в словаре, выводим пустой прозрачный квадратик вместо флага ООН
-                return `<div style="width:20px; height:14px; display:inline-block; margin-right:8px; background:rgba(255,255,255,0.1); border-radius:2px;"></div>`;
-            }
+            if (!code) return `<div style="width:20px; height:14px; display:inline-block; margin-right:8px; background:rgba(255,255,255,0.1); border-radius:2px;"></div>`;
             return `<img src="https://flagcdn.com/w20/${code}.png" class="flag-icon" alt="${nationality}">`;
         }
 
-        // --- ЛОГИКА КАСТОМНОГО ВЫПАДАЮЩЕГО СПИСКА ---
         function initCustomSelect() {
             const trigger = document.getElementById("nat-trigger");
             const optionsContainer = document.getElementById("nat-options");
             const display = document.getElementById("selected-nat-display");
             
-            // Заполняем список
             optionsContainer.innerHTML = "";
             countriesList.forEach(c => {
                 const div = document.createElement("div");
@@ -466,20 +473,14 @@
                 optionsContainer.appendChild(div);
             });
 
-            // Открытие/закрытие по клику
             trigger.onclick = (e) => {
                 e.stopPropagation();
                 optionsContainer.classList.toggle("show");
             };
-
-            // Закрытие при клике вне списка
-            document.addEventListener("click", () => {
-                optionsContainer.classList.remove("show");
-            });
+            document.addEventListener("click", () => optionsContainer.classList.remove("show"));
         }
         initCustomSelect();
 
-        // Функция slugify и логотипы
         function slugify(text) {
             if (!text) return "";
             return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’\.]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
@@ -488,8 +489,8 @@
         function handleImgError(img, type, slug, fallbackChar) {
             const currentExt = img.src.split('.').pop().split('?')[0];
             let nextSrc = '';
-            if (currentExt === 'png') nextSrc = `/static/logos/${type}/${slug}.svg?v=9`;
-            else if (currentExt === 'svg') nextSrc = `/static/logos/${type}/${slug}.webp?v=9`;
+            if (currentExt === 'png') nextSrc = `/static/logos/${type}/${slug}.svg?v=10`;
+            else if (currentExt === 'svg') nextSrc = `/static/logos/${type}/${slug}.webp?v=10`;
             else {
                 img.style.display = 'none';
                 img.nextElementSibling.style.display = 'block';
@@ -500,7 +501,7 @@
 
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=9`;
+            const src = `/static/logos/${type}/${slug}.png?v=10`;
             const fallbackChar = name ? name.charAt(0) : "?";
             return `
                 <div class="logo-container ${sizeClass}">
@@ -523,6 +524,14 @@
             document.getElementById("screen-" + name).classList.remove("hidden");
         }
 
+        function formatMoney(amount) {
+            if (amount >= 1000000000) return (amount / 1000000000).toFixed(1) + ' млрд $';
+            if (amount >= 1000000) return (amount / 1000000).toFixed(1) + ' млн $';
+            if (amount >= 1000) return (amount / 1000).toFixed(0) + ' тыс $';
+            return amount + ' $';
+        }
+
+        // --- ЗАГРУЗКА ДАННЫХ ---
         async function checkManager() {
             try {
                 const res = await fetch(`${API_BASE}/api/manager/${encodeURIComponent(userId)}`);
@@ -531,14 +540,7 @@
                     currentClubId = data.club_id;
                     currentClubName = data.club_name;
                     currentLeague = data.league;
-                    
-                    if(allClubs.length === 0) {
-                         const resClubs = await fetch(`${API_BASE}/api/clubs`);
-                         allClubs = await resClubs.json();
-                    }
-                    const clubObj = allClubs.find(c => c.id === currentClubId);
-                    currentStars = clubObj ? clubObj.stars : 0.5;
-
+                    currentStars = data.stars;
                     showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
                     return true;
                 }
@@ -550,20 +552,13 @@
             showScreen("loading");
             try {
                 const res = await fetch(`${API_BASE}/api/clubs`);
-                if (!res.ok) throw new Error("HTTP " + res.status);
                 allClubs = await res.json();
-                
                 if (!allClubs.length) {
-                    tg.showAlert("Клубы не загружены. Выполните /admin/seed.");
-                    showScreen("welcome");
-                    return;
+                    tg.showAlert("Клубы не загружены. Выполните /admin/seed."); showScreen("welcome"); return;
                 }
-                renderLeagues();
-                showScreen("leagues");
-                window.scrollTo(0, 0);
+                renderLeagues(); showScreen("leagues"); window.scrollTo(0, 0);
             } catch (e) {
-                tg.showAlert("Ошибка загрузки: " + e.message);
-                showScreen("welcome");
+                tg.showAlert("Ошибка загрузки: " + e.message); showScreen("welcome");
             }
         }
 
@@ -583,7 +578,6 @@
         function openLeague(league) {
             leaguesScrollPos = window.scrollY;
             document.getElementById("selected-league-title").innerText = league;
-            
             let filtered = allClubs.filter(c => c.league === league);
             filtered.sort((a, b) => (b.avg_ovr || 0) - (a.avg_ovr || 0));
 
@@ -615,48 +609,37 @@
                     });
                 };
             });
-            
-            showScreen("clubs");
-            window.scrollTo(0, 0);
+            showScreen("clubs"); window.scrollTo(0, 0);
         }
 
         async function selectClub(clubId, clubName, league, stars) {
             try {
                 const res = await fetch(`${API_BASE}/api/select-club`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ telegram_id: userId, first_name: userName, club_id: parseInt(clubId, 10) }),
                 });
                 const data = await res.json();
-                if (!res.ok) {
-                    tg.showAlert(data.detail || "Ошибка при выборе");
-                    return;
-                }
+                if (!res.ok) { tg.showAlert(data.detail || "Ошибка при выборе"); return; }
                 showConfirm(data.club_name, data.league, stars, true, parseInt(clubId, 10));
-            } catch (e) {
-                tg.showAlert("Сетевая ошибка: " + e.message);
-            }
+            } catch (e) { tg.showAlert("Сетевая ошибка"); }
         }
 
         function showConfirm(clubName, league, stars, isNew, clubId) {
-            currentClubName = clubName;
-            currentLeague = league;
-            currentStars = stars;
+            currentClubName = clubName; currentLeague = league; currentStars = stars;
             if (clubId) currentClubId = clubId;
 
             document.getElementById("confirm-club").innerText = clubName;
             document.getElementById("confirm-league").innerText = league;
             document.getElementById("confirm-stars").innerHTML = renderStars(stars);
-            
             document.getElementById("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
             document.getElementById("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
         }
 
+        // --- НАСТРОЙКИ ---
         function goToCoachSetup() {
             const nameInput = document.getElementById("inp-coach-name");
             if(!nameInput.value) nameInput.value = userName;
-            // Исправление бага с иероглифами (innerHTML вместо innerText)
             document.getElementById("setup-club-name").innerHTML = `Клуб: ${currentClubName} (${renderStars(currentStars)})`;
             showScreen("coach");
         }
@@ -664,75 +647,62 @@
         function goToClubSetup() {
             const coachName = document.getElementById("inp-coach-name").value.trim();
             const coachAge = parseInt(document.getElementById("inp-coach-age").value);
-            
-            if (coachName.length < 3) {
-                tg.showAlert("Введите имя тренера (минимум 3 символа)"); return;
-            }
-            if (isNaN(coachAge) || coachAge < 18 || coachAge > 100) {
-                tg.showAlert("Введите корректный возраст тренера"); return;
-            }
-
-            updateBudgetDisplay();
-            showScreen("club-setup");
+            if (coachName.length < 3) { tg.showAlert("Введите имя тренера"); return; }
+            if (isNaN(coachAge) || coachAge < 18 || coachAge > 100) { tg.showAlert("Введите возраст"); return; }
+            updateBudgetDisplay(); showScreen("club-setup");
         }
 
         function updateBudgetDisplay() {
             const extra = parseInt(document.getElementById("inp-extra-budget").value);
-            let leagueBonus = 0;
+            let multiplier = 3; // Остальные по 3 млн
             const l = currentLeague.toLowerCase();
-            if(l.includes("premier league") || l.includes("laliga")) leagueBonus = 50;
-            else if(l.includes("serie a") || l.includes("bundesliga") || l.includes("ligue 1")) leagueBonus = 30;
-            else if(l.includes("championship") || l.includes("eredivisie") || l.includes("portugal")) leagueBonus = 15;
-            else leagueBonus = 5;
+            
+            if (l.includes("premier league")) multiplier = 35;
+            else if (l.includes("laliga") || l.includes("la liga")) multiplier = 25;
+            else if (l.includes("bundesliga") || l.includes("serie a") || l.includes("ligue 1")) multiplier = 15;
+            else if (l.includes("brazilian serie a")) multiplier = 13;
+            else if (l.includes("championship")) multiplier = 25;
+            else if (l.includes("eredivisie") || l.includes("liga portugal") || l.includes("mls") || l.includes("saudi")) multiplier = 10;
+            else if (l.includes("süper lig") || l.includes("super lig")) multiplier = 12;
 
-            const base = (currentStars * 10) + leagueBonus;
+            const base = currentStars * multiplier;
             const total = base + extra;
-
             document.getElementById("display-budget").innerText = `Бюджет: ${total} млн $`;
         }
 
         async function finishSetup() {
             const coachName = document.getElementById("inp-coach-name").value.trim();
-            const coachNat = selectedNationality; // Берем из нашей кастомной переменной
             const coachAge = parseInt(document.getElementById("inp-coach-age").value);
             const difficulty = document.getElementById("inp-difficulty").value;
             const extraBudget = parseInt(document.getElementById("inp-extra-budget").value);
 
             try {
                 const res = await fetch(`${API_BASE}/api/save-settings`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        telegram_id: userId,
-                        coach_name: coachName,
-                        coach_nationality: coachNat,
-                        coach_age: coachAge,
-                        negotiation_difficulty: difficulty,
-                        extra_budget: extraBudget
+                        telegram_id: userId, coach_name: coachName, coach_nationality: selectedNationality,
+                        coach_age: coachAge, negotiation_difficulty: difficulty, extra_budget: extraBudget
                     })
                 });
-                
-                if (res.ok) loadSquad();
-                else tg.showAlert("Ошибка сохранения настроек");
-            } catch(e) {
-                tg.showAlert("Сетевая ошибка");
-            }
+                if (res.ok) {
+                    document.getElementById("bottom-nav").classList.remove("hidden");
+                    loadSquad();
+                } else tg.showAlert("Ошибка сохранения");
+            } catch(e) { tg.showAlert("Сетевая ошибка"); }
         }
 
+        // --- ОФИС / СОСТАВ ---
         async function loadSquad() {
             const listContainer = document.getElementById("squad-list");
-            listContainer.innerHTML = `<p style="text-align:center; color:#8e9eb5;">⏳ Загружаем игроков...</p>`;
-            document.getElementById("squad-title").innerText = `Состав: ${currentClubName}`;
-            showScreen("squad");
+            listContainer.innerHTML = `<p style="text-align:center;">⏳ Загружаем игроков...</p>`;
+            document.getElementById("squad-title").innerText = `Офис: ${currentClubName}`;
+            switchTab('office');
 
             try {
                 const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
-                if (!res.ok) throw new Error("Ошибка сервера");
                 const players = await res.json();
-                
                 if (!players.length) {
-                    listContainer.innerHTML = `<p style="text-align:center;">В команде пока нет игроков.</p>`;
-                    return;
+                    listContainer.innerHTML = `<p style="text-align:center;">Нет игроков.</p>`; return;
                 }
 
                 listContainer.innerHTML = players.map(p => {
@@ -747,28 +717,79 @@
                     else if (p.position.includes("Forward") || p.position.includes("Striker") || p.position.includes("Winger")) shortPos = "ATT";
 
                     const flagImg = getPlayerFlagImg(p.nationality);
+                    const val = formatMoney(p.market_value);
 
                     return `
-                        <div class="player-row">
+                        <div class="player-row" onclick="openPlayerDetails(${p.id})">
                             <div class="player-info">
                                 <div class="player-ovr ${ovrClass}">${p.overall}</div>
                                 <div class="player-pos">${shortPos}</div>
                                 <div class="player-name-block">
                                     <div class="player-name">${p.name}</div>
-                                    <div class="player-meta">
-                                        ${flagImg}
-                                        <span>${p.nationality} · ${p.age} лет</span>
-                                    </div>
+                                    <div class="player-meta">${flagImg} ${p.nationality} · ${p.age} лет</div>
                                 </div>
                             </div>
+                            <div class="player-val">${val}</div>
                         </div>
                     `;
                 }).join("");
+                
+                // Сохраняем список игроков глобально для быстрого доступа
+                window.currentPlayers = players;
+
             } catch (e) {
-                listContainer.innerHTML = `<p style="text-align:center; color:#ff6b6b;">Ошибка загрузки: ${e.message}</p>`;
+                listContainer.innerHTML = `<p style="text-align:center; color:#ff6b6b;">Ошибка: ${e.message}</p>`;
             }
         }
 
+        function openPlayerDetails(playerId) {
+            const p = window.currentPlayers.find(x => x.id === playerId);
+            if (!p) return;
+
+            document.getElementById("pd-name").innerText = p.name;
+            document.getElementById("pd-club").innerText = currentClubName;
+            document.getElementById("pd-ovr").innerText = p.overall;
+            document.getElementById("pd-pos").innerText = p.position;
+            document.getElementById("pd-age").innerText = p.age + " лет";
+            document.getElementById("pd-nat").innerHTML = `${getPlayerFlagImg(p.nationality)} ${p.nationality}`;
+            document.getElementById("pd-value").innerText = formatMoney(p.market_value);
+            document.getElementById("pd-wage").innerText = formatMoney(p.market_value * 0.05) + " / мес";
+
+            // Моковые статы (для красоты)
+            const stats = [
+                { name: "Скорость (PAC)", val: 75 + Math.floor(Math.random() * 20) },
+                { name: "Удар (SHO)", val: 70 + Math.floor(Math.random() * 25) },
+                { name: "Пас (PAS)", val: 70 + Math.floor(Math.random() * 25) },
+                { name: "Дриблинг (DRI)", val: 70 + Math.floor(Math.random() * 25) },
+                { name: "Защита (DEF)", val: 40 + Math.floor(Math.random() * 40) },
+                { name: "Физика (PHY)", val: 70 + Math.floor(Math.random() * 20) }
+            ];
+
+            const statsHtml = stats.map(s => `
+                <div style="margin-bottom: 8px;">
+                    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
+                        <span>${s.name}</span>
+                        <span style="font-weight:bold;">${s.val}</span>
+                    </div>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar" style="width: ${s.val}%;"></div>
+                    </div>
+                </div>
+            `).join("");
+            
+            document.getElementById("pd-stats-container").innerHTML = statsHtml;
+            showScreen("player");
+        }
+
+        // --- НАВИГАЦИЯ ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + tabId).classList.add('active');
+            showScreen(tabId);
+            window.scrollTo(0, 0);
+        }
+
+        // --- ОБРАБОТЧИКИ ---
         document.getElementById("btn-start").onclick = async () => {
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
@@ -785,16 +806,13 @@
         document.getElementById("btn-back-to-coach").onclick = () => showScreen("coach");
         document.getElementById("inp-extra-budget").onchange = updateBudgetDisplay;
         document.getElementById("btn-finish-setup").onclick = finishSetup;
-        document.getElementById("btn-back-to-setup").onclick = () => showScreen("club-setup");
+        document.getElementById("btn-back-to-office").onclick = () => switchTab('office');
 
         document.getElementById("btn-reset").onclick = () => {
-            tg.showConfirm("Ты уверен, что хочешь сбросить клуб?", async (ok) => {
+            tg.showConfirm("Сбросить клуб?", async (ok) => {
                 if (!ok) return;
-                try {
-                    const res = await fetch(`${API_BASE}/api/reset-club/${userId}`, { method: 'DELETE' });
-                    if (res.ok) window.location.reload();
-                    else tg.showAlert("Ошибка");
-                } catch (e) { tg.showAlert("Сетевая ошибка"); }
+                const res = await fetch(`${API_BASE}/api/reset-club/${userId}`, { method: 'DELETE' });
+                if (res.ok) window.location.reload();
             });
         };
     </script>
