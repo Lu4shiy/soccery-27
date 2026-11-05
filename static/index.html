@@ -52,7 +52,7 @@
         }
 
         /* Поля ввода */
-        .form-group { margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; position: relative; }
         .form-group label { display: block; color: #8e9eb5; font-size: 13px; margin-bottom: 6px; }
         .form-control {
             width: 100%;
@@ -62,8 +62,48 @@
             background: #17212b;
             color: white;
             font-size: 15px;
+            outline: none;
         }
-        .form-control:focus { outline: none; border-color: #52a8ff; }
+        .form-control:focus { border-color: #52a8ff; }
+
+        /* Кастомный выпадающий список */
+        .custom-select { position: relative; width: 100%; }
+        .custom-select-trigger {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #2f3b4d;
+            background: #17212b;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+        }
+        .custom-options {
+            position: absolute;
+            top: 105%;
+            left: 0;
+            right: 0;
+            background: #232e3c;
+            border: 1px solid #52a8ff;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .custom-options.show { display: block; }
+        .custom-option {
+            padding: 10px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            border-bottom: 1px solid #17212b;
+        }
+        .custom-option:hover { background: #2f3b4d; }
 
         /* Стили для флагов-картинок */
         .flag-icon {
@@ -71,7 +111,7 @@
             height: 14px;
             object-fit: cover;
             border-radius: 2px;
-            margin-right: 6px;
+            margin-right: 8px;
             vertical-align: middle;
             border: 1px solid rgba(255,255,255,0.1);
         }
@@ -216,12 +256,23 @@
                 <label>Имя и Фамилия</label>
                 <input type="text" id="inp-coach-name" class="form-control" placeholder="Например: Жозе Моуринью" value="">
             </div>
+            
+            <!-- КАСТОМНЫЙ ВЫПАДАЮЩИЙ СПИСОК -->
             <div class="form-group">
                 <label>Национальность</label>
-                <select id="inp-coach-nat" class="form-control">
-                    <!-- Заполняется через JS -->
-                </select>
+                <div class="custom-select">
+                    <div class="custom-select-trigger" id="nat-trigger">
+                        <div style="display:flex; align-items:center;" id="selected-nat-display">
+                            <span>Выберите страну</span>
+                        </div>
+                        <span style="font-size: 10px;">▼</span>
+                    </div>
+                    <div class="custom-options" id="nat-options">
+                        <!-- Заполняется через JS -->
+                    </div>
+                </div>
             </div>
+
             <div class="form-group">
                 <label>Возраст</label>
                 <input type="number" id="inp-coach-age" class="form-control" placeholder="Например: 35" min="18" max="99" value="35">
@@ -292,8 +343,9 @@
         let currentLeague = "";
         let currentStars = 0.5;
         let leaguesScrollPos = 0;
+        let selectedNationality = "Россия"; // По умолчанию
 
-        // ОГРОМНЫЙ список стран с ISO-кодами (для картинок флагов). Исключены Китай и Тайвань.
+        // ОГРОМНЫЙ список стран с ISO-кодами
         const countriesList = [
             { n: "Австралия", c: "au" }, { n: "Австрия", c: "at" }, { n: "Азербайджан", c: "az" }, { n: "Албания", c: "al" },
             { n: "Алжир", c: "dz" }, { n: "Англия", c: "gb-eng" }, { n: "Ангола", c: "ao" }, { n: "Андорра", c: "ad" },
@@ -344,7 +396,7 @@
             { n: "Тайвань", c: "tw" }
         ].sort((a, b) => a.n.localeCompare(b.n));
 
-        // Словарь для игроков (английское название из базы -> ISO код флага)
+        // СУПЕР-ПОДРОБНЫЙ словарь для игроков из FC27
         const playerFlagMap = {
             "England": "gb-eng", "Scotland": "gb-sct", "Wales": "gb-wls", "Northern Ireland": "gb-nir",
             "Russia": "ru", "Spain": "es", "Italy": "it", "Germany": "de", "France": "fr",
@@ -367,34 +419,65 @@
             "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl",
             "Ecuador": "ec", "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo",
             "Costa Rica": "cr", "Panama": "pa", "Honduras": "hn", "Jamaica": "jm",
-            "New Zealand": "nz", "South Africa": "za", "China": "cn", "Taiwan": "tw"
+            "New Zealand": "nz", "South Africa": "za",
+            "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn",
+            "Mali": "ml", "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd",
+            "Central African Republic": "cf", "Equatorial Guinea": "gq", "Benin": "bj",
+            "Togo": "tg", "Niger": "ne", "Chad": "td", "Sudan": "sd", "South Sudan": "ss",
+            "Eritrea": "er", "Djibouti": "dj", "Somalia": "so", "Comoros": "km",
+            "Madagascar": "mg", "Mauritius": "mu", "Seychelles": "sc", "Mozambique": "mz",
+            "Zambia": "zm", "Zimbabwe": "zw", "Angola": "ao", "Namibia": "na",
+            "Botswana": "bw", "Lesotho": "ls", "Eswatini": "sz", "Gambia": "gm",
+            "Liberia": "lr", "Sierra Leone": "sl", "Cape Verde": "cv", "Sao Tome and Principe": "st",
+            "Mauritania": "mr", "Libya": "ly", "Tunisia": "tn", "Kenya": "ke",
+            "Uganda": "ug", "Tanzania": "tz", "Rwanda": "rw", "Burundi": "bi",
+            "Ethiopia": "et", "India": "in", "Thailand": "th", "Vietnam": "vn",
+            "Malaysia": "my", "Indonesia": "id", "Philippines": "ph", "Singapore": "sg",
+            "China PR": "cn", "China": "cn", "Taiwan": "tw" // Если вдруг вылезет Китай (исключение)
         };
 
         function getPlayerFlagImg(nationality) {
-            const code = playerFlagMap[nationality] || "un"; // "un" - флаг ООН (заглушка)
+            const code = playerFlagMap[nationality];
+            if (!code) {
+                // Если страны нет в словаре, выводим пустой прозрачный квадратик вместо флага ООН
+                return `<div style="width:20px; height:14px; display:inline-block; margin-right:8px; background:rgba(255,255,255,0.1); border-radius:2px;"></div>`;
+            }
             return `<img src="https://flagcdn.com/w20/${code}.png" class="flag-icon" alt="${nationality}">`;
         }
 
-        // Заполняем список стран для тренера (с картинками)
-        function populateCountries() {
-            const select = document.getElementById("inp-coach-nat");
-            select.innerHTML = "";
-            countriesList.forEach(c => {
-                const opt = document.createElement("option");
-                opt.value = c.n;
-                opt.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" style="width:16px; margin-right:4px; vertical-align:middle;"> ${c.n}`;
-                // Примечание: некоторые браузеры не показывают картинки внутри <option>, но в Telegram на телефонах работает отлично. 
-                // Для десктопа добавим просто текст, чтобы не ломать выпадающий список.
-                opt.innerText = c.n; 
-                opt.setAttribute("data-flag", c.c);
-                select.appendChild(opt);
-            });
+        // --- ЛОГИКА КАСТОМНОГО ВЫПАДАЮЩЕГО СПИСКА ---
+        function initCustomSelect() {
+            const trigger = document.getElementById("nat-trigger");
+            const optionsContainer = document.getElementById("nat-options");
+            const display = document.getElementById("selected-nat-display");
             
-            // Обновляем селект, добавляя картинку (если браузер поддерживает)
-            // В стандартных <select> картинки не поддерживаются, поэтому мы просто выведем текст, 
-            // но выбранный флаг покажем рядом с полем.
+            // Заполняем список
+            optionsContainer.innerHTML = "";
+            countriesList.forEach(c => {
+                const div = document.createElement("div");
+                div.className = "custom-option";
+                div.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" class="flag-icon"> ${c.n}`;
+                div.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedNationality = c.n;
+                    display.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" class="flag-icon"> <span>${c.n}</span>`;
+                    optionsContainer.classList.remove("show");
+                };
+                optionsContainer.appendChild(div);
+            });
+
+            // Открытие/закрытие по клику
+            trigger.onclick = (e) => {
+                e.stopPropagation();
+                optionsContainer.classList.toggle("show");
+            };
+
+            // Закрытие при клике вне списка
+            document.addEventListener("click", () => {
+                optionsContainer.classList.remove("show");
+            });
         }
-        populateCountries();
+        initCustomSelect();
 
         // Функция slugify и логотипы
         function slugify(text) {
@@ -573,7 +656,8 @@
         function goToCoachSetup() {
             const nameInput = document.getElementById("inp-coach-name");
             if(!nameInput.value) nameInput.value = userName;
-            document.getElementById("setup-club-name").innerText = `Клуб: ${currentClubName} (${renderStars(currentStars)})`;
+            // Исправление бага с иероглифами (innerHTML вместо innerText)
+            document.getElementById("setup-club-name").innerHTML = `Клуб: ${currentClubName} (${renderStars(currentStars)})`;
             showScreen("coach");
         }
 
@@ -609,7 +693,7 @@
 
         async function finishSetup() {
             const coachName = document.getElementById("inp-coach-name").value.trim();
-            const coachNat = document.getElementById("inp-coach-nat").value;
+            const coachNat = selectedNationality; // Берем из нашей кастомной переменной
             const coachAge = parseInt(document.getElementById("inp-coach-age").value);
             const difficulty = document.getElementById("inp-difficulty").value;
             const extraBudget = parseInt(document.getElementById("inp-extra-budget").value);
