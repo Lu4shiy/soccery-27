@@ -21,6 +21,11 @@ class Player(Base):
     name = Column(String)
     club_id = Column(Integer)
 
+class Club(Base):
+    __tablename__ = "clubs"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+
 class PlayerTemp(Base):
     __tablename__ = "player_transfers_temp"
     player_id = Column(Integer, primary_key=True)
@@ -31,9 +36,8 @@ class PlayerTemp(Base):
     source = Column(String)
 
 def parse_tm_money(text):
-    """Превращает €75.00m в 75000000, €500k в 500000"""
     if not text or '€' not in text: return 0
-    text = text.lower().replace('€', '').strip()
+    text = text.lower().replace('€', '').replace(',', '.').strip()
     try:
         if text.endswith('m'):
             return int(float(text[:-1]) * 1_000_000)
@@ -44,7 +48,6 @@ def parse_tm_money(text):
         return 0
 
 def parse_tm_contract(text):
-    """Извлекает дату из 'Jun 30, 2027' -> '2027-06-30'"""
     if not text: return None
     match = re.search(r'(\w{3}) (\d{1,2}), (\d{4})', text)
     if match:
@@ -60,8 +63,15 @@ async def scrape_tm_for_players(club_name):
     print(f"\n🔍 Ищем данные на Transfermarkt для клуба: {club_name}")
     
     db = Session(engine)
-    # Для теста берем только 5 игроков (потом уберешь лимит)
-    players = db.query(Player).limit(5).all() 
+    # ИСПРАВЛЕНИЕ: Фильтруем игроков по ID клуба!
+    club = db.query(Club).filter(Club.name.ilike(f"%{club_name}%")).first()
+    if not club:
+        print(f"❌ Клуб {club_name} не найден в базе.")
+        return
+        
+    # Для теста берем только 5 игроков ЭТОГО клуба
+    players = db.query(Player).filter(Player.club_id == club.id).limit(5).all() 
+    print(f"📋 Берем {len(players)} игроков для теста.")
     
     async with Stealth().use_async(async_playwright()) as p:
         browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
@@ -76,7 +86,7 @@ async def scrape_tm_for_players(club_name):
                 # Ищем игрока через быстрый поиск TM
                 search_url = f"https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query={player.name.replace(' ', '+')}"
                 await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(3000) # Даем время прогрузиться
 
                 # Ищем первую ссылку на профиль игрока в результатах
                 player_link_el = await page.query_selector('table.items tbody tr td.hauptlink a')
@@ -90,26 +100,26 @@ async def scrape_tm_for_players(club_name):
                 
                 # Переходим на страницу игрока
                 await page.goto(profile_url, wait_until="domcontentloaded", timeout=60000)
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(4000) # Ждем загрузки данных
 
-                # Парсим рыночную стоимость
-                mv_el = await page.query_selector('.dataMarktwert a, .marktwert a')
-                market_value_text = (await mv_el.inner_text()).strip() if mv_el else ""
+                # ИСПРАВЛЕНИЕ: Более точные селекторы для TM
+                market_value_text = ""
+                mv_el = await page.query_selector('.dataMarktwert a')
+                if mv_el: market_value_text = (await mv_el.inner_text()).strip()
                 
-                # Парсим контракт
-                contract_el = await page.query_selector('.dataVertrag a, .vertrag a')
-                contract_text = (await contract_el.inner_text()).strip() if contract_el else ""
+                contract_text = ""
+                contract_el = await page.query_selector('.dataVertrag a')
+                if contract_el: contract_text = (await contract_el.inner_text()).strip()
 
                 val = parse_tm_money(market_value_text)
                 ctu = parse_tm_contract(contract_text)
                 
-                # Расчет ЗП (если нет реальных данных, берем 0.5% от стоимости в неделю)
+                # Расчет ЗП (0.5% от стоимости в неделю)
                 wage = int((val * 0.005) / 52) if val > 0 else 0
 
                 if val > 0:
                     print(f"    ✅ {player.name} | Цена: {market_value_text} ({val}) | Контракт: {ctu}")
                     
-                    # Пишем во ВРЕМЕННУЮ таблицу!
                     temp_rec = db.query(PlayerTemp).filter_by(player_id=player.id).first()
                     if not temp_rec:
                         temp_rec = PlayerTemp(player_id=player.id)
@@ -122,9 +132,9 @@ async def scrape_tm_for_players(club_name):
                     temp_rec.source = "Transfermarkt"
                     db.commit()
                 else:
-                    print(f"    ⚠️ Не удалось прочитать цену для {player.name}")
+                    print(f"    ⚠️ Не удалось прочитать цену (текст: '{market_value_text}')")
                 
-                await page.wait_for_timeout(2000) # Пауза между игроками
+                await page.wait_for_timeout(3000) # Пауза между игроками
                 
             except Exception as e:
                 print(f"    ❌ Ошибка при парсинге {player.name}: {e}")
