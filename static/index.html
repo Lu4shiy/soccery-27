@@ -106,10 +106,26 @@
         .club-meta { color: #8e9eb5; font-size: 12px; margin-top: 2px; }
         
         .club-rating-block { display: flex; flex-direction: column; align-items: flex-end; }
-        .club-stars { color: #e6c544; font-size: 12px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px; }
+        .club-stars { font-size: 14px; margin-bottom: 4px; letter-spacing: 1px; }
         .club-ovr {
             background: #17212b; color: #52a8ff; font-weight: bold;
             padding: 4px 8px; border-radius: 6px; font-size: 13px; min-width: 36px; text-align: center;
+        }
+
+        /* Половинка звезды */
+        .star-half {
+            position: relative;
+            display: inline-block;
+            color: #4e5d78; /* Цвет пустой звезды */
+        }
+        .star-half::before {
+            content: '★';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            overflow: hidden;
+            color: #e6c544; /* Цвет заливки */
         }
 
         /* Список игроков (Состав) */
@@ -122,19 +138,14 @@
         .ovr-bronze { background: #b87d4b; color: #1a1a1a; }
         .player-name-block { display: flex; flex-direction: column; }
         .player-name { font-weight: bold; font-size: 14px; }
-        .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; }
+        .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; display: flex; align-items: center; gap: 4px; }
         .player-pos { background: #17212b; color: #52a8ff; font-weight: bold; font-size: 12px; padding: 4px 6px; border-radius: 4px; width: 38px; text-align: center; }
 
         /* Бюджет */
         .budget-display {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2ecc71;
-            text-align: center;
-            margin: 16px 0;
-            background: #17212b;
-            padding: 12px;
-            border-radius: 10px;
+            font-size: 24px; font-weight: bold; color: #2ecc71;
+            text-align: center; margin: 16px 0;
+            background: #17212b; padding: 12px; border-radius: 10px;
         }
     </style>
 </head>
@@ -178,7 +189,7 @@
             <div id="confirm-logo"></div>
             <h2 id="confirm-club" style="color:#52a8ff;"></h2>
             <p id="confirm-league"></p>
-            <div id="confirm-stars" style="color:#e6c544; font-size: 20px; margin-top: 8px;"></div>
+            <div id="confirm-stars" style="font-size: 20px; margin-top: 8px;"></div>
         </div>
         <button class="btn" id="btn-continue" style="margin-bottom: 10px;">Продолжить</button>
         <button class="btn" id="btn-reset" style="background-color: #a82929;">Сменить клуб</button>
@@ -197,16 +208,7 @@
             <div class="form-group">
                 <label>Национальность</label>
                 <select id="inp-coach-nat" class="form-control">
-                    <option value="Россия">Россия</option>
-                    <option value="Англия">Англия</option>
-                    <option value="Испания">Испания</option>
-                    <option value="Италия">Италия</option>
-                    <option value="Германия">Германия</option>
-                    <option value="Франция">Франция</option>
-                    <option value="Португалия">Португалия</option>
-                    <option value="Бразилия">Бразилия</option>
-                    <option value="Аргентина">Аргентина</option>
-                    <option value="Другая">Другая</option>
+                    <!-- Заполняется через JS -->
                 </select>
             </div>
             <div class="form-group">
@@ -274,14 +276,89 @@
         document.getElementById("user-name").innerText = `Привет, ${userName}!`;
 
         let allClubs = [];
-        
-        // Переменные текущего выбора
         let currentClubId = null;
         let currentClubName = "";
         let currentLeague = "";
         let currentStars = 0.5;
+        let leaguesScrollPos = 0; // Запоминаем позицию прокрутки
 
-        // Функция slugify и логотипы (без изменений)
+        // Словарь стран для выпадающего списка тренера
+        const countriesList = [
+            { name: "Россия", flag: "🇷🇺" }, { name: "Англия", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "Испания", flag: "🇪🇸" },
+            { name: "Италия", flag: "🇮🇹" }, { name: "Германия", flag: "🇩🇪" }, { name: "Франция", flag: "🇫🇷" },
+            { name: "Португалия", flag: "🇵🇹" }, { name: "Бразилия", flag: "🇧🇷" }, { name: "Аргентина", flag: "🇦🇷" },
+            { name: "Нидерланды", flag: "🇳🇱" }, { name: "Бельгия", flag: "🇧🇪" }, { name: "Хорватия", flag: "🇭🇷" },
+            { name: "Уругвай", flag: "🇺🇾" }, { name: "Колумбия", flag: "🇨🇴" }, { name: "Мексика", flag: "🇲🇽" },
+            { name: "США", flag: "🇺🇸" }, { name: "Канада", flag: "🇨🇦" }, { name: "Япония", flag: "🇯🇵" },
+            { name: "Южная Корея", flag: "🇰🇷" }, { name: "Китай", flag: "🇨🇳" }, { name: "Австралия", flag: "🇦🇺" },
+            { name: "Марокко", flag: "🇲🇦" }, { name: "Сенегал", flag: "🇸🇳" }, { name: "Нигерия", flag: "🇳🇬" },
+            { name: "Египет", flag: "🇪🇬" }, { name: "Алжир", flag: "🇩🇿" }, { name: "Кот-д'Ивуар", flag: "🇨🇮" },
+            { name: "Гана", flag: "🇬🇭" }, { name: "Камерун", flag: "🇨🇲" }, { name: "Швеция", flag: "🇸🇪" },
+            { name: "Норвегия", flag: "🇳🇴" }, { name: "Дания", flag: "🇩🇰" }, { name: "Финляндия", flag: "🇫🇮" },
+            { name: "Исландия", flag: "🇮🇸" }, { name: "Польша", flag: "🇵🇱" }, { name: "Чехия", flag: "🇨🇿" },
+            { name: "Словакия", flag: "🇸🇰" }, { name: "Венгрия", flag: "🇭🇺" }, { name: "Румыния", flag: "🇷🇴" },
+            { name: "Болгария", flag: "🇧🇬" }, { name: "Греция", flag: "🇬🇷" }, { name: "Турция", flag: "🇹🇷" },
+            { name: "Украина", flag: "🇺🇦" }, { name: "Сербия", flag: "🇷🇸" }, { name: "Швейцария", flag: "🇨🇭" },
+            { name: "Австрия", flag: "🇦🇹" }, { name: "Шотландия", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }, { name: "Уэльс", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" },
+            { name: "Северная Ирландия", flag: "🇬🇧" }, { name: "Ирландия", flag: "🇮🇪" }, { name: "Албания", flag: "🇦🇱" },
+            { name: "Босния и Герцеговина", flag: "🇧🇦" }, { name: "Северная Македония", flag: "🇲🇰" }, { name: "Словения", flag: "🇸🇮" },
+            { name: "Черногория", flag: "🇲🇪" }, { name: "Косово", flag: "🇽🇰" }, { name: "Грузия", flag: "🇬🇪" },
+            { name: "Армения", flag: "🇦🇲" }, { name: "Азербайджан", flag: "🇦🇿" }, { name: "Казахстан", flag: "🇰🇿" },
+            { name: "Израиль", flag: "🇮🇱" }, { name: "Иран", flag: "🇮🇷" }, { name: "Ирак", flag: "🇮🇶" },
+            { name: "Саудовская Аравия", flag: "🇸🇦" }, { name: "Катар", flag: "🇶🇦" }, { name: "ОАЭ", flag: "🇦🇪" },
+            { name: "Узбекистан", flag: "🇺🇿" }, { name: "Перу", flag: "🇵🇪" }, { name: "Чили", flag: "🇨🇱" },
+            { name: "Эквадор", flag: "🇪🇨" }, { name: "Парагвай", flag: "🇵🇾" }, { name: "Венесуэла", flag: "🇻🇪" },
+            { name: "Боливия", flag: "🇧🇴" }, { name: "Коста-Рика", flag: "🇨🇷" }, { name: "Панама", flag: "🇵🇦" },
+            { name: "Гондурас", flag: "🇭🇳" }, { name: "Ямайка", flag: "🇯🇲" }, { name: "Новая Зеландия", flag: "🇳🇿" },
+            { name: "ЮАР", flag: "🇿🇦" }
+        ];
+
+        // Словарь для флагов игроков (английские названия из базы -> эмодзи)
+        const flagMap = {
+            "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+            "Russia": "🇷🇺", "Spain": "🇪🇸", "Italy": "🇮🇹", "Germany": "🇩🇪", "France": "🇫🇷",
+            "Portugal": "🇵🇹", "Brazil": "🇧🇷", "Argentina": "🇦🇷", "Netherlands": "🇳🇱",
+            "Belgium": "🇧🇪", "Croatia": "🇭🇷", "Uruguay": "🇺🇾", "Colombia": "🇨🇴",
+            "Mexico": "🇲🇽", "USA": "🇺🇸", "United States": "🇺🇸", "Canada": "🇨🇦",
+            "Japan": "🇯🇵", "South Korea": "🇰🇷", "Korea Republic": "🇰🇷", "China PR": "🇨🇳",
+            "Australia": "🇦🇺", "Morocco": "🇲🇦", "Senegal": "🇸🇳", "Nigeria": "🇳🇬",
+            "Egypt": "🇪🇬", "Algeria": "🇩🇿", "Ivory Coast": "🇨🇮", "Côte d'Ivoire": "🇨🇮",
+            "Ghana": "🇬🇭", "Cameroon": "🇨🇲", "Sweden": "🇸🇪", "Norway": "🇳🇴",
+            "Denmark": "🇩🇰", "Finland": "🇫🇮", "Iceland": "🇮🇸", "Poland": "🇵🇱",
+            "Czech Republic": "🇨🇿", "Czechia": "🇨🇿", "Slovakia": "🇸🇰", "Hungary": "🇭🇺",
+            "Romania": "🇷🇴", "Bulgaria": "🇧🇬", "Greece": "🇬🇷", "Turkey": "🇹🇷",
+            "Türkiye": "🇹🇷", "Ukraine": "🇺🇦", "Serbia": "🇷🇸", "Switzerland": "🇨🇭",
+            "Austria": "🇦🇹", "Northern Ireland": "🇬🇧", "Republic of Ireland": "🇮🇪",
+            "Ireland": "🇮🇪", "Albania": "🇦🇱", "Bosnia and Herzegovina": "🇧🇦",
+            "North Macedonia": "🇲🇰", "Slovenia": "🇸🇮", "Montenegro": "🇲🇪",
+            "Kosovo": "🇽🇰", "Georgia": "🇬🇪", "Armenia": "🇦🇲", "Azerbaijan": "🇦🇿",
+            "Kazakhstan": "🇰🇿", "Israel": "🇮🇱", "Iran": "🇮🇷", "Iraq": "🇮🇶",
+            "Saudi Arabia": "🇸🇦", "Qatar": "🇶🇦", "UAE": "🇦🇪", "United Arab Emirates": "🇦🇪",
+            "Uzbekistan": "🇺🇿", "Peru": "🇵🇪", "Chile": "🇨🇱", "Ecuador": "🇪🇨",
+            "Paraguay": "🇵🇾", "Venezuela": "🇻🇪", "Bolivia": "🇧🇴", "Costa Rica": "🇨🇷",
+            "Panama": "🇵🇦", "Honduras": "🇭🇳", "Jamaica": "🇯🇲", "New Zealand": "🇳🇿",
+            "South Africa": "🇿🇦"
+        };
+
+        function getFlagEmoji(nationality) {
+            if (!nationality) return "🏳️";
+            return flagMap[nationality] || "🏳️";
+        }
+
+        // Заполняем список стран для тренера при загрузке
+        function populateCountries() {
+            const select = document.getElementById("inp-coach-nat");
+            select.innerHTML = "";
+            countriesList.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.name;
+                opt.innerText = `${c.flag} ${c.name}`;
+                select.appendChild(opt);
+            });
+        }
+        populateCountries();
+
+        // Функция slugify и логотипы
         function slugify(text) {
             if (!text) return "";
             return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’\.]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-');
@@ -290,11 +367,9 @@
         function handleImgError(img, type, slug, fallbackChar) {
             const currentExt = img.src.split('.').pop().split('?')[0];
             let nextSrc = '';
-            if (currentExt === 'png') {
-                nextSrc = `/static/logos/${type}/${slug}.svg?v=9`;
-            } else if (currentExt === 'svg') {
-                nextSrc = `/static/logos/${type}/${slug}.webp?v=9`;
-            } else {
+            if (currentExt === 'png') nextSrc = `/static/logos/${type}/${slug}.svg?v=9`;
+            else if (currentExt === 'svg') nextSrc = `/static/logos/${type}/${slug}.webp?v=9`;
+            else {
                 img.style.display = 'none';
                 img.nextElementSibling.style.display = 'block';
                 return;
@@ -314,10 +389,16 @@
             `;
         }
 
+        // Функция отрисовки звезд (с CSS-половинкой)
         function renderStars(stars) {
             let html = "";
-            for(let i=0; i<Math.floor(stars); i++) html += "★";
-            if (stars % 1 !== 0) html += "½";
+            const fullStars = Math.floor(stars);
+            for (let i = 0; i < fullStars; i++) {
+                html += `<span style="color: #e6c544;">★</span>`;
+            }
+            if (stars % 1 !== 0) {
+                html += `<span class="star-half">★</span>`;
+            }
             return html;
         }
 
@@ -331,12 +412,10 @@
                 const res = await fetch(`${API_BASE}/api/manager/${encodeURIComponent(userId)}`);
                 const data = await res.json();
                 if (data.has_club) {
-                    // Если клуб выбран, но настройки не завершены — кидаем на подтверждение
                     currentClubId = data.club_id;
                     currentClubName = data.club_name;
                     currentLeague = data.league;
                     
-                    // Нам нужно узнать звезды текущего клуба из общего списка
                     if(allClubs.length === 0) {
                          const resClubs = await fetch(`${API_BASE}/api/clubs`);
                          allClubs = await resClubs.json();
@@ -365,6 +444,7 @@
                 }
                 renderLeagues();
                 showScreen("leagues");
+                window.scrollTo(0, 0); // При первом открытии скроллим вверх
             } catch (e) {
                 tg.showAlert("Ошибка загрузки: " + e.message);
                 showScreen("welcome");
@@ -385,7 +465,9 @@
         }
 
         function openLeague(league) {
+            leaguesScrollPos = window.scrollY; // Запоминаем скролл лиг
             document.getElementById("selected-league-title").innerText = league;
+            
             let filtered = allClubs.filter(c => c.league === league);
             filtered.sort((a, b) => (b.avg_ovr || 0) - (a.avg_ovr || 0));
 
@@ -417,7 +499,9 @@
                     });
                 };
             });
+            
             showScreen("clubs");
+            window.scrollTo(0, 0); // Скроллим вверх при входе в клубы
         }
 
         async function selectClub(clubId, clubName, league, stars) {
@@ -453,29 +537,23 @@
             showScreen("confirm");
         }
 
-        // --- ЛОГИКА НАСТРОЙКИ ---
-        
+        // --- НАСТРОЙКИ ---
         function goToCoachSetup() {
-            // Заполняем имя пользователя по умолчанию, если пусто
             const nameInput = document.getElementById("inp-coach-name");
             if(!nameInput.value) nameInput.value = userName;
-            
             document.getElementById("setup-club-name").innerText = `Клуб: ${currentClubName} (${renderStars(currentStars)})`;
             showScreen("coach");
         }
 
         function goToClubSetup() {
-            // Валидация
             const coachName = document.getElementById("inp-coach-name").value.trim();
             const coachAge = parseInt(document.getElementById("inp-coach-age").value);
             
             if (coachName.length < 3) {
-                tg.showAlert("Введите имя тренера (минимум 3 символа)");
-                return;
+                tg.showAlert("Введите имя тренера (минимум 3 символа)"); return;
             }
             if (isNaN(coachAge) || coachAge < 18 || coachAge > 100) {
-                tg.showAlert("Введите корректный возраст тренера");
-                return;
+                tg.showAlert("Введите корректный возраст тренера"); return;
             }
 
             updateBudgetDisplay();
@@ -484,8 +562,6 @@
 
         function updateBudgetDisplay() {
             const extra = parseInt(document.getElementById("inp-extra-budget").value);
-            
-            // Формула начального бюджета: (Звезды * 10) + Бонус лиги
             let leagueBonus = 0;
             const l = currentLeague.toLowerCase();
             if(l.includes("premier league") || l.includes("laliga")) leagueBonus = 50;
@@ -520,11 +596,8 @@
                     })
                 });
                 
-                if (res.ok) {
-                    loadSquad();
-                } else {
-                    tg.showAlert("Ошибка сохранения настроек");
-                }
+                if (res.ok) loadSquad();
+                else tg.showAlert("Ошибка сохранения настроек");
             } catch(e) {
                 tg.showAlert("Сетевая ошибка");
             }
@@ -558,6 +631,9 @@
                     else if (p.position.includes("Midfield")) shortPos = "MID";
                     else if (p.position.includes("Forward") || p.position.includes("Striker") || p.position.includes("Winger")) shortPos = "ATT";
 
+                    // Получаем флаг для национальности
+                    const flag = getFlagEmoji(p.nationality);
+
                     return `
                         <div class="player-row">
                             <div class="player-info">
@@ -565,7 +641,10 @@
                                 <div class="player-pos">${shortPos}</div>
                                 <div class="player-name-block">
                                     <div class="player-name">${p.name}</div>
-                                    <div class="player-meta">${p.nationality} · ${p.age} лет</div>
+                                    <div class="player-meta">
+                                        <span>${flag}</span>
+                                        <span>${p.nationality} · ${p.age} лет</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -581,25 +660,19 @@
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
         };
-        document.getElementById("btn-back-leagues").onclick = () => showScreen("leagues");
         
-        // Кнопка "Продолжить" на экране подтверждения
-        document.getElementById("btn-continue").onclick = () => {
-            // Проверяем, завершена ли настройка (если это старый юзер, у которого всё готово - сразу в состав)
-            // Но для простоты: всегда ведем на создание тренера, если не установлен флаг.
-            // *В нашем случае checkManager не тянет is_setup_complete, поэтому просто ведем в настройки*
-            goToCoachSetup();
+        // Возврат к лигам с восстановлением скролла
+        document.getElementById("btn-back-leagues").onclick = () => {
+            showScreen("leagues");
+            setTimeout(() => window.scrollTo(0, leaguesScrollPos), 10);
         };
-
+        
+        document.getElementById("btn-continue").onclick = goToCoachSetup;
         document.getElementById("btn-back-to-confirm").onclick = () => showScreen("confirm");
         document.getElementById("btn-next-club-setup").onclick = goToClubSetup;
-        
         document.getElementById("btn-back-to-coach").onclick = () => showScreen("coach");
-        
         document.getElementById("inp-extra-budget").onchange = updateBudgetDisplay;
-        
         document.getElementById("btn-finish-setup").onclick = finishSetup;
-        
         document.getElementById("btn-back-to-setup").onclick = () => showScreen("club-setup");
 
         document.getElementById("btn-reset").onclick = () => {
