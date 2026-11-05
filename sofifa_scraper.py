@@ -1,7 +1,7 @@
 import asyncio
 import re
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
+from playwright_stealth import Stealth
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, Session
 from rapidfuzz import process, fuzz
@@ -41,11 +41,12 @@ def parse_contract(contract_text):
 async def scrape_team_playwright(team_name):
     print(f"\n🔍 Запускаем браузер для клуба: '{team_name}'...")
     
-    async with async_playwright() as p:
-        # Запускаем браузер с реалистичным User-Agent
+    # Используем новый синтаксис Stealth
+    async with Stealth().use_async(async_playwright()) as p:
+        # Запускаем браузер с реалистичным User-Agent и скрытием автоматизации
         browser = await p.chromium.launch(
             headless=True,
-            args=["--disable-blink-features=AutomationControlled"] # Скрываем, что это робот
+            args=["--disable-blink-features=AutomationControlled"]
         )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -53,8 +54,6 @@ async def scrape_team_playwright(team_name):
         )
         page = await context.new_page()
         
-        # Применяем Stealth (маскировку)
-        await stealth_async(page)
         print("🛡️ Stealth-режим активирован.")
 
         search_url = f"https://sofifa.com/teams?keyword={team_name}"
@@ -62,18 +61,15 @@ async def scrape_team_playwright(team_name):
         
         try:
             await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-            # Даем Cloudflare 5 секунд, чтобы проверить браузер и пропустить нас
             print("⏳ Ждем прохождения защиты Cloudflare (5 сек)...")
             await page.wait_for_timeout(5000) 
             
-            # Ждем появления таблицы
             await page.wait_for_selector('table tbody tr', timeout=15000)
         except Exception as e:
             print(f"❌ Таблица поиска не появилась. Cloudflare снова блокирует. Ошибка: {e}")
             await browser.close()
             return
 
-        # Ищем ссылку на клуб
         team_link = await page.query_selector('table tbody tr td a[href^="/team/"]')
         if not team_link:
             print(f"❌ Клуб '{team_name}' не найден на SoFIFA.")
@@ -83,9 +79,8 @@ async def scrape_team_playwright(team_name):
         team_url = "https://sofifa.com" + await team_link.get_attribute("href")
         print(f"✅ Страница клуба: {team_url}")
         
-        # Переходим на страницу клуба
         await page.goto(team_url, wait_until="domcontentloaded", timeout=60000)
-        await page.wait_for_timeout(3000) # Пауза перед парсингом
+        await page.wait_for_timeout(3000)
         
         try:
             await page.wait_for_selector('table tbody tr', timeout=15000)
@@ -94,7 +89,6 @@ async def scrape_team_playwright(team_name):
             await browser.close()
             return
 
-        # Собираем строки таблицы
         rows = await page.query_selector_all('table.table-hover.persist-area tbody tr')
         if not rows:
             rows = await page.query_selector_all('table tbody tr')
@@ -108,13 +102,11 @@ async def scrape_team_playwright(team_name):
 
         for row in rows:
             try:
-                # Имя игрока
                 name_el = await row.query_selector('td.col-name a')
                 if not name_el: continue
                 sofifa_name = (await name_el.inner_text()).strip()
                 if not sofifa_name: continue
 
-                # Цена, зарплата, контракт
                 val_el = await row.query_selector('td[data-col="vl"]')
                 wage_el = await row.query_selector('td[data-col="wg"]')
                 ct_el = await row.query_selector('td[data-col="tt"]')
@@ -123,7 +115,6 @@ async def scrape_team_playwright(team_name):
                 wage_text = (await wage_el.inner_text()).strip() if wage_el else ""
                 contract_text = (await ct_el.inner_text()).strip() if ct_el else ""
 
-                # Сопоставление имен
                 player = None
                 for p in db_players:
                     if sofifa_name.lower() in p.name.lower() or p.name.lower() in sofifa_name.lower():
