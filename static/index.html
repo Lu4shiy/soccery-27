@@ -19,6 +19,7 @@
         h2 { margin: 8px 0; }
         p { color: #8e9eb5; margin: 4px 0; }
         .hidden { display: none !important; }
+        
         .card {
             background-color: #232e3c;
             border-radius: 12px;
@@ -138,6 +139,53 @@
             min-width: 42px;
             text-align: center;
         }
+
+        /* Список игроков (Состав) */
+        .squad-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .player-row {
+            background: #232e3c;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .player-ovr {
+            font-size: 18px;
+            font-weight: bold;
+            width: 36px;
+            text-align: center;
+            padding: 4px 0;
+            border-radius: 6px;
+        }
+        /* Цвета рейтинга как в FIFA */
+        .ovr-gold { background: #e6c544; color: #1a1a1a; }
+        .ovr-silver { background: #a3a3a3; color: #1a1a1a; }
+        .ovr-bronze { background: #b87d4b; color: #1a1a1a; }
+        
+        .player-name-block { display: flex; flex-direction: column; }
+        .player-name { font-weight: bold; font-size: 14px; }
+        .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; }
+        
+        .player-pos {
+            background: #17212b;
+            color: #52a8ff;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            width: 38px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -186,6 +234,13 @@
         <button class="btn" id="btn-reset" style="background-color: #a82929;">Сменить клуб</button>
     </div>
 
+    <!-- ЭКРАН 6: Состав команды -->
+    <div id="screen-squad" class="screen hidden">
+        <button class="btn-back" id="btn-back-confirm">← Назад</button>
+        <h2 id="squad-title" style="margin-bottom: 16px;">Состав команды</h2>
+        <div id="squad-list" class="squad-container"></div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -197,6 +252,9 @@
         document.getElementById("user-name").innerText = `Привет, ${userName}!`;
 
         let allClubs = [];
+        let currentClubId = null;
+        let currentClubName = "";
+        let currentLeague = "";
 
         // 1. Строгая функция: убирает ВСЕ спецсимволы, точки, апострофы и ударения (ö -> o, ú -> u)
         function slugify(text) {
@@ -218,9 +276,9 @@
             let nextSrc = '';
             
             if (currentExt === 'png') {
-                nextSrc = `/static/logos/${type}/${slug}.svg?v=8`;
+                nextSrc = `/static/logos/${type}/${slug}.svg?v=9`;
             } else if (currentExt === 'svg') {
-                nextSrc = `/static/logos/${type}/${slug}.webp?v=8`;
+                nextSrc = `/static/logos/${type}/${slug}.webp?v=9`;
             } else {
                 // Если ничего не нашли — показываем букву
                 img.style.display = 'none';
@@ -233,7 +291,7 @@
         // 3. Генерация HTML логотипа
         function getLogoHTML(type, name, sizeClass = '') {
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=8`; // Всегда начинаем с PNG
+            const src = `/static/logos/${type}/${slug}.png?v=9`; // Всегда начинаем с PNG
             const fallbackChar = name ? name.charAt(0) : "?";
             
             return `
@@ -256,7 +314,8 @@
                 const res = await fetch(`${API_BASE}/api/manager/${encodeURIComponent(userId)}`);
                 const data = await res.json();
                 if (data.has_club) {
-                    showConfirm(data.club_name, data.league, false);
+                    // Передаем ID клуба в функцию подтверждения
+                    showConfirm(data.club_name, data.league, false, data.club_id);
                     return true;
                 }
             } catch (e) { console.error(e); }
@@ -285,7 +344,6 @@
         }
 
         function renderLeagues() {
-            // Получаем уникальные лиги
             const uniqueLeagues = [...new Set(allClubs.map(c => c.league))].filter(l => l).sort();
             const grid = document.getElementById("leagues-grid");
             grid.innerHTML = "";
@@ -305,7 +363,6 @@
         function openLeague(league) {
             document.getElementById("selected-league-title").innerText = league;
             
-            // Фильтруем клубы по лиге и сортируем по рейтингу
             let filtered = allClubs.filter(c => c.league === league);
             filtered.sort((a, b) => (b.avg_ovr || 0) - (a.avg_ovr || 0));
 
@@ -353,24 +410,77 @@
                     tg.showAlert(data.detail || "Ошибка при выборе");
                     return;
                 }
-                showConfirm(data.club_name, data.league, true);
+                showConfirm(data.club_name, data.league, true, parseInt(clubId, 10));
             } catch (e) {
                 tg.showAlert("Сетевая ошибка: " + e.message);
             }
         }
 
-        function showConfirm(clubName, league, isNew) {
+        function showConfirm(clubName, league, isNew, clubId) {
+            currentClubName = clubName;
+            currentLeague = league;
+            if (clubId) currentClubId = clubId;
+
             document.getElementById("confirm-club").innerText = clubName;
             document.getElementById("confirm-league").innerText = league;
             
-            // Вставляем большой логотип на экран подтверждения
             document.getElementById("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
-            
             document.getElementById("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
         }
 
-        // Кнопки навигации
+        async function loadSquad() {
+            if (!currentClubId) {
+                tg.showAlert("Ошибка: ID клуба не найден. Попробуйте выбрать клуб заново.");
+                return;
+            }
+            
+            const listContainer = document.getElementById("squad-list");
+            listContainer.innerHTML = `<p style="text-align:center; color:#8e9eb5;">⏳ Загружаем игроков...</p>`;
+            document.getElementById("squad-title").innerText = `Состав: ${currentClubName}`;
+            showScreen("squad");
+
+            try {
+                const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
+                if (!res.ok) throw new Error("Ошибка сервера");
+                const players = await res.json();
+                
+                if (!players.length) {
+                    listContainer.innerHTML = `<p style="text-align:center;">В команде пока нет игроков.</p>`;
+                    return;
+                }
+
+                listContainer.innerHTML = players.map(p => {
+                    let ovrClass = "ovr-bronze";
+                    if (p.overall >= 75) ovrClass = "ovr-gold";
+                    else if (p.overall >= 65) ovrClass = "ovr-silver";
+
+                    let shortPos = p.position;
+                    if (p.position.includes("Goalkeeper")) shortPos = "GK";
+                    else if (p.position.includes("Back")) shortPos = "DEF";
+                    else if (p.position.includes("Midfield")) shortPos = "MID";
+                    else if (p.position.includes("Forward") || p.position.includes("Striker") || p.position.includes("Winger")) shortPos = "ATT";
+
+                    return `
+                        <div class="player-row">
+                            <div class="player-info">
+                                <div class="player-ovr ${ovrClass}">${p.overall}</div>
+                                <div class="player-pos">${shortPos}</div>
+                                <div class="player-name-block">
+                                    <div class="player-name">${p.name}</div>
+                                    <div class="player-meta">${p.nationality} · ${p.age} лет</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+
+            } catch (e) {
+                listContainer.innerHTML = `<p style="text-align:center; color:#ff6b6b;">Ошибка загрузки: ${e.message}</p>`;
+            }
+        }
+
+        // --- Обработчики кнопок ---
         document.getElementById("btn-start").onclick = async () => {
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
@@ -381,17 +491,19 @@
         };
 
         document.getElementById("btn-continue").onclick = () => {
-            tg.showAlert("Карьера сохранена! Следующий экран в разработке.");
+            loadSquad();
         };
 
-        // Кнопка сброса клуба
+        document.getElementById("btn-back-confirm").onclick = () => {
+            showScreen("confirm");
+        };
+
         document.getElementById("btn-reset").onclick = () => {
             tg.showConfirm("Ты уверен, что хочешь сбросить клуб и выбрать заново?", async (ok) => {
                 if (!ok) return;
                 try {
                     const res = await fetch(`${API_BASE}/api/reset-club/${userId}`, { method: 'DELETE' });
                     if (res.ok) {
-                        // Перезагружаем страницу, чтобы вернуться на экран выбора
                         window.location.reload();
                     } else {
                         tg.showAlert("Ошибка при сбросе");

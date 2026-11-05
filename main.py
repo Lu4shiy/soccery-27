@@ -155,6 +155,24 @@ def get_manager(telegram_id: str):
     finally:
         db.close()
 
+@app.get("/api/clubs/{club_id}/players")
+def get_club_players(club_id: int):
+    db = Session(engine)
+    try:
+        players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "position": p.position,
+                "age": p.age,
+                "overall": p.overall_rating,
+                "nationality": p.nationality
+            }
+            for p in players
+        ]
+    finally:
+        db.close()
 
 class SelectClubRequest(BaseModel):
     telegram_id: str
@@ -202,6 +220,27 @@ def reset_club(telegram_id: str):
             db.delete(manager)
             db.commit()
         return {"status": "ok"}
+    finally:
+        db.close()
+
+@app.get("/api/clubs/{club_id}/players")
+def get_club_players(club_id: int):
+    """Возвращает состав клуба, отсортированный по рейтингу."""
+    db = Session(engine)
+    try:
+        players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
+        
+        result = []
+        for p in players:
+            result.append({
+                "id": p.id,
+                "name": p.name,
+                "position": p.position,
+                "age": p.age,
+                "overall": p.overall_rating,
+                "nationality": p.nationality
+            })
+        return result
     finally:
         db.close()
 
