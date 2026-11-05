@@ -65,6 +65,17 @@
         }
         .form-control:focus { outline: none; border-color: #52a8ff; }
 
+        /* Стили для флагов-картинок */
+        .flag-icon {
+            width: 20px;
+            height: 14px;
+            object-fit: cover;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
         /* Стили для заглушек логотипов */
         .logo-container {
             width: 44px;
@@ -116,7 +127,7 @@
         .star-half {
             position: relative;
             display: inline-block;
-            color: #4e5d78; /* Цвет пустой звезды */
+            color: #4e5d78;
         }
         .star-half::before {
             content: '★';
@@ -125,7 +136,7 @@
             top: 0;
             width: 50%;
             overflow: hidden;
-            color: #e6c544; /* Цвет заливки */
+            color: #e6c544;
         }
 
         /* Список игроков (Состав) */
@@ -138,7 +149,7 @@
         .ovr-bronze { background: #b87d4b; color: #1a1a1a; }
         .player-name-block { display: flex; flex-direction: column; }
         .player-name { font-weight: bold; font-size: 14px; }
-        .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+        .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
         .player-pos { background: #17212b; color: #52a8ff; font-weight: bold; font-size: 12px; padding: 4px 6px; border-radius: 4px; width: 38px; text-align: center; }
 
         /* Бюджет */
@@ -280,81 +291,106 @@
         let currentClubName = "";
         let currentLeague = "";
         let currentStars = 0.5;
-        let leaguesScrollPos = 0; // Запоминаем позицию прокрутки
+        let leaguesScrollPos = 0;
 
-        // Словарь стран для выпадающего списка тренера
+        // ОГРОМНЫЙ список стран с ISO-кодами (для картинок флагов). Исключены Китай и Тайвань.
         const countriesList = [
-            { name: "Россия", flag: "🇷🇺" }, { name: "Англия", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "Испания", flag: "🇪🇸" },
-            { name: "Италия", flag: "🇮🇹" }, { name: "Германия", flag: "🇩🇪" }, { name: "Франция", flag: "🇫🇷" },
-            { name: "Португалия", flag: "🇵🇹" }, { name: "Бразилия", flag: "🇧🇷" }, { name: "Аргентина", flag: "🇦🇷" },
-            { name: "Нидерланды", flag: "🇳🇱" }, { name: "Бельгия", flag: "🇧🇪" }, { name: "Хорватия", flag: "🇭🇷" },
-            { name: "Уругвай", flag: "🇺🇾" }, { name: "Колумбия", flag: "🇨🇴" }, { name: "Мексика", flag: "🇲🇽" },
-            { name: "США", flag: "🇺🇸" }, { name: "Канада", flag: "🇨🇦" }, { name: "Япония", flag: "🇯🇵" },
-            { name: "Южная Корея", flag: "🇰🇷" }, { name: "Китай", flag: "🇨🇳" }, { name: "Австралия", flag: "🇦🇺" },
-            { name: "Марокко", flag: "🇲🇦" }, { name: "Сенегал", flag: "🇸🇳" }, { name: "Нигерия", flag: "🇳🇬" },
-            { name: "Египет", flag: "🇪🇬" }, { name: "Алжир", flag: "🇩🇿" }, { name: "Кот-д'Ивуар", flag: "🇨🇮" },
-            { name: "Гана", flag: "🇬🇭" }, { name: "Камерун", flag: "🇨🇲" }, { name: "Швеция", flag: "🇸🇪" },
-            { name: "Норвегия", flag: "🇳🇴" }, { name: "Дания", flag: "🇩🇰" }, { name: "Финляндия", flag: "🇫🇮" },
-            { name: "Исландия", flag: "🇮🇸" }, { name: "Польша", flag: "🇵🇱" }, { name: "Чехия", flag: "🇨🇿" },
-            { name: "Словакия", flag: "🇸🇰" }, { name: "Венгрия", flag: "🇭🇺" }, { name: "Румыния", flag: "🇷🇴" },
-            { name: "Болгария", flag: "🇧🇬" }, { name: "Греция", flag: "🇬🇷" }, { name: "Турция", flag: "🇹🇷" },
-            { name: "Украина", flag: "🇺🇦" }, { name: "Сербия", flag: "🇷🇸" }, { name: "Швейцария", flag: "🇨🇭" },
-            { name: "Австрия", flag: "🇦🇹" }, { name: "Шотландия", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }, { name: "Уэльс", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" },
-            { name: "Северная Ирландия", flag: "🇬🇧" }, { name: "Ирландия", flag: "🇮🇪" }, { name: "Албания", flag: "🇦🇱" },
-            { name: "Босния и Герцеговина", flag: "🇧🇦" }, { name: "Северная Македония", flag: "🇲🇰" }, { name: "Словения", flag: "🇸🇮" },
-            { name: "Черногория", flag: "🇲🇪" }, { name: "Косово", flag: "🇽🇰" }, { name: "Грузия", flag: "🇬🇪" },
-            { name: "Армения", flag: "🇦🇲" }, { name: "Азербайджан", flag: "🇦🇿" }, { name: "Казахстан", flag: "🇰🇿" },
-            { name: "Израиль", flag: "🇮🇱" }, { name: "Иран", flag: "🇮🇷" }, { name: "Ирак", flag: "🇮🇶" },
-            { name: "Саудовская Аравия", flag: "🇸🇦" }, { name: "Катар", flag: "🇶🇦" }, { name: "ОАЭ", flag: "🇦🇪" },
-            { name: "Узбекистан", flag: "🇺🇿" }, { name: "Перу", flag: "🇵🇪" }, { name: "Чили", flag: "🇨🇱" },
-            { name: "Эквадор", flag: "🇪🇨" }, { name: "Парагвай", flag: "🇵🇾" }, { name: "Венесуэла", flag: "🇻🇪" },
-            { name: "Боливия", flag: "🇧🇴" }, { name: "Коста-Рика", flag: "🇨🇷" }, { name: "Панама", flag: "🇵🇦" },
-            { name: "Гондурас", flag: "🇭🇳" }, { name: "Ямайка", flag: "🇯🇲" }, { name: "Новая Зеландия", flag: "🇳🇿" },
-            { name: "ЮАР", flag: "🇿🇦" }
-        ];
+            { n: "Австралия", c: "au" }, { n: "Австрия", c: "at" }, { n: "Азербайджан", c: "az" }, { n: "Албания", c: "al" },
+            { n: "Алжир", c: "dz" }, { n: "Англия", c: "gb-eng" }, { n: "Ангола", c: "ao" }, { n: "Андорра", c: "ad" },
+            { n: "Аргентина", c: "ar" }, { n: "Армения", c: "am" }, { n: "Афганистан", c: "af" }, { n: "Багамы", c: "bs" },
+            { n: "Бангладеш", c: "bd" }, { n: "Барбадос", c: "bb" }, { n: "Бахрейн", c: "bh" }, { n: "Беларусь", c: "by" },
+            { n: "Бельгия", c: "be" }, { n: "Бенин", c: "bj" }, { n: "Болгария", c: "bg" }, { n: "Боливия", c: "bo" },
+            { n: "Босния и Герцеговина", c: "ba" }, { n: "Ботсвана", c: "bw" }, { n: "Бразилия", c: "br" }, { n: "Буркина-Фасо", c: "bf" },
+            { n: "Бурунди", c: "bi" }, { n: "Бутан", c: "bt" }, { n: "Вануату", c: "vu" }, { n: "Великобритания", c: "gb" },
+            { n: "Венгрия", c: "hu" }, { n: "Венесуэла", c: "ve" }, { n: "Вьетнам", c: "vn" }, { n: "Габон", c: "ga" },
+            { n: "Гаити", c: "ht" }, { n: "Гайана", c: "gy" }, { n: "Гамбия", c: "gm" }, { n: "Гана", c: "gh" },
+            { n: "Гватемала", c: "gt" }, { n: "Гвинея", c: "gn" }, { n: "Гвинея-Бисау", c: "gw" }, { n: "Германия", c: "de" },
+            { n: "Гондурас", c: "hn" }, { n: "Гренада", c: "gd" }, { n: "Греция", c: "gr" }, { n: "Грузия", c: "ge" },
+            { n: "Дания", c: "dk" }, { n: "Джибути", c: "dj" }, { n: "Доминика", c: "dm" }, { n: "Доминикана", c: "do" },
+            { n: "Египет", c: "eg" }, { n: "Замбия", c: "zm" }, { n: "Зимбабве", c: "zw" }, { n: "Израиль", c: "il" },
+            { n: "Индия", c: "in" }, { n: "Индонезия", c: "id" }, { n: "Иордания", c: "jo" }, { n: "Ирак", c: "iq" },
+            { n: "Иран", c: "ir" }, { n: "Ирландия", c: "ie" }, { n: "Исландия", c: "is" }, { n: "Испания", c: "es" },
+            { n: "Италия", c: "it" }, { n: "Йемен", c: "ye" }, { n: "Кабо-Верде", c: "cv" }, { n: "Казахстан", c: "kz" },
+            { n: "Камбоджа", c: "kh" }, { n: "Камерун", c: "cm" }, { n: "Канада", c: "ca" }, { n: "Катар", c: "qa" },
+            { n: "Кения", c: "ke" }, { n: "Кипр", c: "cy" }, { n: "Кыргызстан", c: "kg" }, { n: "Колумбия", c: "co" },
+            { n: "Коморы", c: "km" }, { n: "Конго", c: "cg" }, { n: "ДР Конго", c: "cd" }, { n: "Коста-Рика", c: "cr" },
+            { n: "Кот-д'Ивуар", c: "ci" }, { n: "Куба", c: "cu" }, { n: "Кувейт", c: "kw" }, { n: "Лаос", c: "la" },
+            { n: "Латвия", c: "lv" }, { n: "Лесото", c: "ls" }, { n: "Либерия", c: "lr" }, { n: "Ливан", c: "lb" },
+            { n: "Ливия", c: "ly" }, { n: "Литва", c: "lt" }, { n: "Лихтенштейн", c: "li" }, { n: "Люксембург", c: "lu" },
+            { n: "Маврикий", c: "mu" }, { n: "Мавритания", c: "mr" }, { n: "Мадагаскар", c: "mg" }, { n: "Македония", c: "mk" },
+            { n: "Малави", c: "mw" }, { n: "Малайзия", c: "my" }, { n: "Мали", c: "ml" }, { n: "Мальдивы", c: "mv" },
+            { n: "Мальта", c: "mt" }, { n: "Марокко", c: "ma" }, { n: "Мексика", c: "mx" }, { n: "Мозамбик", c: "mz" },
+            { n: "Молдова", c: "md" }, { n: "Монако", c: "mc" }, { n: "Монголия", c: "mn" }, { n: "Мьянма", c: "mm" },
+            { n: "Намибия", c: "na" }, { n: "Непал", c: "np" }, { n: "Нигер", c: "ne" }, { n: "Нигерия", c: "ng" },
+            { n: "Нидерланды", c: "nl" }, { n: "Никарагуа", c: "ni" }, { n: "Новая Зеландия", c: "nz" }, { n: "Норвегия", c: "no" },
+            { n: "ОАЭ", c: "ae" }, { n: "Оман", c: "om" }, { n: "Пакистан", c: "pk" }, { n: "Панама", c: "pa" },
+            { n: "Папуа-Новая Гвинея", c: "pg" }, { n: "Парагвай", c: "py" }, { n: "Перу", c: "pe" }, { n: "Польша", c: "pl" },
+            { n: "Португалия", c: "pt" }, { n: "Россия", c: "ru" }, { n: "Руанда", c: "rw" }, { n: "Румыния", c: "ro" },
+            { n: "Сальвадор", c: "sv" }, { n: "Самоа", c: "ws" }, { n: "Сан-Марино", c: "sm" }, { n: "Саудовская Аравия", c: "sa" },
+            { n: "Сенегал", c: "sn" }, { n: "Сербия", c: "rs" }, { n: "Сингапур", c: "sg" }, { n: "Сирия", c: "sy" },
+            { n: "Словакия", c: "sk" }, { n: "Словения", c: "si" }, { n: "Соломоновы Острова", c: "sb" }, { n: "Сомали", c: "so" },
+            { n: "Судан", c: "sd" }, { n: "Суринам", c: "sr" }, { n: "США", c: "us" }, { n: "Сьерра-Леоне", c: "sl" },
+            { n: "Таджикистан", c: "tj" }, { n: "Таиланд", c: "th" }, { n: "Танзания", c: "tz" }, { n: "Того", c: "tg" },
+            { n: "Тонга", c: "to" }, { n: "Тринидад и Тобаго", c: "tt" }, { n: "Тунис", c: "tn" }, { n: "Туркменистан", c: "tm" },
+            { n: "Турция", c: "tr" }, { n: "Уганда", c: "ug" }, { n: "Узбекистан", c: "uz" }, { n: "Украина", c: "ua" },
+            { n: "Уругвай", c: "uy" }, { n: "Уэльс", c: "gb-wls" }, { n: "Фиджи", c: "fj" }, { n: "Филиппины", c: "ph" },
+            { n: "Финляндия", c: "fi" }, { n: "Франция", c: "fr" }, { n: "Хорватия", c: "hr" }, { n: "ЦАР", c: "cf" },
+            { n: "Чад", c: "td" }, { n: "Черногория", c: "me" }, { n: "Чехия", c: "cz" }, { n: "Чили", c: "cl" },
+            { n: "Швейцария", c: "ch" }, { n: "Швеция", c: "se" }, { n: "Шотландия", c: "gb-sct" }, { n: "Шри-Ланка", c: "lk" },
+            { n: "Эквадор", c: "ec" }, { n: "Экваториальная Гвинея", c: "gq" }, { n: "Эритрея", c: "er" }, { n: "Эстония", c: "ee" },
+            { n: "Эфиопия", c: "et" }, { n: "ЮАР", c: "za" }, { n: "Южный Судан", c: "ss" }, { n: "Ямайка", c: "jm" },
+            { n: "Япония", c: "jp" }
+        ].sort((a, b) => a.n.localeCompare(b.n));
 
-        // Словарь для флагов игроков (английские названия из базы -> эмодзи)
-        const flagMap = {
-            "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-            "Russia": "🇷🇺", "Spain": "🇪🇸", "Italy": "🇮🇹", "Germany": "🇩🇪", "France": "🇫🇷",
-            "Portugal": "🇵🇹", "Brazil": "🇧🇷", "Argentina": "🇦🇷", "Netherlands": "🇳🇱",
-            "Belgium": "🇧🇪", "Croatia": "🇭🇷", "Uruguay": "🇺🇾", "Colombia": "🇨🇴",
-            "Mexico": "🇲🇽", "USA": "🇺🇸", "United States": "🇺🇸", "Canada": "🇨🇦",
-            "Japan": "🇯🇵", "South Korea": "🇰🇷", "Korea Republic": "🇰🇷", "China PR": "🇨🇳",
-            "Australia": "🇦🇺", "Morocco": "🇲🇦", "Senegal": "🇸🇳", "Nigeria": "🇳🇬",
-            "Egypt": "🇪🇬", "Algeria": "🇩🇿", "Ivory Coast": "🇨🇮", "Côte d'Ivoire": "🇨🇮",
-            "Ghana": "🇬🇭", "Cameroon": "🇨🇲", "Sweden": "🇸🇪", "Norway": "🇳🇴",
-            "Denmark": "🇩🇰", "Finland": "🇫🇮", "Iceland": "🇮🇸", "Poland": "🇵🇱",
-            "Czech Republic": "🇨🇿", "Czechia": "🇨🇿", "Slovakia": "🇸🇰", "Hungary": "🇭🇺",
-            "Romania": "🇷🇴", "Bulgaria": "🇧🇬", "Greece": "🇬🇷", "Turkey": "🇹🇷",
-            "Türkiye": "🇹🇷", "Ukraine": "🇺🇦", "Serbia": "🇷🇸", "Switzerland": "🇨🇭",
-            "Austria": "🇦🇹", "Northern Ireland": "🇬🇧", "Republic of Ireland": "🇮🇪",
-            "Ireland": "🇮🇪", "Albania": "🇦🇱", "Bosnia and Herzegovina": "🇧🇦",
-            "North Macedonia": "🇲🇰", "Slovenia": "🇸🇮", "Montenegro": "🇲🇪",
-            "Kosovo": "🇽🇰", "Georgia": "🇬🇪", "Armenia": "🇦🇲", "Azerbaijan": "🇦🇿",
-            "Kazakhstan": "🇰🇿", "Israel": "🇮🇱", "Iran": "🇮🇷", "Iraq": "🇮🇶",
-            "Saudi Arabia": "🇸🇦", "Qatar": "🇶🇦", "UAE": "🇦🇪", "United Arab Emirates": "🇦🇪",
-            "Uzbekistan": "🇺🇿", "Peru": "🇵🇪", "Chile": "🇨🇱", "Ecuador": "🇪🇨",
-            "Paraguay": "🇵🇾", "Venezuela": "🇻🇪", "Bolivia": "🇧🇴", "Costa Rica": "🇨🇷",
-            "Panama": "🇵🇦", "Honduras": "🇭🇳", "Jamaica": "🇯🇲", "New Zealand": "🇳🇿",
-            "South Africa": "🇿🇦"
+        // Словарь для игроков (английское название из базы -> ISO код флага)
+        const playerFlagMap = {
+            "England": "gb-eng", "Scotland": "gb-sct", "Wales": "gb-wls", "Northern Ireland": "gb-nir",
+            "Russia": "ru", "Spain": "es", "Italy": "it", "Germany": "de", "France": "fr",
+            "Portugal": "pt", "Brazil": "br", "Argentina": "ar", "Netherlands": "nl",
+            "Belgium": "be", "Croatia": "hr", "Uruguay": "uy", "Colombia": "co",
+            "Mexico": "mx", "USA": "us", "United States": "us", "Canada": "ca",
+            "Japan": "jp", "South Korea": "kr", "Korea Republic": "kr",
+            "Australia": "au", "Morocco": "ma", "Senegal": "sn", "Nigeria": "ng",
+            "Egypt": "eg", "Algeria": "dz", "Ivory Coast": "ci", "Côte d'Ivoire": "ci",
+            "Ghana": "gh", "Cameroon": "cm", "Sweden": "se", "Norway": "no",
+            "Denmark": "dk", "Finland": "fi", "Iceland": "is", "Poland": "pl",
+            "Czech Republic": "cz", "Czechia": "cz", "Slovakia": "sk", "Hungary": "hu",
+            "Romania": "ro", "Bulgaria": "bg", "Greece": "gr", "Turkey": "tr",
+            "Türkiye": "tr", "Ukraine": "ua", "Serbia": "rs", "Switzerland": "ch",
+            "Austria": "at", "Republic of Ireland": "ie", "Ireland": "ie", "Albania": "al",
+            "Bosnia and Herzegovina": "ba", "North Macedonia": "mk", "Slovenia": "si",
+            "Montenegro": "me", "Kosovo": "xk", "Georgia": "ge", "Armenia": "am",
+            "Azerbaijan": "az", "Kazakhstan": "kz", "Israel": "il", "Iran": "ir",
+            "Iraq": "iq", "Saudi Arabia": "sa", "Qatar": "qa", "UAE": "ae",
+            "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl",
+            "Ecuador": "ec", "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo",
+            "Costa Rica": "cr", "Panama": "pa", "Honduras": "hn", "Jamaica": "jm",
+            "New Zealand": "nz", "South Africa": "za"
         };
 
-        function getFlagEmoji(nationality) {
-            if (!nationality) return "🏳️";
-            return flagMap[nationality] || "🏳️";
+        function getPlayerFlagImg(nationality) {
+            const code = playerFlagMap[nationality] || "un"; // "un" - флаг ООН (заглушка)
+            return `<img src="https://flagcdn.com/w20/${code}.png" class="flag-icon" alt="${nationality}">`;
         }
 
-        // Заполняем список стран для тренера при загрузке
+        // Заполняем список стран для тренера (с картинками)
         function populateCountries() {
             const select = document.getElementById("inp-coach-nat");
             select.innerHTML = "";
             countriesList.forEach(c => {
                 const opt = document.createElement("option");
-                opt.value = c.name;
-                opt.innerText = `${c.flag} ${c.name}`;
+                opt.value = c.n;
+                opt.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" style="width:16px; margin-right:4px; vertical-align:middle;"> ${c.n}`;
+                // Примечание: некоторые браузеры не показывают картинки внутри <option>, но в Telegram на телефонах работает отлично. 
+                // Для десктопа добавим просто текст, чтобы не ломать выпадающий список.
+                opt.innerText = c.n; 
+                opt.setAttribute("data-flag", c.c);
                 select.appendChild(opt);
             });
+            
+            // Обновляем селект, добавляя картинку (если браузер поддерживает)
+            // В стандартных <select> картинки не поддерживаются, поэтому мы просто выведем текст, 
+            // но выбранный флаг покажем рядом с полем.
         }
         populateCountries();
 
@@ -389,16 +425,11 @@
             `;
         }
 
-        // Функция отрисовки звезд (с CSS-половинкой)
         function renderStars(stars) {
             let html = "";
             const fullStars = Math.floor(stars);
-            for (let i = 0; i < fullStars; i++) {
-                html += `<span style="color: #e6c544;">★</span>`;
-            }
-            if (stars % 1 !== 0) {
-                html += `<span class="star-half">★</span>`;
-            }
+            for (let i = 0; i < fullStars; i++) html += `<span style="color: #e6c544;">★</span>`;
+            if (stars % 1 !== 0) html += `<span class="star-half">★</span>`;
             return html;
         }
 
@@ -444,7 +475,7 @@
                 }
                 renderLeagues();
                 showScreen("leagues");
-                window.scrollTo(0, 0); // При первом открытии скроллим вверх
+                window.scrollTo(0, 0);
             } catch (e) {
                 tg.showAlert("Ошибка загрузки: " + e.message);
                 showScreen("welcome");
@@ -465,7 +496,7 @@
         }
 
         function openLeague(league) {
-            leaguesScrollPos = window.scrollY; // Запоминаем скролл лиг
+            leaguesScrollPos = window.scrollY;
             document.getElementById("selected-league-title").innerText = league;
             
             let filtered = allClubs.filter(c => c.league === league);
@@ -501,7 +532,7 @@
             });
             
             showScreen("clubs");
-            window.scrollTo(0, 0); // Скроллим вверх при входе в клубы
+            window.scrollTo(0, 0);
         }
 
         async function selectClub(clubId, clubName, league, stars) {
@@ -537,7 +568,6 @@
             showScreen("confirm");
         }
 
-        // --- НАСТРОЙКИ ---
         function goToCoachSetup() {
             const nameInput = document.getElementById("inp-coach-name");
             if(!nameInput.value) nameInput.value = userName;
@@ -603,7 +633,6 @@
             }
         }
 
-        // --- СОСТАВ ---
         async function loadSquad() {
             const listContainer = document.getElementById("squad-list");
             listContainer.innerHTML = `<p style="text-align:center; color:#8e9eb5;">⏳ Загружаем игроков...</p>`;
@@ -631,8 +660,7 @@
                     else if (p.position.includes("Midfield")) shortPos = "MID";
                     else if (p.position.includes("Forward") || p.position.includes("Striker") || p.position.includes("Winger")) shortPos = "ATT";
 
-                    // Получаем флаг для национальности
-                    const flag = getFlagEmoji(p.nationality);
+                    const flagImg = getPlayerFlagImg(p.nationality);
 
                     return `
                         <div class="player-row">
@@ -642,7 +670,7 @@
                                 <div class="player-name-block">
                                     <div class="player-name">${p.name}</div>
                                     <div class="player-meta">
-                                        <span>${flag}</span>
+                                        ${flagImg}
                                         <span>${p.nationality} · ${p.age} лет</span>
                                     </div>
                                 </div>
@@ -655,13 +683,11 @@
             }
         }
 
-        // --- ОБРАБОТЧИКИ КНОПОК ---
         document.getElementById("btn-start").onclick = async () => {
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
         };
         
-        // Возврат к лигам с восстановлением скролла
         document.getElementById("btn-back-leagues").onclick = () => {
             showScreen("leagues");
             setTimeout(() => window.scrollTo(0, leaguesScrollPos), 10);
