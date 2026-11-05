@@ -746,17 +746,37 @@
             document.getElementById("pd-value").innerText = formatMoney(p.market_value);
             document.getElementById("pd-wage").innerText = formatMoney(p.wage) + " / нед.";
 
-            // Логика контракта
-            const y = Math.floor(p.contract_months / 12);
-            const m = p.contract_months % 12;
-            let timeStr = "";
-            if (y === 0) timeStr = `${m} мес.`;
-            else if (m === 0) timeStr = `${y} лет`;
-            else timeStr = `${y} г. ${m} мес.`;
+            // Логика контракта (отсчет от 1 августа 2026)
+            let contractText = "Неизвестно";
+            if (p.contract_until) {
+                const startDate = new Date('2026-08-01');
+                const endDate = new Date(p.contract_until);
+                
+                if (endDate > startDate) {
+                    // Считаем разницу в месяцах
+                    let months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
+                    months -= startDate.getMonth();
+                    months += endDate.getMonth();
+                    
+                    const y = Math.floor(months / 12);
+                    const m = months % 12;
+                    
+                    let timeStr = "";
+                    if (y === 0) timeStr = `${m} мес.`;
+                    else if (m === 0) timeStr = `${y} лет`;
+                    else timeStr = `${y} г. ${m} мес.`;
+                    
+                    const year = endDate.getFullYear();
+                    contractText = `Действует до 30.06.${year} (${timeStr})`;
+                } else {
+                    contractText = "Истек";
+                }
+            }
+            document.getElementById("pd-contract").innerText = contractText;
 
-            const endYear = 2026 + y + (m > 0 ? 1 : 0);
-            document.getElementById("pd-contract").innerText = `Действует до 30.06.${endYear} (${timeStr})`;
-
+            // Зарплата теперь отображается как есть (в неделю)
+            document.getElementById("pd-wage").innerText = p.wage > 0 ? formatMoney(p.wage) + " / нед." : "Неизвестно";
+            
             // Логика статов (Вратари vs Полевые)
             const isGK = p.position.includes("Goalkeeper") || p.position === "GK";
             let stats = [];

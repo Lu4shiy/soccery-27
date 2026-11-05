@@ -221,26 +221,16 @@ def get_club_players(club_id: int):
         players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
         result = []
         for p in players:
-            ovr = p.overall_rating or 50
-            
-            # Генерация реалистичной стоимости (экспоненциально от рейтинга)
-            # Игрок с OVR 85 будет стоить около 100 млн, с OVR 60 - около 1 млн
-            base_val = int(((ovr - 40) ** 3.2) * 100)
-            if ovr < 50: base_val = 50000 + (ovr * 1000)
-            
-            # Зарплата (недельная) - примерно 1/200 от стоимости, но не меньше 1к
-            wage = max(1000, int(base_val / 200))
-            
-            # Контракт (детерминированный рандом, чтобы не менялся при обновлении)
-            random.seed(p.player_id)
-            months_left = random.randint(1, 60) # От 1 месяца до 5 лет
+            # Если данных нет, ставим дефолтные значения
+            wage = p.wage if p.wage else 0
+            contract_until = p.contract_until if p.contract_until else None
             
             result.append({
                 "id": p.id, "name": p.name, "position": p.position, "age": p.age,
                 "overall": p.overall_rating, "nationality": p.nationality,
-                "market_value": base_val,
+                "market_value": p.market_value or 0,
                 "wage": wage,
-                "contract_months": months_left,
+                "contract_until": contract_until,
                 
                 # Статы полевых
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
