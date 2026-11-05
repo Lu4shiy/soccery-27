@@ -10,7 +10,6 @@ from rapidfuzz import process, fuzz
 
 # --- НАСТРОЙКА БАЗЫ ДАННЫХ ---
 DATABASE_URL = "postgresql://neondb_owner:npg_KpNaC4uhstX3@ep-purple-rice-b9sdria3-pooler.c-7.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
@@ -65,17 +64,16 @@ def scrape_team(team_name):
         time.sleep(2)
         team_page = scraper.get(team_url)
         team_soup = BeautifulSoup(team_page.text, 'html.parser')
+        
+        # Ищем все строки в таблице состава
         rows = team_soup.select('table tbody tr')
         if not rows:
             print("❌ Таблица игроков не найдена.")
             return
             
-        print(f"📊 Найдено {len(rows)} игроков. Сверяем с базой...")
+        print(f"📊 Найдено {len(rows)} строк (игроков). Сверяем с базой...")
         
         db = Session(engine)
-        
-        # 1. Загружаем всех игроков этого клуба из базы для нечеткого поиска
-        # (в реальном коде нужно передать club_id, но для теста ищем по всем игрокам)
         db_players = db.query(Player).all()
         db_names = [p.name for p in db_players]
         
@@ -84,61 +82,66 @@ def scrape_team(team_name):
         
         for row in rows:
             try:
-                name_tag = row.select_one('td[data-col="pn"] a')
-                if not name_tag: continue
-                sofifa_name = name_tag.text.strip()
+                # ИСПРАВЛЕНО: ищем имя в td.col-name > a
+                name_a = row.select_one('td.col-name a')
+                if not name_a:
+                    continue
                 
+                sofifa_name = name_a.get_text(strip=True)
+                if not sofifa_name:
+                    continue
+                
+                # Стоимость, зарплата, контракт (по data-col)
                 val_tag = row.select_one('td[data-col="vl"]')
                 wage_tag = row.select_one('td[data-col="wg"]')
-                ct_tag = row.select_one('td[data-col="ct"]')
+                ct_tag = row.select_one('td[data-col="tt"]')
                 
-                value_text = val_tag.text.strip() if val_tag else ""
-                wage_text = wage_tag.text.strip() if wage_tag else ""
-                contract_text = ct_tag.text.strip() if ct_tag else ""
+                value_text = val_tag.get_text(strip=True) if val_tag else ""
+                wage_text = wage_tag.get_text(strip=True) if wage_tag else ""
+                contract_text = ct_tag.get_text(strip=True) if ct_tag else ""
                 
-                # --- ЛОГИКА ПОИСКА ---
+                # 1. Прямое совпадение (без учета регистра)
                 player = None
-                
-                # 1. Пробуем точное совпадение (без учета регистра)
                 for p in db_players:
                     if sofifa_name.lower() in p.name.lower() or p.name.lower() in sofifa_name.lower():
                         player = p
                         break
                 
-                # 2. Если точного нет, используем нечеткий поиск (Fuzzy)
+                # 2. Нечеткий поиск (если прямого нет)
                 if not player:
-                    # Ищем лучшее совпадение с порогом схожести 70%
                     match = process.extractOne(sofifa_name, db_names, scorer=fuzz.token_sort_ratio)
-                    if match and match[1] >= 70:
+                    if match and match[1] >= 65:  # Порог схожести 65%
                         best_name = match[0]
                         player = next((p for p in db_players if p.name == best_name), None)
                         if player:
-                            print(f"  🔍 Нечеткое совпадение: SoFIFA '{sofifa_name}' -> База '{player.name}' ({match[1]}%)")
+                            print(f"  🔍 Нечеткое совпадение: SoFIFA '{sofifa_name}' -> База '{player.name}' ({match[1]:.0f}%)")
                 
                 if player:
                     player.market_value = parse_money(value_text)
                     player.wage = parse_money(wage_text)
                     player.contract_until = parse_contract(contract_text)
                     updated += 1
-                    print(f"  ✅ Обновлен: {player.name} | Цена: {value_text} | ЗП: {wage_text}")
+                    print(f"  ✅ Обновлен: {player.name} | Цена: {value_text} | ЗП: {wage_text} | Контракт: {contract_text}")
                 else:
                     not_found.append(sofifa_name)
-                    print(f"  ❌ Не найден в базе: '{sofifa_name}'")
+                    # Выводим только первые 5 ненайденных, чтобы не засорять лог
+                    if len(not_found) <= 5:
+                        print(f"  ❌ Не найден в базе: '{sofifa_name}'")
                     
             except Exception as e:
-                print(f"  ⚠️ Ошибка строки: {e}")
+                print(f"  ⚠️ Ошибка обработки строки: {e}")
                 
         db.commit()
         db.close()
         
         print(f"\n📈 ИТОГ: Обновлено {updated} из {len(rows)}.")
         if not_found:
-            print(f"⚠️ Не найдено игроков: {len(not_found)}")
-            print("Примеры ненайденных имен (первые 10):", not_found[:10])
+            print(f"⚠️ Всего не найдено: {len(not_found)} игроков.")
+            if len(not_found) > 5:
+                print(f"   Примеры (первые 10): {not_found[:10]}")
             
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        print(f"❌ Критическая ошибка: {e}")
 
 if __name__ == "__main__":
-    # Для теста берем один клуб
     scrape_team("FC Bayern München")
