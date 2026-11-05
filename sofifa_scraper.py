@@ -1,6 +1,6 @@
+import asyncio
 import re
-import cloudscraper
-from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, Session
 from rapidfuzz import process, fuzz
@@ -23,8 +23,6 @@ class Player(Base):
     wage = Column(Integer)
     contract_until = Column(String)
 
-scraper = cloudscraper.create_scraper()
-
 def parse_money(text):
     if not text or not text.startswith('€'): return 0
     text = text.replace('€', '').strip()
@@ -39,88 +37,104 @@ def parse_contract(contract_text):
         return f"{int(years[1])}-06-30"
     return None
 
-def scrape_bayern():
-    # Прямая ссылка на страницу Баварии
-    team_url = "https://sofifa.com/team/21/"
-    print(f"🔍 Загружаем напрямую: {team_url}")
+async def scrape_team_playwright(team_name):
+    print(f"\n🔍 Запускаем браузер для клуба: '{team_name}'...")
     
-    try:
-        response = scraper.get(team_url)
-        if "Just a moment..." in response.text:
-            print("❌ Cloudflare заблокировал прямой запрос.")
-            return
-            
-        soup = BeautifulSoup(response.text, 'html.parser')
-        rows = soup.select('table tbody tr')
+    async with async_playwright() as p:
+        # Запускаем Chromium в фоновом режиме
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
         
+        # 1. Поиск клуба через страницу поиска SoFIFA
+        search_url = f"https://sofifa.com/teams?keyword={team_name}"
+        print(f"🔗 Переходим на поиск: {search_url}")
+        await page.goto(search_url, wait_until="networkidle", timeout=60000)
+        
+        # Ждём появления таблицы (если Cloudflare пропустит)
+        try:
+            await page.wait_for_selector('table tbody tr', timeout=15000)
+        except Exception:
+            print("❌ Таблица поиска не появилась. Возможно, Cloudflare всё ещё блокирует.")
+            await browser.close()
+            return
+
+        # Берём ссылку на первый клуб из результатов
+        team_link = await page.query_selector('table tbody tr td a[href^="/team/"]')
+        if not team_link:
+            print(f"❌ Клуб '{team_name}' не найден на SoFIFA.")
+            await browser.close()
+            return
+        
+        team_url = "https://sofifa.com" + await team_link.get_attribute("href")
+        print(f"✅ Страница клуба: {team_url}")
+        
+        # 2. Переходим на страницу клуба
+        await page.goto(team_url, wait_until="networkidle", timeout=60000)
+        
+        try:
+            await page.wait_for_selector('table tbody tr', timeout=15000)
+        except Exception:
+            print("❌ Таблица игроков не появилась.")
+            await browser.close()
+            return
+
+        # 3. Парсим строки таблицы (используем селектор, который нашёлся в рабочих примерах[reference:1])
+        rows = await page.query_selector_all('table.table-hover.persist-area tbody tr')
         if not rows:
-            print("❌ Таблица игроков не найдена (возможно, структура изменилась или это страница-заглушка).")
-            return
-            
-        print(f"📊 Найдено {len(rows)} строк. Начинаем анализ первой строки...")
-        
-        # Выводим HTML первой строки, чтобы понять структуру
-        print("\n--- HTML ПЕРВОЙ СТРОКИ ---")
-        print(rows[0].prettify()[:800]) # Первые 800 символов для просмотра
-        print("--------------------------\n")
+            # Пробуем более общий селектор, если таблица имеет другой класс
+            rows = await page.query_selector_all('table tbody tr')
+
+        print(f"📊 Найдено {len(rows)} строк. Сверяем с базой...")
         
         db = Session(engine)
         db_players = db.query(Player).all()
         db_names = [p.name for p in db_players]
-        
         updated = 0
-        
-        for row in rows:
-            try:
-                # Ищем имя в любом теге <a> внутри ячейки
-                name_a = row.select_one('td.col-name a')
-                if not name_a:
-                    name_a = row.select_one('a[href*="/player/"]')
-                    
-                if not name_a: continue
-                sofifa_name = name_a.get_text(strip=True)
-                if not sofifa_name: continue
-                
-                # Ищем данные по атрибуту data-col (у SoFIFA они плавают, пробуем разные варианты)
-                val_tag = row.select_one('td[data-col="vl"]') or row.select_one('td[data-col="value"]')
-                wage_tag = row.select_one('td[data-col="wg"]') or row.select_one('td[data-col="wage"]')
-                ct_tag = row.select_one('td[data-col="tt"]') or row.select_one('td[data-col="ct"]')
-                
-                value_text = val_tag.get_text(strip=True) if val_tag else ""
-                wage_text = wage_tag.get_text(strip=True) if wage_tag else ""
-                contract_text = ct_tag.get_text(strip=True) if ct_tag else ""
-                
-                # Сопоставление
-                player = None
-                for p in db_players:
-                    if sofifa_name.lower() in p.name.lower() or p.name.lower() in sofifa_name.lower():
-                        player = p
-                        break
-                
-                if not player:
-                    match = process.extractOne(sofifa_name, db_names, scorer=fuzz.token_sort_ratio)
-                    if match and match[1] >= 60: 
-                        best_name = match[0]
-                        player = next((p for p in db_players if p.name == best_name), None)
 
-                if player:
-                    player.market_value = parse_money(value_text)
-                    player.wage = parse_money(wage_text)
-                    player.contract_until = parse_contract(contract_text)
-                    updated += 1
-                    print(f"  ✅ {player.name} | Цена: {value_text} | ЗП: {wage_text} | Контракт: {contract_text}")
-                else:
-                    print(f"  ❌ Нет в базе: {sofifa_name} (SoFIFA: {value_text})")
-                    
-            except Exception as e:
-                pass
-                
+        for row in rows:
+            # Имя игрока
+            name_el = await row.query_selector('td.col-name a')
+            if not name_el: continue
+            sofifa_name = (await name_el.inner_text()).strip()
+            if not sofifa_name: continue
+
+            # Цена, зарплата, контракт — ищем по `data-col` или по позиции
+            val_el = await row.query_selector('td[data-col="vl"]')
+            wage_el = await row.query_selector('td[data-col="wg"]')
+            ct_el = await row.query_selector('td[data-col="tt"]')
+
+            value_text = (await val_el.inner_text()).strip() if val_el else ""
+            wage_text = (await wage_el.inner_text()).strip() if wage_el else ""
+            contract_text = (await ct_el.inner_text()).strip() if ct_el else ""
+
+            # Сопоставление имен
+            player = None
+            for p in db_players:
+                if sofifa_name.lower() in p.name.lower() or p.name.lower() in sofifa_name.lower():
+                    player = p
+                    break
+
+            if not player:
+                match = process.extractOne(sofifa_name, db_names, scorer=fuzz.token_sort_ratio)
+                if match and match[1] >= 60:
+                    best_name = match[0]
+                    player = next((p for p in db_players if p.name == best_name), None)
+                    if player:
+                        print(f"  🔍 Нечёткое: '{sofifa_name}' -> '{player.name}' ({match[1]:.0f}%)")
+
+            if player:
+                player.market_value = parse_money(value_text)
+                player.wage = parse_money(wage_text)
+                player.contract_until = parse_contract(contract_text)
+                updated += 1
+                print(f"  ✅ {player.name} | Цена: {value_text} | ЗП: {wage_text} | Контракт: {contract_text}")
+            else:
+                print(f"  ❌ Нет в базе: '{sofifa_name}'")
+
         db.commit()
         db.close()
         print(f"\n📈 ИТОГ: Обновлено {updated} из {len(rows)}.")
-        
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        await browser.close()
 
 if __name__ == "__main__":
-    scrape_bayern()
+    asyncio.run(scrape_team_playwright("FC Bayern München"))
