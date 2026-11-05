@@ -5,9 +5,12 @@ import cloudscraper
 from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, Session
+from urllib.parse import quote
 
-# --- НАСТРОЙКА БАЗЫ ДАННЫХ (Автономно от main.py) ---
-DATABASE_URL = "postgresql://neondb_owner:npg_KpNaC4uhstX3@ep-purple-rice-b9sdria3-pooler.c-7.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+# --- НАСТРОЙКА БАЗЫ ДАННЫХ ---
+# ВСТАВЬ СВОЮ ССЫЛКУ ИЗ NEON ВМЕСТО ТЕКСТА В КАВЫЧКАХ:
+DATABASE_URL = "postgresql://neondb_owner:пароль@ep-сервер.neon.tech/neondb?sslmode=require"
+
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
@@ -24,7 +27,7 @@ class Player(Base):
     market_value = Column(Integer)
     wage = Column(Integer)
     contract_until = Column(String)
-# ---------------------------------------------------
+# ------------------------------
 
 scraper = cloudscraper.create_scraper()
 
@@ -44,7 +47,8 @@ def parse_contract(contract_text):
 
 def scrape_team(team_name):
     print(f"\n🔍 [1/4] Ищем клуб: '{team_name}'...")
-    search_url = f"https://sofifa.com/teams?keyword={scraper.utils.quote(team_name)}"
+    # ИСПРАВЛЕНО: используем quote из urllib
+    search_url = f"https://sofifa.com/teams?keyword={quote(team_name)}"
     
     try:
         response = scraper.get(search_url)
@@ -112,4 +116,12 @@ def scrape_team(team_name):
         print(f"❌ Сетевая ошибка: {e}")
 
 if __name__ == "__main__":
-    scrape_team("FC Bayern München")
+    # Сюда впиши клубы (используй их ОФИЦИАЛЬНЫЕ названия, чтобы SoFIFA их нашла)
+    clubs_to_update = [
+        "FC Bayern München", "Real Madrid", "Manchester City"
+    ]
+    
+    for club in clubs_to_update:
+        scrape_team(club)
+        print("-" * 30)
+        time.sleep(3)
