@@ -203,7 +203,6 @@
             font-weight: bold;
         }
 
-        /* ТАКТИКА */
         .tactics-topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
         .tactics-topbar h2 { margin: 0; font-size: 20px; }
         .formation-select {
@@ -296,7 +295,6 @@
             padding: 1px 4px; border-radius: 6px; border: 1.5px solid #17212b;
         }
 
-        /* ЗАПАС И РЕЗЕРВ */
         .bench-section { margin-top: 16px; }
         .bench-title {
             font-size: 14px; font-weight: bold; color: #8e9eb5; margin-bottom: 8px;
@@ -317,7 +315,6 @@
         
         .reserve-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; opacity: 0.7; }
 
-        /* СТАНДАРТЫ */
         .roles-section { margin-top: 16px; background: #232e3c; border-radius: 12px; padding: 12px 14px; }
         .roles-section h3 { margin: 0 0 6px; font-size: 14px; color: #52a8ff; }
         .role-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #17212b; gap: 10px; }
@@ -332,12 +329,10 @@
         }
         .role-select:focus { border-color: #52a8ff; }
 
-        /* МОДАЛ */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
         .modal-content { background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
         .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
 
-        /* СПОРТЦЕНТР */
         .competitions-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
         .competitions-table th, .competitions-table td { padding: 8px; text-align: left; border-bottom: 1px solid #17212b; }
         .competitions-table th { color: #52a8ff; font-weight: bold; }
@@ -734,7 +729,7 @@
             "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
             "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw",
-            "Kenya": "ke" // Добавлен флаг Кении
+            "Kenya": "ke"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -1262,8 +1257,8 @@
 
                 // Сортируем: сначала национальные, потом континентальные, потом мировые
                 tournaments.sort((a, b) => {
-                    if (a.continent === currentContinent && b.continent !== currentContinent) return -1;
-                    if (b.continent === currentContinent && a.continent !== currentContinent) return 1;
+                    if (a.continent === "Domestic" && b.continent !== "Domestic") return -1;
+                    if (b.continent === "Domestic" && a.continent !== "Domestic") return 1;
                     if (a.type === "League" && b.type !== "League") return -1;
                     if (b.type === "League" && a.type !== "League") return 1;
                     return 0;
