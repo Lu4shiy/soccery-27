@@ -10,7 +10,6 @@ from typing import Optional, List
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
@@ -119,26 +118,23 @@ Base.metadata.create_all(bind=engine)
 def seed_training_programs():
     db = Session(engine)
     try:
-        # 1. Принудительно срезаем все OVR-бусты до 1
         db.query(TrainingProgram).filter(TrainingProgram.ovr_boost > 1).update({TrainingProgram.ovr_boost: 1})
         
-        # 2. Проверяем наличие вратарских тренировок
         gk_count = db.query(TrainingProgram).filter(TrainingProgram.position_focus == "GK").count()
         if gk_count == 0:
             gk_progs = [
-                TrainingProgram(name="Вратарская реакция", description="Отработка реакции и прыгучести. +1 к реакции (REF), +1 к прыжку (DIV).",
+                TrainingProgram(name="Вратарская реакция", description="Отработка реакции и прыгучести. +1 к реакции, +1 к прыжку.",
                                 duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
-                TrainingProgram(name="Игра на выходах", description="Чтение игры и позиционирование. +1 к позиции (POS), +1 к хватке (HAN).",
+                TrainingProgram(name="Игра на выходах", description="Чтение игры и позиционирование. +1 к позиции, +1 к хватке.",
                                 duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
-                TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции (REF).",
+                TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции.",
                                 duration_weeks=2, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1})),
-                TrainingProgram(name="Пенальти и стандарты", description="Спецподготовка к сериям пенальти. +1 к позиции (POS), +1 к реакции (REF).",
+                TrainingProgram(name="Пенальти и стандарты", description="Спецподготовка к сериям пенальти. +1 к позиции, +1 к реакции.",
                                 duration_weeks=5, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_reflexes": 1})),
             ]
             for p in gk_progs:
                 db.add(p)
         
-        # 3. Инициализация базовых тренировок, если таблица пуста
         if db.query(TrainingProgram).count() == 0:
             programs = [
                 TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +1 к скорости.",
@@ -280,7 +276,6 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
     if datetime.utcnow() < end_date:
         return False
 
-    # Бонусы к статам (с шансом 60%, значение +1)
     if prog.stat_boosts:
         boosts = json.loads(prog.stat_boosts)
         for stat, val in boosts.items():
@@ -289,12 +284,10 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
                 if random.random() < 0.6:
                     setattr(player, stat, current + 1)
 
-    # Бонус к OVR (ЖЕСТКО +1, с шансом 35%)
     if prog.ovr_boost and prog.ovr_boost > 0:
         if random.random() < 0.35:
             player.overall_rating = (player.overall_rating or 50) + 1
 
-    # Логика добавления альтернативной позиции
     if prog.position_focus:
         alts = json.loads(player.alt_positions or "[]")
         native = normalize_pos(player.position)
@@ -396,7 +389,8 @@ def get_manager(telegram_id: str):
         return {
             "has_club": True, "club_id": club.id, "club_name": club.name,
             "league": club.league, "stars": club.stars or 3.0,
-            "is_setup_complete": bool(m.is_setup_complete)
+            "is_setup_complete": bool(m.is_setup_complete),
+            "coach_name": m.coach_name
         }
     finally:
         db.close()
@@ -450,6 +444,24 @@ def save_settings(req: SaveSettingsRequest):
         m.negotiation_difficulty = req.negotiation_difficulty
         m.extra_budget = req.extra_budget
         m.is_setup_complete = 1
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+class UpdateCoachNameRequest(BaseModel):
+    telegram_id: str
+    coach_name: str
+
+
+@app.post("/api/update-coach-name")
+def update_coach_name(req: UpdateCoachNameRequest):
+    db = Session(engine)
+    try:
+        m = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
+        if not m: raise HTTPException(status_code=404, detail="Менеджер не найден")
+        m.coach_name = req.coach_name
         db.commit()
         return {"status": "ok"}
     finally:
@@ -646,7 +658,6 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     web_app_url = "https://soccery-27.onrender.com/app"
-    # ReplyKeyboardMarkup создает именно ту синюю кнопку "Open" снизу
     keyboard = types.ReplyKeyboardMarkup(
         keyboard=[[types.KeyboardButton(text="🚀 Открыть Soccery 27", web_app=types.WebAppInfo(url=web_app_url))]],
         resize_keyboard=True
@@ -663,7 +674,6 @@ async def start_bot():
 
 @app.on_event("startup")
 async def on_startup():
-    # Фикс схемы БД (добавляем колонку, если таблица создалась в старой версии)
     db = Session(engine)
     try:
         db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS formation VARCHAR DEFAULT '4-3-3 (Линия)';"))

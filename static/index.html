@@ -82,7 +82,7 @@
         .nav-item {
             color: #8e9eb5;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             display: flex;
             flex-direction: column;
@@ -502,10 +502,24 @@
             padding-right: 22px;
         }
         .role-select:focus { border-color: #52a8ff; }
+
+        /* ==== КАСТОМНЫЙ МОДАЛ ==== */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center;
+            z-index: 2000; padding: 20px;
+        }
+        .modal-content {
+            background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+        .modal-actions {
+            display: flex; flex-direction: column; gap: 10px; margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <div id="screen-welcome" class="screen">
+    <div id="screen-welcome" class="screen hidden">
         <h1>Soccery 27</h1>
         <p style="text-align:center;">Футбольный менеджер нового поколения</p>
         <div class="card">
@@ -515,8 +529,8 @@
         <button class="btn" id="btn-start">Начать карьеру</button>
     </div>
 
-    <div id="screen-loading" class="screen hidden">
-        <div class="card"><h2>⏳ Загружаем данные...</h2></div>
+    <div id="screen-loading" class="screen">
+        <div class="card"><h2>⏳ Загрузка...</h2></div>
     </div>
 
     <div id="screen-leagues" class="screen hidden">
@@ -604,6 +618,23 @@
     <div id="screen-office" class="screen hidden">
         <h2 id="squad-title">Офис: Состав команды</h2>
         <div id="squad-list" class="squad-container"></div>
+    </div>
+
+    <div id="screen-account" class="screen hidden">
+        <h2>👤 Аккаунт</h2>
+        <div class="card">
+            <h3>Профиль тренера</h3>
+            <div class="form-group">
+                <label>Имя и Фамилия</label>
+                <input type="text" id="inp-account-coach-name" class="form-control" value="">
+            </div>
+            <button class="btn" id="btn-save-account-name">Сохранить имя</button>
+        </div>
+        <div class="card">
+            <h3>Управление клубом</h3>
+            <p>Текущий клуб: <b id="account-club-name" style="color:#52a8ff;"></b></p>
+            <button class="btn" id="btn-change-club" style="background-color: #a82929; margin-top: 10px;">Сменить клуб</button>
+        </div>
     </div>
 
     <div id="screen-player" class="screen hidden">
@@ -729,6 +760,20 @@
         <div class="nav-item" onclick="switchTab('office')" id="nav-office"><div class="nav-icon">💼</div>Офис</div>
         <div class="nav-item" onclick="switchTab('center')" id="nav-center"><div class="nav-icon">🏟</div>Спортцентр</div>
         <div class="nav-item" onclick="switchTab('tactics')" id="nav-tactics"><div class="nav-icon">📋</div>Состав</div>
+        <div class="nav-item" onclick="switchTab('account')" id="nav-account"><div class="nav-icon">👤</div>Аккаунт</div>
+    </div>
+
+    <!-- КАСТОМНЫЙ МОДАЛ -->
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Несохранённые изменения</h3>
+            <p style="font-size:14px;">Вы изменили состав, но не сохранили его. Что сделать?</p>
+            <div class="modal-actions">
+                <button class="btn" id="modal-btn-save" style="background-color:#2ecc71;">Сохранить и выйти</button>
+                <button class="btn" id="modal-btn-exit" style="background-color:#a82929;">Выйти без сохранения</button>
+                <button class="btn-secondary" id="modal-btn-stay">Остаться</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -743,13 +788,8 @@
         };
         try { tg.expand(); } catch (e) { console.warn("tg.expand failed:", e); }
 
-        // Фикс сброса прогресса: сохраняем ID в localStorage на случай, если Telegram его не передаст
         let userId = (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? String(tg.initDataUnsafe.user.id) : localStorage.getItem('soccery_user_id');
-        if (!userId) {
-            userId = "dev_user";
-        } else {
-            localStorage.setItem('soccery_user_id', userId);
-        }
+        if (!userId) { userId = "dev_user"; } else { localStorage.setItem('soccery_user_id', userId); }
         
         const userName = (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || "Игрок";
         const API_BASE = window.location.origin;
@@ -765,6 +805,14 @@
         let selectedNationality = "Россия";
         let managerSetupComplete = false;
         let tacticsDirty = false;
+        let pendingTabId = null;
+
+        const STAT_NAMES = {
+            "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
+            "gk_kicking": "Выбивание", "gk_positioning": "Позиционирование",
+            "pace": "Скорость", "shooting": "Удар", "passing": "Пас",
+            "dribbling": "Дриблинг", "defending": "Защита", "physicality": "Физика"
+        };
 
         const countriesList = [
             { n: "Австралия", c: "au" }, { n: "Австрия", c: "at" }, { n: "Азербайджан", c: "az" }, { n: "Албания", c: "al" },
@@ -923,7 +971,7 @@
             return amount + ' $';
         }
 
-        async function checkManager() {
+        async function checkManager(skipConfirm) {
             try {
                 const res = await fetch(API_BASE + '/api/manager/' + encodeURIComponent(userId));
                 const data = await res.json();
@@ -933,7 +981,9 @@
                     currentLeague = data.league;
                     currentStars = data.stars;
                     managerSetupComplete = !!data.is_setup_complete;
-                    showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
+                    if (!skipConfirm) {
+                        showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
+                    }
                     return true;
                 }
             } catch (e) { console.error(e); }
@@ -1281,15 +1331,15 @@
                     const progRes = await fetch(API_BASE + '/api/training-programs');
                     let programs = await progRes.json();
 
-                    // Фильтрация: вратарям — только GK-тренировки, полевым — только остальные
                     programs = programs.filter(function(prog) {
                         const isGKProg = prog.position_focus === "GK";
                         return isGK ? isGKProg : !isGKProg;
                     });
 
                     listDiv.innerHTML = programs.map(function(prog) {
-                        const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) { return '+' + prog.stat_boosts[k] + ' ' + k; }).join(", ");
-                        // Жестко выводим шанс +1 OVR вместо старых значений
+                        const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) {
+                            return '+' + prog.stat_boosts[k] + ' ' + (STAT_NAMES[k] || k);
+                        }).join(", ");
                         const ovrText = prog.ovr_boost > 0 ? 'шанс +1 OVR' : "";
                         return '<div class="training-card" onclick="startTraining(' + playerId + ', ' + prog.id + ')">' +
                             '<div class="training-name">' + prog.name + '</div>' +
@@ -1324,13 +1374,8 @@
 
         function switchTab(tabId) {
             if (currentScreenIsTactics() && tabId !== 'tactics' && tacticsDirty) {
-                tg.showConfirm("У вас есть несохранённые изменения в составе. Выйти без сохранения?", function(ok) {
-                    if (ok) {
-                        tacticsDirty = false;
-                        tg.disableClosingConfirmation();
-                        _doSwitchTab(tabId);
-                    }
-                });
+                pendingTabId = tabId;
+                $("custom-modal").classList.remove("hidden");
                 return;
             }
             _doSwitchTab(tabId);
@@ -1342,6 +1387,13 @@
             showScreen(tabId);
             if (tabId === 'tactics') {
                 loadTactics();
+            } else if (tabId === 'account') {
+                $("account-club-name").innerText = currentClubName;
+                fetch(API_BASE + '/api/manager/' + userId)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.coach_name) $("inp-account-coach-name").value = data.coach_name;
+                    });
             }
             window.scrollTo(0, 0);
         }
@@ -1354,11 +1406,36 @@
         window.openPlayerDetails = openPlayerDetails;
         window.startTraining = startTraining;
         window.handleImgError = handleImgError;
+        window.onSlotClick = onSlotClick;
+        window.onBenchPlayerClick = onBenchPlayerClick;
+
+        // === МОДАЛ ===
+        $("modal-btn-stay").onclick = function() {
+            $("custom-modal").classList.add("hidden");
+            pendingTabId = null;
+        };
+        $("modal-btn-exit").onclick = function() {
+            $("custom-modal").classList.add("hidden");
+            tacticsDirty = false;
+            tg.disableClosingConfirmation();
+            if (pendingTabId) _doSwitchTab(pendingTabId);
+            pendingTabId = null;
+        };
+        $("modal-btn-save").onclick = async function() {
+            const btn = $("modal-btn-save");
+            btn.innerText = "Сохранение...";
+            const success = await doSaveTactics();
+            btn.innerText = "Сохранить и выйти";
+            if (success) {
+                $("custom-modal").classList.add("hidden");
+                if (pendingTabId) _doSwitchTab(pendingTabId);
+                pendingTabId = null;
+            }
+        };
 
         // ========================================
         // ============ ВКЛАДКА «СОСТАВ» ==========
         // ========================================
-        // НОВЫЕ КООРДИНАТЫ: Y-расстояние между линиями минимум 16-18%
         const FORMATIONS = {
             "3-1-4-2": [
                 { role: "GK", x: 50, y: 94 },
@@ -1809,7 +1886,6 @@
             if (!currentClubId) return;
             try {
                 const players = await ensurePlayersLoaded();
-                // Если есть несохраненные изменения, не затираем их с сервера
                 if (!tacticsLoaded && !tacticsDirty) {
                     const res = await fetch(API_BASE + '/api/tactics/' + userId);
                     let data = {};
@@ -1998,7 +2074,6 @@
             }
             renderTactics();
         }
-        window.onSlotClick = onSlotClick;
 
         function onBenchPlayerClick(playerId) {
             if (selectedSlotIndex !== null) {
@@ -2013,7 +2088,6 @@
             }
             renderTactics();
         }
-        window.onBenchPlayerClick = onBenchPlayerClick;
 
         function placeBenchPlayerIntoSlot(benchPlayerId, slotIdx) {
             const existingIdx = tacticsState.starting_xi.indexOf(benchPlayerId);
@@ -2077,7 +2151,7 @@
             markDirty();
         };
 
-        $("btn-save-tactics").onclick = async function() {
+        async function doSaveTactics() {
             try {
                 const res = await fetch(API_BASE + '/api/tactics', {
                     method: "POST",
@@ -2095,19 +2169,55 @@
                 if (res.ok) {
                     tacticsDirty = false;
                     tg.disableClosingConfirmation();
-                    tg.showAlert("✅ Состав сохранён!");
+                    return true;
                 } else {
                     const err = await res.json().catch(function() { return {}; });
                     tg.showAlert("Ошибка сохранения: " + (err.detail || res.status));
+                    return false;
                 }
             } catch (e) {
                 tg.showAlert("Сетевая ошибка: " + e.message);
+                return false;
             }
+        }
+
+        $("btn-save-tactics").onclick = async function() {
+            const btn = $("btn-save-tactics");
+            btn.innerText = "Сохранение...";
+            const success = await doSaveTactics();
+            btn.innerText = "💾 Сохранить состав";
+            if (success) tg.showAlert("✅ Состав сохранён!");
+        };
+
+        // === АККАУНТ ===
+        $("btn-save-account-name").onclick = async function() {
+            const newName = $("inp-account-coach-name").value.trim();
+            if (newName.length < 3) return tg.showAlert("Слишком короткое имя");
+            try {
+                const res = await fetch(API_BASE + '/api/update-coach-name', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ telegram_id: userId, coach_name: newName })
+                });
+                if (res.ok) tg.showAlert("✅ Имя тренера обновлено!");
+                else tg.showAlert("Ошибка обновления");
+            } catch(e) { tg.showAlert("Сетевая ошибка"); }
+        };
+
+        $("btn-change-club").onclick = function() {
+            tg.showConfirm("Вы уверены, что хотите сменить клуб? Прогресс текущей карьеры будет сброшен.", async function(ok) {
+                if (!ok) return;
+                const res = await fetch(API_BASE + '/api/reset-club/' + userId, { method: 'DELETE' });
+                if (res.ok) {
+                    localStorage.removeItem('soccery_user_id');
+                    window.location.reload();
+                }
+            });
         };
 
         // === НАВИГАЦИЯ ===
         $("btn-start").onclick = async function() {
-            const hasClub = await checkManager();
+            const hasClub = await checkManager(false);
             if (!hasClub) await loadData();
         };
         
@@ -2142,6 +2252,20 @@
             });
         };
 
+        // === АВТО-ВХОД ===
+        async function initApp() {
+            const hasClub = await checkManager(true); // true = не показывать экран подтверждения
+            if (hasClub && managerSetupComplete) {
+                $("bottom-nav").classList.remove("hidden");
+                loadSquad();
+            } else if (hasClub && !managerSetupComplete) {
+                goToCoachSetup();
+            } else {
+                showScreen("welcome");
+            }
+        }
+
+        window.addEventListener('load', initApp);
         console.log("Soccery 27 initialized OK. User:", userId);
     })();
     </script>
