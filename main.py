@@ -441,7 +441,7 @@ def run_seed_script():
     result = subprocess.run([sys.executable, "seed_data.py"], capture_output=True, text=True)
     print("Вывод (stdout):", result.stdout)
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Soccery 27 API"}
 
