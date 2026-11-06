@@ -16,7 +16,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from sqlalchemy import (
-    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float
+    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float, inspect, text
 )
 from sqlalchemy.orm import declarative_base, Session
 
@@ -69,7 +69,7 @@ class Player(Base):
     gk_reflexes = Column(Integer)
 
     # === НОВЫЕ ПОЛЯ ===
-    alt_positions = Column(String, default="[]")  # JSON-список альтернативных позиций
+    alt_positions = Column(String, default="[]")
     training_program_id = Column(Integer, ForeignKey("training_programs.id"), nullable=True)
     training_started_at = Column(DateTime, nullable=True)
 
@@ -108,20 +108,46 @@ class TrainingProgram(Base):
     name = Column(String)
     description = Column(String)
     duration_weeks = Column(Integer)
-    position_focus = Column(String, nullable=True)  # если задано — открывает эту позицию
-    stat_boosts = Column(String, default="{}")  # JSON: {stat: +value}
+    position_focus = Column(String, nullable=True)
+    stat_boosts = Column(String, default="{}")
     ovr_boost = Column(Integer, default=0)
 
 
 Base.metadata.create_all(bind=engine)
 
-# === Инициализация программ тренировок (один раз) ===
+# === АВТОМИГРАЦИЯ БАЗЫ ДАННЫХ ===
+def run_migrations():
+    inspector = inspect(engine)
+    if 'players' in inspector.get_table_names():
+        columns = [c['name'] for c in inspector.get_columns('players')]
+        with engine.begin() as conn:
+            if 'alt_positions' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE players ADD COLUMN alt_positions VARCHAR DEFAULT '[]'"))
+                    print("Migrated: added alt_positions")
+                except Exception as e:
+                    print("Migration failed (alt_positions):", e)
+            if 'training_program_id' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE players ADD COLUMN training_program_id INTEGER"))
+                    print("Migrated: added training_program_id")
+                except Exception as e:
+                    print("Migration failed (training_program_id):", e)
+            if 'training_started_at' not in columns:
+                try:
+                    conn.execute(text("ALTER TABLE players ADD COLUMN training_started_at TIMESTAMP"))
+                    print("Migrated: added training_started_at")
+                except Exception as e:
+                    print("Migration failed (training_started_at):", e)
+
+run_migrations()
+
+# === Инициализация программ тренировок ===
 def seed_training_programs():
     db = Session(engine)
     try:
         if db.query(TrainingProgram).count() == 0:
             programs = [
-                # Быстрые (недели)
                 TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +2 к скорости.",
                                 duration_weeks=2, stat_boosts=json.dumps({"pace": 2})),
                 TrainingProgram(name="Ударная техника", description="Отработка ударов. +2 к удару.",
@@ -134,14 +160,12 @@ def seed_training_programs():
                                 duration_weeks=4, stat_boosts=json.dumps({"defending": 2})),
                 TrainingProgram(name="Физическая мощь", description="Работа в зале. +2 к физике.",
                                 duration_weeks=4, stat_boosts=json.dumps({"physicality": 2})),
-                # Средние (месяцы)
                 TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. +3 к OVR.",
                                 duration_weeks=12, ovr_boost=3, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
                 TrainingProgram(name="Освоение новой позиции (лёгкая)", description="Открывает смежную позицию.",
                                 duration_weeks=16, position_focus="adjacent"),
                 TrainingProgram(name="Освоение новой позиции (сложная)", description="Открывает дальнюю позицию.",
                                 duration_weeks=32, position_focus="far"),
-                # Долгие (год+)
                 TrainingProgram(name="Фундаментальная переподготовка", description="Смена амплуа. Открывает любую позицию.",
                                 duration_weeks=80, position_focus="any"),
                 TrainingProgram(name="Воспитание лидера", description="Капитанские качества. +5 к OVR, +2 пас, +2 физика.",
@@ -157,8 +181,6 @@ seed_training_programs()
 
 
 # === Штрафы за позицию ===
-# Ключ: (родная_позиция_группа, целевая_позиция) -> штраф
-# Используем упрощённую матрицу на основе групп и конкретных позиций.
 POSITION_GROUPS = {
     "GK": ["GK"],
     "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
@@ -166,146 +188,40 @@ POSITION_GROUPS = {
     "ATT": ["LW", "RW", "ST", "CF"],
 }
 
-# Точные штрафы для конкретных пар (родная -> целевая)
-# Если пары нет, используется штраф по группам.
 POSITION_PENALTY = {
-    # CM
-    ("CM", "CDM"): 4,
-    ("CM", "CAM"): 4,
-    ("CM", "LM"): 6,
-    ("CM", "RM"): 6,
-    ("CM", "CB"): 10,
-    ("CM", "LB"): 11,
-    ("CM", "RB"): 11,
-    ("CM", "ST"): 8,
-    ("CM", "LW"): 9,
-    ("CM", "RW"): 9,
-    ("CM", "GK"): 45,
-    # CDM
-    ("CDM", "CM"): 3,
-    ("CDM", "CAM"): 6,
-    ("CDM", "CB"): 7,
-    ("CDM", "LB"): 8,
-    ("CDM", "RB"): 8,
-    ("CDM", "LM"): 8,
-    ("CDM", "RM"): 8,
-    ("CDM", "ST"): 12,
-    ("CDM", "GK"): 45,
-    # CAM
-    ("CAM", "CM"): 3,
-    ("CAM", "CDM"): 6,
-    ("CAM", "ST"): 5,
-    ("CAM", "LW"): 6,
-    ("CAM", "RW"): 6,
-    ("CAM", "LM"): 7,
-    ("CAM", "RM"): 7,
-    ("CAM", "CB"): 15,
-    ("CAM", "GK"): 45,
-    # ST
-    ("ST", "CF"): 1,
-    ("ST", "CAM"): 7,
-    ("ST", "LW"): 5,
-    ("ST", "RW"): 5,
-    ("ST", "CM"): 10,
-    ("ST", "CDM"): 14,
-    ("ST", "CB"): 18,
-    ("ST", "GK"): 48,
-    # LW
-    ("LW", "LM"): 3,
-    ("LW", "RW"): 2,
-    ("LW", "ST"): 5,
-    ("LW", "CAM"): 6,
-    ("LW", "CM"): 9,
-    ("LW", "LB"): 7,
-    ("LW", "RB"): 12,
-    ("LW", "CB"): 15,
-    ("LW", "GK"): 47,
-    # RW (симметрично LW)
-    ("RW", "RM"): 3,
-    ("RW", "LW"): 2,
-    ("RW", "ST"): 5,
-    ("RW", "CAM"): 6,
-    ("RW", "CM"): 9,
-    ("RW", "RB"): 7,
-    ("RW", "LB"): 12,
-    ("RW", "CB"): 15,
-    ("RW", "GK"): 47,
-    # CB
-    ("CB", "CDM"): 7,
-    ("CB", "LB"): 4,
-    ("CB", "RB"): 4,
-    ("CB", "CM"): 12,
-    ("CB", "CAM"): 16,
-    ("CB", "ST"): 20,
-    ("CB", "GK"): 40,
-    # LB
-    ("LB", "LWB"): 2,
-    ("LB", "CB"): 4,
-    ("LB", "RB"): 5,
-    ("LB", "LM"): 4,
-    ("LB", "CM"): 11,
-    ("LB", "CDM"): 9,
-    ("LB", "CAM"): 15,
-    ("LB", "ST"): 20,
-    ("LB", "GK"): 45,
-    # RB (симметрично LB)
-    ("RB", "RWB"): 2,
-    ("RB", "CB"): 4,
-    ("RB", "LB"): 5,
-    ("RB", "RM"): 4,
-    ("RB", "CM"): 11,
-    ("RB", "CDM"): 9,
-    ("RB", "CAM"): 15,
-    ("RB", "ST"): 20,
-    ("RB", "GK"): 45,
-    # GK
-    ("GK", "CB"): 40,
-    ("GK", "CM"): 45,
-    ("GK", "ST"): 48,
-    # LWB/RWB (аналогично LB/RB)
-    ("LWB", "LB"): 2,
-    ("LWB", "LM"): 3,
-    ("LWB", "CB"): 5,
-    ("RWB", "RB"): 2,
-    ("RWB", "RM"): 3,
-    ("RWB", "CB"): 5,
-    # LM
-    ("LM", "LW"): 3,
-    ("LM", "CM"): 5,
-    ("LM", "CAM"): 6,
-    ("LM", "LB"): 4,
-    ("LM", "CDM"): 9,
-    ("LM", "ST"): 9,
-    ("LM", "CB"): 14,
-    ("LM", "GK"): 45,
-    # RM (симметрично LM)
-    ("RM", "RW"): 3,
-    ("RM", "CM"): 5,
-    ("RM", "CAM"): 6,
-    ("RM", "RB"): 4,
-    ("RM", "CDM"): 9,
-    ("RM", "ST"): 9,
-    ("RM", "CB"): 14,
-    ("RM", "GK"): 45,
+    ("CM", "CDM"): 4, ("CM", "CAM"): 4, ("CM", "LM"): 6, ("CM", "RM"): 6,
+    ("CM", "CB"): 10, ("CM", "LB"): 11, ("CM", "RB"): 11, ("CM", "ST"): 8,
+    ("CM", "LW"): 9, ("CM", "RW"): 9, ("CM", "GK"): 45,
+    ("CDM", "CM"): 3, ("CDM", "CAM"): 6, ("CDM", "CB"): 7, ("CDM", "LB"): 8,
+    ("CDM", "RB"): 8, ("CDM", "LM"): 8, ("CDM", "RM"): 8, ("CDM", "ST"): 12, ("CDM", "GK"): 45,
+    ("CAM", "CM"): 3, ("CAM", "CDM"): 6, ("CAM", "ST"): 5, ("CAM", "LW"): 6,
+    ("CAM", "RW"): 6, ("CAM", "LM"): 7, ("CAM", "RM"): 7, ("CAM", "CB"): 15, ("CAM", "GK"): 45,
+    ("ST", "CF"): 1, ("ST", "CAM"): 7, ("ST", "LW"): 5, ("ST", "RW"): 5,
+    ("ST", "CM"): 10, ("ST", "CDM"): 14, ("ST", "CB"): 18, ("ST", "GK"): 48,
+    ("LW", "LM"): 3, ("LW", "RW"): 2, ("LW", "ST"): 5, ("LW", "CAM"): 6,
+    ("LW", "CM"): 9, ("LW", "LB"): 7, ("LW", "RB"): 12, ("LW", "CB"): 15, ("LW", "GK"): 47,
+    ("RW", "RM"): 3, ("RW", "LW"): 2, ("RW", "ST"): 5, ("RW", "CAM"): 6,
+    ("RW", "CM"): 9, ("RW", "RB"): 7, ("RW", "LB"): 12, ("RW", "CB"): 15, ("RW", "GK"): 47,
+    ("CB", "CDM"): 7, ("CB", "LB"): 4, ("CB", "RB"): 4, ("CB", "CM"): 12,
+    ("CB", "CAM"): 16, ("CB", "ST"): 20, ("CB", "GK"): 40,
+    ("LB", "LWB"): 2, ("LB", "CB"): 4, ("LB", "RB"): 5, ("LB", "LM"): 4,
+    ("LB", "CM"): 11, ("LB", "CDM"): 9, ("LB", "CAM"): 15, ("LB", "ST"): 20, ("LB", "GK"): 45,
+    ("RB", "RWB"): 2, ("RB", "CB"): 4, ("RB", "LB"): 5, ("RB", "RM"): 4,
+    ("RB", "CM"): 11, ("RB", "CDM"): 9, ("RB", "CAM"): 15, ("RB", "ST"): 20, ("RB", "GK"): 45,
+    ("GK", "CB"): 40, ("GK", "CM"): 45, ("GK", "ST"): 48,
+    ("LWB", "LB"): 2, ("LWB", "LM"): 3, ("LWB", "CB"): 5,
+    ("RWB", "RB"): 2, ("RWB", "RM"): 3, ("RWB", "CB"): 5,
+    ("LM", "LW"): 3, ("LM", "CM"): 5, ("LM", "CAM"): 6, ("LM", "LB"): 4,
+    ("LM", "CDM"): 9, ("LM", "ST"): 9, ("LM", "CB"): 14, ("LM", "GK"): 45,
+    ("RM", "RW"): 3, ("RM", "CM"): 5, ("RM", "CAM"): 6, ("RM", "RB"): 4,
+    ("RM", "CDM"): 9, ("RM", "ST"): 9, ("RM", "CB"): 14, ("RM", "GK"): 45,
 }
 
-# Штрафы по группам (если точной пары нет)
 GROUP_PENALTY = {
-    ("MID", "MID"): 5,
-    ("MID", "DEF"): 12,
-    ("MID", "ATT"): 9,
-    ("MID", "GK"): 45,
-    ("DEF", "MID"): 11,
-    ("DEF", "DEF"): 4,
-    ("DEF", "ATT"): 18,
-    ("DEF", "GK"): 42,
-    ("ATT", "MID"): 8,
-    ("ATT", "DEF"): 16,
-    ("ATT", "ATT"): 3,
-    ("ATT", "GK"): 47,
-    ("GK", "DEF"): 40,
-    ("GK", "MID"): 45,
-    ("GK", "ATT"): 48,
+    ("MID", "MID"): 5, ("MID", "DEF"): 12, ("MID", "ATT"): 9, ("MID", "GK"): 45,
+    ("DEF", "MID"): 11, ("DEF", "DEF"): 4, ("DEF", "ATT"): 18, ("DEF", "GK"): 42,
+    ("ATT", "MID"): 8, ("ATT", "DEF"): 16, ("ATT", "ATT"): 3, ("ATT", "GK"): 47,
+    ("GK", "DEF"): 40, ("GK", "MID"): 45, ("GK", "ATT"): 48,
 }
 
 
@@ -341,33 +257,27 @@ def group_of(pos: str) -> str:
 
 
 def position_penalty(native_pos: str, target_pos: str, alt_positions: list) -> int:
-    """Возвращает штраф к OVR (0, если позиция родная или альтернативная)."""
     native = normalize_pos(native_pos)
     target = normalize_pos(target_pos)
     if native == target:
         return 0
-    # Если позиция есть в альтернативных — штрафа нет
     alts = [normalize_pos(a) for a in alt_positions]
     if target in alts:
         return 0
-    # Точный штраф
     key = (native, target)
     if key in POSITION_PENALTY:
         return POSITION_PENALTY[key]
-    # Штраф по группам
     ng = group_of(native)
     tg = group_of(target)
     return GROUP_PENALTY.get((ng, tg), 20)
 
 
-# === Эффективный OVR ===
 def effective_overall(player: Player, slot_pos: str) -> int:
     alts = json.loads(player.alt_positions or "[]")
     pen = position_penalty(player.position, slot_pos, alts)
     return max(1, player.overall_rating - pen)
 
 
-# === Применение завершённой тренировки ===
 def apply_training_if_done(player: Player, db: Session) -> bool:
     if not player.training_program_id or not player.training_started_at:
         return False
@@ -377,7 +287,6 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
     end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
     if datetime.utcnow() < end_date:
         return False
-    # Применяем эффекты
     if prog.stat_boosts:
         boosts = json.loads(prog.stat_boosts)
         for stat, val in boosts.items():
@@ -386,24 +295,20 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
     if prog.ovr_boost:
         player.overall_rating = (player.overall_rating or 50) + prog.ovr_boost
     if prog.position_focus:
-        # Логика добавления альтернативной позиции
         alts = json.loads(player.alt_positions or "[]")
         native = normalize_pos(player.position)
         if prog.position_focus == "any":
-            # Открываем случайную дальнюю позицию
             all_pos = ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST"]
             candidates = [p for p in all_pos if p != native and p not in alts]
             if candidates:
                 alts.append(random.choice(candidates))
         elif prog.position_focus == "far":
-            # Открываем позицию из другой группы
             ng = group_of(native)
             candidates = [p for p in ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST"]
                           if p != native and p not in alts and group_of(p) != ng]
             if candidates:
                 alts.append(random.choice(candidates))
-        else:  # adjacent
-            # Смежная позиция
+        else:
             adjacent_map = {
                 "CM": ["CDM", "CAM", "LM", "RM"],
                 "CDM": ["CM", "CB"],
@@ -422,7 +327,6 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
             if candidates:
                 alts.append(random.choice(candidates))
         player.alt_positions = json.dumps(alts)
-    # Очищаем тренировку
     player.training_program_id = None
     player.training_started_at = None
     db.commit()
@@ -569,7 +473,6 @@ def get_club_players(club_id: int):
         players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
         result = []
         for p in players:
-            # Применяем тренировки, если завершились
             apply_training_if_done(p, db)
             alts = json.loads(p.alt_positions or "[]")
             result.append({
@@ -589,8 +492,6 @@ def get_club_players(club_id: int):
     finally:
         db.close()
 
-
-# === ТРЕНИРОВКИ ===
 
 @app.get("/api/training-programs")
 def get_training_programs():
@@ -648,7 +549,6 @@ def training_status(player_id: int):
         player = db.query(Player).filter_by(id=player_id).first()
         if not player:
             raise HTTPException(status_code=404, detail="Игрок не найден")
-        # Проверяем завершение
         apply_training_if_done(player, db)
         if not player.training_program_id:
             return {"active": False}
@@ -666,8 +566,6 @@ def training_status(player_id: int):
     finally:
         db.close()
 
-
-# === ТАКТИКА ===
 
 @app.get("/api/tactics/{telegram_id}")
 def get_tactics(telegram_id: str):
@@ -757,7 +655,6 @@ async def on_startup():
     asyncio.create_task(start_bot())
 
 
-# --- РАЗДАЧА ---
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
