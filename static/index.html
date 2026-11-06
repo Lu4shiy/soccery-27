@@ -347,6 +347,7 @@
         .continent-CONMEBOL { background: #2e4a1a; color: #2ecc71; }
         .continent-AFC { background: #5a3a1a; color: #e67e22; }
         .continent-CONCACAF { background: #5a1a3a; color: #e74c3c; }
+        .continent-World { background: #5a4a1a; color: #f1c40f; }
     </style>
 </head>
 <body>
@@ -519,7 +520,7 @@
                     </div>
                 </div>
                 <div id="pd-training-available">
-                    <p style="font-size:12px;">Доступные программы (5 из 14):</p>
+                    <p style="font-size:12px;">Доступные программы (5 из 15):</p>
                     <div id="pd-training-list" class="training-list"></div>
                 </div>
             </div>
@@ -529,7 +530,7 @@
     <div id="screen-center" class="screen hidden">
         <h2>🏟 Спортивный центр</h2>
         <div class="card">
-            <h3>Турниры</h3>
+            <h3>Турниры сезона 2026/27</h3>
             <p style="font-size: 12px;">Ваш клуб: <b id="center-club-name" style="color:#52a8ff;"></b> (<span id="center-club-continent"></span>)</p>
             <table class="competitions-table">
                 <thead>
@@ -1163,7 +1164,6 @@
                         return isGK ? isGKProg : !isGKProg;
                     });
 
-                    // Берем 5 случайных
                     filtered = filtered.sort(() => 0.5 - Math.random()).slice(0, 5);
 
                     listDiv.innerHTML = filtered.map(function(prog) {
@@ -1249,47 +1249,33 @@
             const tbody = $("competitions-list");
             tbody.innerHTML = "<tr><td colspan='2'>Загрузка...</td></tr>";
             
-            // Имитация списка турниров для клуба
-            const tournaments = [
-                { name: currentLeague, continent: currentContinent },
-                { name: "Национальный Кубок", continent: currentContinent },
-                { name: "Национальный Суперкубок", continent: currentContinent },
-                { name: "UEFA Champions League", continent: "UEFA" },
-                { name: "UEFA Europa League", continent: "UEFA" },
-                { name: "UEFA Conference League", continent: "UEFA" },
-                { name: "UEFA Super Cup", continent: "UEFA" },
-                { name: "FIFA Intercontinental Cup", continent: "World" },
-                { name: "FIFA Club World Cup", continent: "World" }
-            ];
+            try {
+                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments');
+                const tournaments = await res.json();
+                
+                if (!tournaments.length) {
+                    tbody.innerHTML = "<tr><td colspan='2'>Нет данных о турнирах.</td></tr>";
+                    return;
+                }
 
-            // Фильтруем по континенту клуба (если клуб не из Европы, убираем еврокубки)
-            let filtered = tournaments.filter(t => {
-                if (t.continent === "World") return true;
-                if (t.continent === currentContinent) return true;
-                if (currentContinent === "UEFA" && t.continent === "UEFA") return true;
-                // Если клуб из КОНМЕБОЛ, добавляем Либертадорес
-                if (currentContinent === "CONMEBOL" && t.name === "UEFA Champions League") return false; // Убираем ЛЧ
-                return false;
-            });
+                // Сортируем: сначала национальные, потом континентальные, потом мировые
+                tournaments.sort((a, b) => {
+                    if (a.continent === currentContinent && b.continent !== currentContinent) return -1;
+                    if (b.continent === currentContinent && a.continent !== currentContinent) return 1;
+                    if (a.type === "League" && b.type !== "League") return -1;
+                    if (b.type === "League" && a.type !== "League") return 1;
+                    return 0;
+                });
 
-            if (currentContinent === "CONMEBOL") {
-                filtered.push({ name: "CONMEBOL Libertadores", continent: "CONMEBOL" });
-                filtered.push({ name: "CONMEBOL Sudamericana", continent: "CONMEBOL" });
+                tbody.innerHTML = tournaments.map(t => `
+                    <tr>
+                        <td>${t.name}</td>
+                        <td><span class="continent-badge continent-${t.continent}">${t.continent}</span></td>
+                    </tr>
+                `).join("");
+            } catch (e) {
+                tbody.innerHTML = "<tr><td colspan='2'>Ошибка загрузки турниров.</td></tr>";
             }
-
-            // Сортируем: сначала внутренние, потом континентальные, потом мировые
-            filtered.sort((a, b) => {
-                if (a.continent === currentContinent && b.continent !== currentContinent) return -1;
-                if (b.continent === currentContinent && a.continent !== currentContinent) return 1;
-                return 0;
-            });
-
-            tbody.innerHTML = filtered.map(t => `
-                <tr>
-                    <td>${t.name}</td>
-                    <td><span class="continent-badge continent-${t.continent}">${t.continent}</span></td>
-                </tr>
-            `).join("");
         }
 
         // === МОДАЛ ===
@@ -1574,7 +1560,7 @@
         let tacticsLoaded = false;
         let selectedSlotIndex = null;
         let selectedBenchPlayerId = null;
-        let benchTargetSize = 7; // 5-9
+        let benchTargetSize = 7;
 
         function getPlayerById(id) {
             if (!window.currentPlayers) return null;
@@ -1783,7 +1769,6 @@
                     while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
                     while (tacticsState.starting_xi.length > needed) tacticsState.starting_xi.pop();
 
-                    // Инициализация запаса, если пусто
                     if (tacticsState.bench.length === 0) {
                         const allInXI = new Set(tacticsState.starting_xi.filter(x => x != null));
                         const rest = players.filter(p => !allInXI.has(p.id));
@@ -1865,10 +1850,7 @@
             
             const all = window.currentPlayers || [];
             
-            // Собираем тех, кто на лавке
             const benchPlayers = tacticsState.bench.map(id => getPlayerById(id)).filter(Boolean);
-            
-            // Резерв — все, кто не в основе и не в запасе
             const reserve = all.filter(function(p) { return !xiSet.has(p.id) && !benchSet.has(p.id); });
 
             function getFamilyOrder(pos) {
@@ -1992,13 +1974,11 @@
         }
 
         function onReservePlayerClick(playerId) {
-            // Автоматически добавляем в запас, если есть место
             if (tacticsState.bench.length >= benchTargetSize) {
                 tg.showAlert("Скамейка заполнена (максимум " + benchTargetSize + "). Сначала уберите кого-то в резерв.");
                 return;
             }
             tacticsState.bench.push(playerId);
-            // Убираем из основы, если вдруг был
             const xiIdx = tacticsState.starting_xi.indexOf(playerId);
             if (xiIdx >= 0) tacticsState.starting_xi[xiIdx] = null;
             markDirty();
@@ -2015,10 +1995,8 @@
                 tacticsState.starting_xi[existingIdx] = tmp;
                 return;
             }
-            // Игрок с лавки — просто кладём в слот, удаляя из лавки
             const benchIdx = tacticsState.bench.indexOf(benchPlayerId);
             if (benchIdx >= 0) tacticsState.bench.splice(benchIdx, 1);
-            // Если в слоте кто-то был — отправляем на лавку
             if (tacticsState.starting_xi[slotIdx] != null) {
                 tacticsState.bench.push(tacticsState.starting_xi[slotIdx]);
             }
@@ -2032,11 +2010,9 @@
             
             benchTargetSize = newSize;
             
-            // Если уменьшаем — лишних в резерв
             while (tacticsState.bench.length > benchTargetSize) {
                 tacticsState.bench.pop();
             }
-            // Если увеличиваем — добираем из резерва
             if (tacticsState.bench.length < benchTargetSize) {
                 const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
                 const benchSet = new Set(tacticsState.bench);
@@ -2081,7 +2057,6 @@
             tacticsState.penalty_taker_id = null;
             autoAssignStartingXI(window.currentPlayers || []);
             
-            // Заполняем запас
             const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
             const rest = (window.currentPlayers || []).filter(p => !xiSet.has(p.id));
             tacticsState.bench = rest.slice(0, benchTargetSize).map(p => p.id);

@@ -36,7 +36,7 @@ class Club(Base):
     name = Column(String, index=True)
     league = Column(String, index=True)
     stars = Column(Float, default=3.0)
-    continent = Column(String, default="UEFA") # НОВОЕ ПОЛЕ
+    continent = Column(String, default="UEFA")
 
 class Player(Base):
     __tablename__ = "players"
@@ -91,7 +91,7 @@ class Tactic(Base):
     manager_id = Column(Integer, ForeignKey("managers.id"), index=True, unique=True)
     formation = Column(String, default="4-3-3 (Линия)")
     starting_xi = Column(String, default="[]")
-    bench = Column(String, default="[]") # НОВОЕ ПОЛЕ
+    bench = Column(String, default="[]")
     captain_id = Column(Integer, nullable=True)
     free_kick_taker_id = Column(Integer, nullable=True)
     corner_taker_id = Column(Integer, nullable=True)
@@ -108,6 +108,21 @@ class TrainingProgram(Base):
     stat_boosts = Column(String, default="{}")
     ovr_boost = Column(Integer, default=0)
 
+# === НОВЫЕ ТАБЛИЦЫ ДЛЯ ТУРНИРОВ ===
+class Tournament(Base):
+    __tablename__ = "tournaments"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    continent = Column(String) # UEFA, CONMEBOL, AFC, CONCACAF, OFC, CAF, World
+    type = Column(String) # League, Cup, SuperCup, Continental, World
+
+class ClubTournament(Base):
+    __tablename__ = "club_tournaments"
+    id = Column(Integer, primary_key=True, index=True)
+    club_id = Column(Integer, ForeignKey("clubs.id"), index=True)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"), index=True)
+    season = Column(String, default="2026/27")
+
 Base.metadata.create_all(bind=engine)
 
 # === ИНИЦИАЛИЗАЦИЯ И МИГРАЦИИ ===
@@ -118,7 +133,7 @@ def init_db():
         db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
         db.commit()
         
-        # Назначаем континенты клубам (упрощенно по лигам)
+        # Назначаем континенты клубам
         leagues_uefa = ["premier league", "laliga", "serie a", "bundesliga", "ligue 1", "eredivisie", "liga portugal", "super lig", "championship", "pro league", "superliga", "scottish premiership", "allsvenskan", "eliteserien", "ekstraklasa", "austrian bundesliga", "brack super league", "sse airtricity"]
         leagues_conmebol = ["brazilian serie a", "liga profesional"]
         leagues_concacaf = ["mls", "liga bbva mx"]
@@ -126,19 +141,170 @@ def init_db():
         
         for c in db.query(Club).all():
             l = (c.league or "").lower()
-            if any(x in l for x in leagues_uefa):
-                c.continent = "UEFA"
-            elif any(x in l for x in leagues_conmebol):
-                c.continent = "CONMEBOL"
-            elif any(x in l for x in leagues_concacaf):
-                c.continent = "CONCACAF"
-            elif any(x in l for x in leagues_afc):
-                c.continent = "AFC"
-            else:
-                c.continent = "UEFA" # По умолчанию
+            if any(x in l for x in leagues_uefa): c.continent = "UEFA"
+            elif any(x in l for x in leagues_conmebol): c.continent = "CONMEBOL"
+            elif any(x in l for x in leagues_concacaf): c.continent = "CONCACAF"
+            elif any(x in l for x in leagues_afc): c.continent = "AFC"
+            else: c.continent = "UEFA"
         db.commit()
+
+        # === ЗАПОЛНЕНИЕ ТУРНИРОВ СЕЗОНА 2026/27 ===
+        if db.query(Tournament).count() == 0:
+            tournaments_data = [
+                # UEFA
+                {"name": "UEFA Champions League", "continent": "UEFA", "type": "Continental"},
+                {"name": "UEFA Europa League", "continent": "UEFA", "type": "Continental"},
+                {"name": "UEFA Conference League", "continent": "UEFA", "type": "Continental"},
+                {"name": "UEFA Super Cup", "continent": "UEFA", "type": "Continental"},
+                # World
+                {"name": "FIFA Intercontinental Cup", "continent": "World", "type": "World"},
+                {"name": "FIFA Club World Cup", "continent": "World", "type": "World"},
+                # England
+                {"name": "Premier League", "continent": "UEFA", "type": "League"},
+                {"name": "FA Cup", "continent": "UEFA", "type": "Cup"},
+                {"name": "EFL Cup", "continent": "UEFA", "type": "Cup"},
+                {"name": "FA Community Shield", "continent": "UEFA", "type": "SuperCup"},
+                # Spain
+                {"name": "LaLiga", "continent": "UEFA", "type": "League"},
+                {"name": "Copa del Rey", "continent": "UEFA", "type": "Cup"},
+                {"name": "Supercopa de España", "continent": "UEFA", "type": "SuperCup"},
+                # Germany
+                {"name": "Bundesliga", "continent": "UEFA", "type": "League"},
+                {"name": "DFB-Pokal", "continent": "UEFA", "type": "Cup"},
+                {"name": "DFL-Supercup", "continent": "UEFA", "type": "SuperCup"},
+                # Italy
+                {"name": "Serie A", "continent": "UEFA", "type": "League"},
+                {"name": "Coppa Italia", "continent": "UEFA", "type": "Cup"},
+                {"name": "Supercoppa Italiana", "continent": "UEFA", "type": "SuperCup"},
+                # France
+                {"name": "Ligue 1", "continent": "UEFA", "type": "League"},
+                {"name": "Coupe de France", "continent": "UEFA", "type": "Cup"},
+                {"name": "Trophée des Champions", "continent": "UEFA", "type": "SuperCup"},
+                # Portugal
+                {"name": "Liga Portugal", "continent": "UEFA", "type": "League"},
+                {"name": "Taça de Portugal", "continent": "UEFA", "type": "Cup"},
+                {"name": "Supertaça Cândido de Oliveira", "continent": "UEFA", "type": "SuperCup"},
+                # Netherlands
+                {"name": "Eredivisie", "continent": "UEFA", "type": "League"},
+                {"name": "KNVB Cup", "continent": "UEFA", "type": "Cup"},
+                {"name": "Johan Cruyff Shield", "continent": "UEFA", "type": "SuperCup"},
+                # CONMEBOL
+                {"name": "CONMEBOL Libertadores", "continent": "CONMEBOL", "type": "Continental"},
+                {"name": "CONMEBOL Sudamericana", "continent": "CONMEBOL", "type": "Continental"},
+                {"name": "Recopa Sudamericana", "continent": "CONMEBOL", "type": "SuperCup"},
+                # CONCACAF
+                {"name": "CONCACAF Champions Cup", "continent": "CONCACAF", "type": "Continental"},
+                {"name": "Leagues Cup", "continent": "CONCACAF", "type": "Continental"},
+                # AFC
+                {"name": "AFC Champions League Elite", "continent": "AFC", "type": "Continental"},
+                {"name": "AFC Champions League Two", "continent": "AFC", "type": "Continental"},
+            ]
+            for t_data in tournaments_data:
+                db.add(Tournament(**t_data))
+            db.commit()
+
+        # Назначаем участие клубов (пример для топ-клубов, остальные по лиге)
+        # Это упрощённая логика: если клуб из АПЛ, он участвует в АПЛ, Кубке Англии, Кубке лиги.
+        # Если он в списке ЛЧ, добавляем ЛЧ и т.д.
+        if db.query(ClubTournament).count() == 0:
+            # Получаем ID турниров
+            tour_map = {t.name: t.id for t in db.query(Tournament).all()}
+            
+            # Списки участников еврокубков
+            ucl_teams = ["Arsenal", "Aston Villa", "Liverpool", "Man City", "Man United", "Lens", "Lille", "Paris Saint-Germain", "Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart", "AEK Athens", "Como", "Inter", "Napoli", "Roma", "Feyenoord", "PSV", "Bodø/Glimt", "Viking", "FC Porto", "Sporting CP", "Slovan Bratislava", "Atlético de Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal", "Fenerbahçe", "Galatasaray", "Shakhtar Donetsk", "Club Brugge", "Slavia Praha", "LASK", "Sabah"]
+            uel_teams = ["Crystal Palace", "Bournemouth", "Sunderland", "Milan", "Juventus", "Real Sociedad", "Celta de Vigo", "Hoffenheim", "Bayer Leverkusen", "Marseille", "Rennes", "AZ Alkmaar", "Torreense", "Benfica", "Beşiktaş", "Anderlecht", "Lyon", "Olympiacos", "Sparta Praha", "Sturm Graz", "Union SG", "Celje", "Celtic", "GNK Dinamo", "H. Beer-Sheva", "Levski Sofia", "N.E.C.", "Ararat-Armenia", "Ferencváros", "Jagiellonia", "Lech Poznań", "Lillestrøm", "OFI Crete", "Omonia", "Salzburg", "Viktoria Plzeň"]
+            uecl_teams = ["Brighton", "Atalanta", "Getafe", "Freiburg", "Monaco", "Braga", "Ajax", "Twente", "Gent", "Sint-Truidense", "Trabzonspor", "Jablonec", "Panathinaikos", "Aarhus", "Copenhagen", "Midtjylland", "Nordsjælland", "Brann", "Pafos", "Lugano", "Thun", "Hearts", "Mjällby", "Hajduk Split", "Crvena Zvezda", "U. Craiova", "Kairat Almaty", "CSKA Sofia", "KuPS Kuopio", "Borac", "Riga", "Egnatia", "Kauno Žalgiris", "L. Red Imps", "Inter Escaldes", "Iberia Tbilisi"]
+            
+            # Пример для АПЛ
+            for club in db.query(Club).filter(Club.league.ilike("%Premier League%")).all():
+                # Лига
+                if "Premier League" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Premier League"]))
+                if "FA Cup" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FA Cup"]))
+                if "EFL Cup" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["EFL Cup"]))
+                
+                if club.name in ucl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
+                elif club.name in uel_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                elif club.name in uecl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                
+                if club.name == "Arsenal" or club.name == "Man City":
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FA Community Shield"]))
+
+            # Пример для Ла Лиги
+            for club in db.query(Club).filter(Club.league.ilike("%LaLiga%")).all():
+                if "LaLiga" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["LaLiga"]))
+                if "Copa del Rey" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Copa del Rey"]))
+                
+                if club.name in ucl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
+                elif club.name in uel_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                elif club.name in uecl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                
+                if club.name in ["Barcelona", "Real Madrid", "Atlético de Madrid", "Real Sociedad"]:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Supercopa de España"]))
+
+            # Пример для Бундеслиги
+            for club in db.query(Club).filter(Club.league.ilike("%Bundesliga%")).all():
+                if "Bundesliga" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Bundesliga"]))
+                if "DFB-Pokal" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["DFB-Pokal"]))
+                
+                if club.name in ucl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
+                elif club.name in uel_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                elif club.name in uecl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                
+                if club.name in ["Bayern München", "Borussia Dortmund"]:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["DFL-Supercup"]))
+
+            # Пример для Серии А
+            for club in db.query(Club).filter(Club.league.ilike("%Serie A%")).all():
+                if "Serie A" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Serie A"]))
+                if "Coppa Italia" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Coppa Italia"]))
+                
+                if club.name in ucl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
+                elif club.name in uel_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                elif club.name in uecl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                
+                if club.name in ["Inter", "Lazio"]:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Supercoppa Italiana"]))
+
+            # Пример для Лиги 1
+            for club in db.query(Club).filter(Club.league.ilike("%Ligue 1%")).all():
+                if "Ligue 1" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Ligue 1"]))
+                if "Coupe de France" in tour_map: db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Coupe de France"]))
+                
+                if club.name in ucl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
+                elif club.name in uel_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                elif club.name in uecl_teams:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                
+                if club.name in ["Paris Saint-Germain", "Lens"]:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["Trophée des Champions"]))
+
+            # Добавляем Межконтинентальный кубок и Клубный чемпионат мира для известных клубов
+            for club_name in ["Paris Saint-Germain", "Real Madrid", "Bayern München", "Borussia Dortmund", "Chelsea", "Palmeiras", "Flamengo", "Al Hilal", "Inter Miami", "Boca Juniors", "Auckland City", "Al Ahly", "Mamelodi Sundowns", "Toluca"]:
+                club = db.query(Club).filter(Club.name.ilike(f"%{club_name}%")).first()
+                if club:
+                    if "FIFA Intercontinental Cup" in tour_map:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Intercontinental Cup"]))
+                    if "FIFA Club World Cup" in tour_map:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
+
+            db.commit()
     except Exception as e:
         print("Ошибка миграции:", e)
+        db.rollback()
     finally:
         db.close()
 
@@ -148,47 +314,26 @@ init_db()
 def seed_training_programs():
     db = Session(engine)
     try:
-        # Очищаем старые тренировки (чтобы убрать +3 и +5)
-        db.query(TrainingProgram).delete()
-        
-        programs = [
-            # Полевые
-            TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +1 к скорости.",
-                            duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
-            TrainingProgram(name="Ударная техника", description="Отработка ударов. +1 к удару.",
-                            duration_weeks=3, stat_boosts=json.dumps({"shooting": 1})),
-            TrainingProgram(name="Пас в движении", description="Быстрые комбинации. +1 к пасу.",
-                            duration_weeks=3, stat_boosts=json.dumps({"passing": 1})),
-            TrainingProgram(name="Дриблинг 1-в-1", description="Обводка и контроль мяча. +1 к дриблингу.",
-                            duration_weeks=4, stat_boosts=json.dumps({"dribbling": 1})),
-            TrainingProgram(name="Оборонительная стойка", description="Отбор и позиционная игра. +1 к защите.",
-                            duration_weeks=4, stat_boosts=json.dumps({"defending": 1})),
-            TrainingProgram(name="Физическая мощь", description="Работа в зале. +1 к физике.",
-                            duration_weeks=4, stat_boosts=json.dumps({"physicality": 1})),
-            TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. Шанс +1 к OVR.",
-                            duration_weeks=12, ovr_boost=1, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
-            TrainingProgram(name="Освоение позиции (лёгкая)", description="Открывает смежную позицию.",
-                            duration_weeks=16, position_focus="adjacent"),
-            TrainingProgram(name="Освоение позиции (сложная)", description="Открывает дальнюю позицию.",
-                            duration_weeks=32, position_focus="far"),
-            TrainingProgram(name="Переподготовка", description="Смена амплуа.",
-                            duration_weeks=80, position_focus="any"),
-            TrainingProgram(name="Воспитание лидера", description="Капитанские качества. +1 пас, +1 физика.",
-                            duration_weeks=52, ovr_boost=1, stat_boosts=json.dumps({"passing": 1, "physicality": 1})),
-            
-            # Вратарские
-            TrainingProgram(name="Реакция вратаря", description="Отработка реакции и прыгучести. +1 к реакции, +1 к прыжку.",
-                            duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
-            TrainingProgram(name="Игра на выходах", description="Чтение игры. +1 к позиции, +1 к хватке.",
-                            duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
-            TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции.",
-                            duration_weeks=2, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1})),
-            TrainingProgram(name="Пенальти", description="Спецподготовка к сериям пенальти. +1 к позиции, +1 к реакции.",
-                            duration_weeks=5, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_reflexes": 1})),
-        ]
-        for p in programs:
-            db.add(p)
-        db.commit()
+        if db.query(TrainingProgram).count() == 0:
+            programs = [
+                TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +1 к скорости.", duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
+                TrainingProgram(name="Ударная техника", description="Отработка ударов. +1 к удару.", duration_weeks=3, stat_boosts=json.dumps({"shooting": 1})),
+                TrainingProgram(name="Пас в движении", description="Быстрые комбинации. +1 к пасу.", duration_weeks=3, stat_boosts=json.dumps({"passing": 1})),
+                TrainingProgram(name="Дриблинг 1-в-1", description="Обводка и контроль мяча. +1 к дриблингу.", duration_weeks=4, stat_boosts=json.dumps({"dribbling": 1})),
+                TrainingProgram(name="Оборонительная стойка", description="Отбор и позиционная игра. +1 к защите.", duration_weeks=4, stat_boosts=json.dumps({"defending": 1})),
+                TrainingProgram(name="Физическая мощь", description="Работа в зале. +1 к физике.", duration_weeks=4, stat_boosts=json.dumps({"physicality": 1})),
+                TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. Шанс +1 к OVR.", duration_weeks=12, ovr_boost=1, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
+                TrainingProgram(name="Освоение позиции (лёгкая)", description="Открывает смежную позицию.", duration_weeks=16, position_focus="adjacent"),
+                TrainingProgram(name="Освоение позиции (сложная)", description="Открывает дальнюю позицию.", duration_weeks=32, position_focus="far"),
+                TrainingProgram(name="Переподготовка", description="Смена амплуа.", duration_weeks=80, position_focus="any"),
+                TrainingProgram(name="Воспитание лидера", description="Капитанские качества. +1 пас, +1 физика.", duration_weeks=52, ovr_boost=1, stat_boosts=json.dumps({"passing": 1, "physicality": 1})),
+                TrainingProgram(name="Реакция вратаря", description="Отработка реакции и прыгучести. +1 к реакции, +1 к прыжку.", duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
+                TrainingProgram(name="Игра на выходах", description="Чтение игры. +1 к позиции, +1 к хватке.", duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
+                TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции.", duration_weeks=2, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1})),
+                TrainingProgram(name="Пенальти", description="Спецподготовка к сериям пенальти. +1 к позиции, +1 к реакции.", duration_weeks=5, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_reflexes": 1})),
+            ]
+            for p in programs: db.add(p)
+            db.commit()
     finally:
         db.close()
 
@@ -249,7 +394,6 @@ def effective_overall(player: Player, slot_pos: str) -> int:
     pen = position_penalty(player.position, slot_pos, alts)
     return max(1, player.overall_rating - pen)
 
-# === ЛОГИКА ЗАВЕРШЕНИЯ ТРЕНИРОВОК ===
 def apply_training_if_done(player: Player, db: Session) -> bool:
     if not player.training_program_id or not player.training_started_at: return False
     prog = db.query(TrainingProgram).filter_by(id=player.training_program_id).first()
@@ -257,21 +401,16 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
     end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
     if datetime.utcnow() < end_date: return False
 
-    # Бонусы к статам (шанс 60%)
     if prog.stat_boosts:
         boosts = json.loads(prog.stat_boosts)
         for stat, val in boosts.items():
             if hasattr(player, stat):
                 current = getattr(player, stat) or 0
-                if random.random() < 0.6:
-                    setattr(player, stat, current + 1)
+                if random.random() < 0.6: setattr(player, stat, current + 1)
 
-    # Бонус к OVR (строго +1, шанс 33%)
     if prog.ovr_boost and prog.ovr_boost > 0:
-        if random.random() < 0.33:
-            player.overall_rating = (player.overall_rating or 50) + 1
+        if random.random() < 0.33: player.overall_rating = (player.overall_rating or 50) + 1
 
-    # Логика добавления альтернативной позиции
     if prog.position_focus:
         alts = json.loads(player.alt_positions or "[]")
         native = normalize_pos(player.position)
@@ -287,8 +426,7 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
             adjacent_map = {"CM": ["CDM", "CAM", "LM", "RM"], "CDM": ["CM", "CB"], "CAM": ["CM", "ST", "LW", "RW"], "ST": ["CF", "CAM", "LW", "RW"], "LW": ["LM", "ST", "RW"], "RW": ["RM", "ST", "LW"], "CB": ["CDM", "LB", "RB"], "LB": ["LWB", "CB", "LM"], "RB": ["RWB", "CB", "RM"], "LM": ["LW", "CM", "LB"], "RM": ["RW", "CM", "RB"], "GK": []}
             candidates = [p for p in adjacent_map.get(native, []) if p not in alts]
             if candidates: alts.append(random.choice(candidates))
-        elif prog.position_focus == "GK":
-            pass
+        elif prog.position_focus == "GK": pass
         player.alt_positions = json.dumps(alts)
 
     player.training_program_id = None
@@ -442,7 +580,6 @@ def get_training_programs():
     db = Session(engine)
     try:
         programs = db.query(TrainingProgram).all()
-        # Возвращаем ВСЕ программы, фронтенд сам выберет 5 случайных
         return [{"id": p.id, "name": p.name, "description": p.description, "duration_weeks": p.duration_weeks, "position_focus": p.position_focus, "stat_boosts": json.loads(p.stat_boosts or "{}"), "ovr_boost": p.ovr_boost} for p in programs]
     finally:
         db.close()
@@ -484,7 +621,6 @@ def training_status(player_id: int):
     finally:
         db.close()
 
-# === ТАКТИКИ (с запасом) ===
 @app.get("/api/tactics/{telegram_id}")
 def get_tactics(telegram_id: str):
     db = Session(engine)
@@ -533,6 +669,16 @@ def save_tactics(req: SaveTacticsRequest):
         t.penalty_taker_id = req.penalty_taker_id
         db.commit()
         return {"status": "ok"}
+    finally:
+        db.close()
+
+# === ЭНДПОИНТ ДЛЯ ТУРНИРОВ ===
+@app.get("/api/clubs/{club_id}/tournaments")
+def get_club_tournaments(club_id: int):
+    db = Session(engine)
+    try:
+        rows = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == club_id).all()
+        return [{"id": t.id, "name": t.name, "continent": t.continent, "type": t.type} for t in rows]
     finally:
         db.close()
 
