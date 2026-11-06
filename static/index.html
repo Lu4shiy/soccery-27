@@ -1247,7 +1247,7 @@
             tbody.innerHTML = "<tr><td colspan='2'>Загрузка...</td></tr>";
             
             try {
-                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments');
+                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments?t=' + Date.now());
                 const tournaments = await res.json();
                 
                 if (!tournaments.length) {
@@ -1255,7 +1255,6 @@
                     return;
                 }
 
-                // Сортируем: сначала национальные, потом континентальные, потом мировые
                 tournaments.sort((a, b) => {
                     if (a.continent === "Domestic" && b.continent !== "Domestic") return -1;
                     if (b.continent === "Domestic" && a.continent !== "Domestic") return 1;

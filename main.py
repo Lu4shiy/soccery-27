@@ -5,13 +5,14 @@ import subprocess
 import sys
 import asyncio
 import random
+import unicodedata
 from datetime import datetime, timedelta
 from typing import Optional, List
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
@@ -121,56 +122,34 @@ class ClubTournament(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# === СПИСКИ УЧАСТНИКОВ ЕВРОКУБКОВ 2026/27 (FC 27) ===
-UCL_TEAMS = [
-    "Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchester United",
-    "Atlético Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal",
-    "Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart",
-    "Inter", "Como", "Napoli", "Roma",
-    "Paris Saint-Germain", "Lens", "Lille",
-    "PSV", "Feyenoord", "Sporting CP", "FC Porto",
-    "Galatasaray", "Fenerbahçe",
-    "AEK Athens", "Club Brugge KV", "Bodø/Glimt", "Viking", "LASK", "Sabah", "Slavia Praha", "Slovan Bratislava", "Shakhtar Donetsk"
-]
+# === СПИСКИ УЧАСТНИКОВ ЕВРОКУБКОВ 2026/27 ===
+UCL_TEAMS = ["Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchester United", "Atlético Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal", "Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart", "Inter", "Como", "Napoli", "Roma", "Paris Saint-Germain", "Lens", "Lille", "PSV", "Feyenoord", "Sporting CP", "FC Porto", "Galatasaray", "Fenerbahçe", "AEK Athens", "Club Brugge KV", "Bodø/Glimt", "Viking", "LASK", "Sabah", "Slavia Praha", "Slovan Bratislava", "Shakhtar Donetsk"]
+UEL_TEAMS = ["Crystal Palace", "Bournemouth", "Sunderland", "Milan", "Juventus", "Real Sociedad", "Celta de Vigo", "Bayer Leverkusen", "Hoffenheim", "Marseille", "Rennes", "Benfica", "Torreense", "AZ Alkmaar", "Anderlecht", "Union Saint-Gilloise", "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "Sturm Graz", "Olympiacos", "Ararat-Armenia", "Dinamo Zagreb", "Ludogorets"]
+UECL_TEAMS = ["Atalanta", "Braga", "Ajax", "Freiburg", "Monaco", "Copenhagen", "Midtjylland", "Crvena Zvezda", "Gent", "Panathinaikos", "Pafos", "Brighton", "Lugano", "Getafe", "Twente", "KuPS", "Borac Banja Luka", "Sint-Truiden", "Lincoln Red Imps", "Brann", "Hearts", "Kairat", "Trabzonspor", "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec", "Nordsjælland", "Inter Escaldes", "Aarhus", "Thun", "CSKA Sofia", "Kauno Žalgiris", "Mjällby", "Iberia 1999", "Egnatia"]
 
-UEL_TEAMS = [
-    "Crystal Palace", "Bournemouth", "Sunderland",
-    "Milan", "Juventus", "Real Sociedad", "Celta de Vigo",
-    "Bayer Leverkusen", "Hoffenheim",
-    "Marseille", "Rennes", "Benfica", "Torreense",
-    "AZ Alkmaar", "Anderlecht", "Union Saint-Gilloise",
-    "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "Sturm Graz",
-    "Olympiacos", "Ararat-Armenia", "Dinamo Zagreb", "Ludogorets"
-]
+def clean_name(n):
+    n = unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8')
+    return n.lower().replace(" ", "").replace("-", "").replace(".", "").replace("fc", "").replace("cf", "")
 
-UECL_TEAMS = [
-    "Atalanta", "Braga", "Ajax", "Freiburg", "Monaco",
-    "Copenhagen", "Midtjylland", "Crvena Zvezda", "Gent",
-    "Panathinaikos", "Pafos", "Brighton", "Lugano",
-    "Getafe", "Twente", "KuPS", "Borac Banja Luka", "Sint-Truiden",
-    "Lincoln Red Imps", "Brann", "Hearts", "Kairat", "Trabzonspor",
-    "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec",
-    "Nordsjælland", "Inter Escaldes", "Aarhus", "Thun",
-    "CSKA Sofia", "Kauno Žalgiris", "Mjällby", "Iberia 1999", "Egnatia"
-]
+def is_in_list(club_name, team_list):
+    c_clean = clean_name(club_name)
+    for t in team_list:
+        t_clean = clean_name(t)
+        if t_clean in c_clean or c_clean in t_clean:
+            return True
+    return False
 
-# --- ИНИЦИАЛИЗАЦИЯ БД ---
-def init_db():
+# --- ПЕРЕСОЗДАНИЕ ТУРНИРОВ ---
+def rebuild_tournaments():
     db = Session(engine)
     try:
-        # Добавляем колонки, если их нет (миграции)
-        db.execute(text("ALTER TABLE clubs ADD COLUMN IF NOT EXISTS continent VARCHAR DEFAULT 'UEFA';"))
-        db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
-        db.commit()
-
-        # ПОЛНАЯ ПЕРЕЗАПИСЬ ТУРНИРОВ (чтобы исправить старые баги)
         db.execute(text("DROP TABLE IF EXISTS club_tournaments CASCADE;"))
         db.execute(text("DROP TABLE IF EXISTS tournaments CASCADE;"))
         db.commit()
         Base.metadata.tables['tournaments'].create(bind=engine)
         Base.metadata.tables['club_tournaments'].create(bind=engine)
 
-        # Назначаем континенты
+        # 1. Континенты
         for c in db.query(Club).all():
             l = (c.league or "").lower()
             if "brazil" in l or "argentin" in l: c.continent = "CONMEBOL"
@@ -179,82 +158,68 @@ def init_db():
             else: c.continent = "UEFA"
         db.commit()
 
-        # 1. Создаем базовые турниры
-        tournaments_to_add = []
-        
-        # Континентальные
+        # 2. Базовые турниры
+        tour_names = set()
         for c, t_list in [
-            ("UEFA", [("UEFA Champions League", "Continental"), ("UEFA Europa League", "Continental"), ("UEFA Conference League", "Continental")]),
-            ("CONMEBOL", [("CONMEBOL Libertadores", "Continental"), ("CONMEBOL Sudamericana", "Continental")]),
-            ("CONCACAF", [("CONCACAF Champions Cup", "Continental")]),
-            ("AFC", [("AFC Champions League Elite", "Continental")]),
-            ("World", [("FIFA Intercontinental Cup", "World"), ("FIFA Club World Cup", "World")])
+            ("UEFA", ["UEFA Champions League", "UEFA Europa League", "UEFA Conference League"]),
+            ("CONMEBOL", ["CONMEBOL Libertadores", "CONMEBOL Sudamericana"]),
+            ("CONCACAF", ["CONCACAF Champions Cup"]),
+            ("AFC", ["AFC Champions League Elite"]),
+            ("World", ["FIFA Intercontinental Cup", "FIFA Club World Cup"])
         ]:
-            for name, t_type in t_list:
-                tournaments_to_add.append(Tournament(name=name, continent=c, type=t_type))
+            for name in t_list:
+                tour_names.add((name, c, "Continental" if c != "World" else "World"))
 
-        # Национальные лиги (уникальные)
         unique_leagues = set(cl.league for cl in db.query(Club).all() if cl.league)
         for l in unique_leagues:
-            tournaments_to_add.append(Tournament(name=l, continent="Domestic", type="League"))
+            tour_names.add((l, "Domestic", "League"))
 
-        # Национальные кубки (маппинг)
-        cup_map = {
-            "Premier League": ["FA Cup", "EFL Cup"],
-            "Championship": ["FA Cup", "EFL Cup"],
-            "LaLiga": ["Copa del Rey"],
-            "Bundesliga": ["DFB-Pokal"],
-            "2. Bundesliga": ["DFB-Pokal"],
-            "3. Liga": ["DFB-Pokal"],
-            "Serie A": ["Coppa Italia"],
-            "Ligue 1": ["Coupe de France"],
-            "Eredivisie": ["KNVB Cup"],
-            "Liga Portugal": ["Taça de Portugal"],
-            "Süper Lig": ["Türkiye Kupası"],
-            "Allsvenskan": ["Svenska Cupen"],
-            "Superettan": ["Svenska Cupen"],
-            "Eliteserien": ["Norwegian Cup"],
-            "Danish Superliga": ["Danish Cup"],
-        }
-        # Для лиг, которых нет в маппинге, создаем "Кубок [Название лиги]"
+        cup_map = {}
         for l in unique_leagues:
-            if l not in cup_map:
-                cup_map[l] = [f"{l} Cup"]
+            cups = []
+            ll = l.lower()
+            if "premier league" in ll or "championship" in ll: cups = ["FA Cup", "EFL Cup"]
+            elif "laliga" in ll or "la liga" in ll: cups = ["Copa del Rey"]
+            elif "bundesliga" in ll or "3. liga" in ll: cups = ["DFB-Pokal"]
+            elif "serie a" in ll: cups = ["Coppa Italia"]
+            elif "ligue 1" in ll: cups = ["Coupe de France"]
+            elif "eredivisie" in ll: cups = ["KNVB Cup"]
+            elif "liga portugal" in ll: cups = ["Taça de Portugal"]
+            elif "süper lig" in ll: cups = ["Türkiye Kupası"]
+            elif "allsvenskan" in ll or "superettan" in ll: cups = ["Svenska Cupen"]
+            elif "eliteserien" in ll: cups = ["Norwegian Cup"]
+            else: cups = [f"{l} Cup"]
+            
+            for cup in cups:
+                tour_names.add((cup, "Domestic", "Cup"))
+            cup_map[l] = cups
 
-        for cups in cup_map.values():
-            for cup_name in cups:
-                if cup_name not in [t.name for t in tournaments_to_add]:
-                    tournaments_to_add.append(Tournament(name=cup_name, continent="Domestic", type="Cup"))
-
-        for t in tournaments_to_add:
-            db.add(t)
+        for name, cont, t_type in tour_names:
+            if not db.query(Tournament).filter_by(name=name).first():
+                db.add(Tournament(name=name, continent=cont, type=t_type))
         db.commit()
 
-        # Получаем ID всех турниров
         tour_map = {t.name: t.id for t in db.query(Tournament).all()}
 
-        # 2. Привязываем клубы
+        # 3. Привязка клубов
         for club in db.query(Club).all():
-            # --- Национальные турниры ---
+            if not club.league: continue
+            
             if club.league in tour_map:
                 db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[club.league]))
+            
+            cups = cup_map.get(club.league, [f"{club.league} Cup"])
+            for c in cups:
+                if c in tour_map:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
 
-            cups_for_league = cup_map.get(club.league, [f"{club.league} Cup"])
-            for c_name in cups_for_league:
-                if c_name in tour_map:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c_name]))
-
-            # --- Континентальные турниры (по спискам) ---
             if club.continent == "UEFA":
-                if club.name in UCL_TEAMS:
+                if is_in_list(club.name, UCL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
-                elif club.name in UEL_TEAMS:
+                elif is_in_list(club.name, UEL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
-                elif club.name in UECL_TEAMS:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
                 else:
-                    # Если клуб не в списках, но из Европы — даем ЛК (чтобы не было пусто)
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
             
             elif club.continent == "CONMEBOL":
@@ -275,10 +240,23 @@ def init_db():
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
 
         db.commit()
+        print("✅ Турниры успешно пересозданы.")
+    except Exception as e:
+        print("❌ Ошибка пересоздания турниров:", e)
+        db.rollback()
+    finally:
+        db.close()
 
+# --- ИНИЦИАЛИЗАЦИЯ БД ---
+def init_db():
+    db = Session(engine)
+    try:
+        db.execute(text("ALTER TABLE clubs ADD COLUMN IF NOT EXISTS continent VARCHAR DEFAULT 'UEFA';"))
+        db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
+        db.commit()
+        rebuild_tournaments()
     except Exception as e:
         print("Ошибка инициализации БД:", e)
-        db.rollback()
     finally:
         db.close()
 
@@ -418,6 +396,11 @@ def run_seed_script():
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"message": "Soccery 27 API"}
+
+@app.get("/admin/force-rebuild")
+def force_rebuild():
+    rebuild_tournaments()
+    return {"status": "ok", "message": "Все турниры пересозданы и привязаны к клубам. Зайдите в приложение."}
 
 @app.post("/admin/seed")
 def trigger_seed(background_tasks: BackgroundTasks, credentials: HTTPBasicCredentials = Depends(security)):
