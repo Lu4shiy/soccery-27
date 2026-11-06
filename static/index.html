@@ -2,6 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Soccery 27</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -66,7 +69,6 @@
         }
         .btn-secondary:active { background: #2f3b4d; }
 
-        /* --- НИЖНЕЕ МЕНЮ --- */
         .bottom-nav {
             position: fixed;
             bottom: 0; left: 0; right: 0;
@@ -92,7 +94,6 @@
         .nav-item.active { color: #52a8ff; font-weight: bold; }
         .nav-icon { font-size: 20px; }
 
-        /* Поля ввода */
         .form-group { margin-bottom: 16px; position: relative; }
         .form-group label { display: block; color: #8e9eb5; font-size: 13px; margin-bottom: 6px; }
         .form-control {
@@ -101,7 +102,6 @@
         }
         .form-control:focus { border-color: #52a8ff; }
 
-        /* Кастомный выпадающий список */
         .custom-select { position: relative; width: 100%; }
         .custom-select-trigger {
             padding: 12px; border-radius: 8px; border: 1px solid #2f3b4d;
@@ -119,7 +119,6 @@
 
         .flag-icon { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; margin-right: 8px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.1); }
 
-        /* ЛОГОТИПЫ */
         .logo-container {
             width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
             border-radius: 8px; background-color: #ffffff; margin-right: 12px; flex-shrink: 0; overflow: hidden;
@@ -129,7 +128,6 @@
         .logo-fallback { font-weight: bold; color: #52a8ff; font-size: 20px; text-transform: uppercase; }
         .logo-large { width: 80px !important; height: 80px !important; margin: 0 auto 16px auto !important; font-size: 36px !important; padding: 8px !important; }
 
-        /* Сетка для лиг */
         .leagues-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
         .league-card {
             background: #232e3c; border-radius: 12px; padding: 16px 10px;
@@ -141,7 +139,6 @@
         .league-card .logo-fallback { font-size: 28px; }
         .league-name { font-size: 13px; font-weight: bold; line-height: 1.2; }
 
-        /* Список клубов */
         .club-card {
             background: #232e3c; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px;
             display: flex; align-items: center; justify-content: space-between;
@@ -159,11 +156,9 @@
             padding: 4px 8px; border-radius: 6px; font-size: 13px; min-width: 36px; text-align: center;
         }
 
-        /* Половинка звезды */
         .star-half { position: relative; display: inline-block; color: #4e5d78; }
         .star-half::before { content: '★'; position: absolute; left: 0; top: 0; width: 50%; overflow: hidden; color: #e6c544; }
 
-        /* Список игроков */
         .squad-container { display: flex; flex-direction: column; gap: 8px; }
         .player-row { background: #232e3c; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .player-row:active { background: #2f3b4d; }
@@ -179,10 +174,8 @@
         
         .player-val { font-weight: bold; color: #2ecc71; font-size: 13px; text-align: right; }
 
-        /* Бюджет */
         .budget-display { font-size: 24px; font-weight: bold; color: #2ecc71; text-align: center; margin: 16px 0; background: #17212b; padding: 12px; border-radius: 10px; }
 
-        /* Детали игрока */
         .player-detail-header { text-align: center; margin-bottom: 20px; }
         .player-detail-ovr { font-size: 48px; font-weight: bold; margin: 0; }
         .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
@@ -192,7 +185,6 @@
         .stat-bar-container { background: #17212b; height: 8px; border-radius: 4px; margin-top: 4px; overflow: hidden; }
         .stat-bar { background: #52a8ff; height: 100%; }
 
-        /* Тренировки */
         .training-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
         .training-card {
             background: #17212b; border-radius: 10px; padding: 12px;
@@ -213,9 +205,6 @@
             font-weight: bold;
         }
 
-        /* ============================= */
-        /* ===== ВКЛАДКА «СОСТАВ» ====== */
-        /* ============================= */
         .tactics-topbar {
             display: flex;
             align-items: center;
@@ -409,7 +398,6 @@
             border: 1.5px solid #17212b;
         }
 
-        /* Скамейка */
         .bench-section { margin-top: 16px; }
         .bench-title {
             font-size: 14px;
@@ -471,7 +459,6 @@
             font-weight: bold;
         }
 
-        /* Стандарты */
         .roles-section {
             margin-top: 16px;
             background: #232e3c;
@@ -518,7 +505,6 @@
     </style>
 </head>
 <body>
-    <!-- ЭКРАН 1: Приветствие -->
     <div id="screen-welcome" class="screen">
         <h1>Soccery 27</h1>
         <p style="text-align:center;">Футбольный менеджер нового поколения</p>
@@ -529,25 +515,21 @@
         <button class="btn" id="btn-start">Начать карьеру</button>
     </div>
 
-    <!-- ЭКРАН 2: Загрузка -->
     <div id="screen-loading" class="screen hidden">
         <div class="card"><h2>⏳ Загружаем данные...</h2></div>
     </div>
 
-    <!-- ЭКРАН 3: Лиги -->
     <div id="screen-leagues" class="screen hidden">
         <h2>Выбери лигу</h2>
         <div id="leagues-grid" class="leagues-grid"></div>
     </div>
 
-    <!-- ЭКРАН 4: Клубы -->
     <div id="screen-clubs" class="screen hidden">
         <button class="btn-back" id="btn-back-leagues">← Назад к лигам</button>
         <h2 id="selected-league-title">Клубы</h2>
         <div id="clubs-list" style="margin-top: 16px;"></div>
     </div>
 
-    <!-- ЭКРАН 5: Подтверждение -->
     <div id="screen-confirm" class="screen hidden">
         <h2 style="text-align:center;">Выбранный клуб</h2>
         <div class="card" style="text-align:center;">
@@ -560,7 +542,6 @@
         <button class="btn" id="btn-reset" style="background-color: #a82929;">Сменить клуб</button>
     </div>
 
-    <!-- ЭКРАН 6: Настройка тренера -->
     <div id="screen-coach" class="screen hidden">
         <button class="btn-back" id="btn-back-to-confirm">← Назад</button>
         <h2>Создание тренера</h2>
@@ -587,7 +568,6 @@
         <button class="btn" id="btn-next-club-setup">Далее</button>
     </div>
 
-    <!-- ЭКРАН 7: Настройка клуба -->
     <div id="screen-club-setup" class="screen hidden">
         <button class="btn-back" id="btn-back-to-coach">← Назад</button>
         <h2>Настройка клуба</h2>
@@ -621,13 +601,11 @@
         <button class="btn" id="btn-finish-setup">Завершить настройку</button>
     </div>
 
-    <!-- ЭКРАН 8: ОФИС -->
     <div id="screen-office" class="screen hidden">
         <h2 id="squad-title">Офис: Состав команды</h2>
         <div id="squad-list" class="squad-container"></div>
     </div>
 
-    <!-- ЭКРАН 9: ДЕТАЛИ ИГРОКА -->
     <div id="screen-player" class="screen hidden">
         <button class="btn-back" id="btn-back-to-office">← Назад в офис</button>
         <div class="card">
@@ -691,7 +669,6 @@
         <div class="card"><p>Новости, календарь и матчи появятся здесь.</p></div>
     </div>
 
-    <!-- ЭКРАН 10: СОСТАВ / ТАКТИКА -->
     <div id="screen-tactics" class="screen hidden">
         <div class="tactics-topbar">
             <h2>📋 Состав</h2>
@@ -748,7 +725,6 @@
         <button class="btn" id="btn-save-tactics">💾 Сохранить состав</button>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ -->
     <div id="bottom-nav" class="bottom-nav hidden">
         <div class="nav-item" onclick="switchTab('office')" id="nav-office"><div class="nav-icon">💼</div>Офис</div>
         <div class="nav-item" onclick="switchTab('center')" id="nav-center"><div class="nav-icon">🏟</div>Спортцентр</div>
@@ -756,13 +732,22 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        const API_BASE = window.location.origin;
-        const userId = tg.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : "dev_user";
-        const userName = tg.initDataUnsafe?.user?.first_name || "Игрок";
+    (function() {
+        // === БЕЗОПАСНЫЙ TG ФОЛБЭК ===
+        const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
+            expand: () => {},
+            showAlert: (msg) => alert(msg),
+            showConfirm: (msg, cb) => { if (cb) cb(confirm(msg)); },
+            initDataUnsafe: { user: null }
+        };
+        try { tg.expand(); } catch (e) { console.warn("tg.expand failed:", e); }
 
-        document.getElementById("user-name").innerText = `Привет, ${userName}!`;
+        const API_BASE = window.location.origin;
+        const userId = (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) ? String(tg.initDataUnsafe.user.id) : "dev_user";
+        const userName = (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || "Игрок";
+
+        const $ = (id) => document.getElementById(id);
+        $("user-name").innerText = "Привет, " + userName + "!";
 
         let allClubs = [];
         let currentClubId = null;
@@ -818,9 +803,7 @@
             { n: "Швейцария", c: "ch" }, { n: "Швеция", c: "se" }, { n: "Шотландия", c: "gb-sct" }, { n: "Шри-Ланка", c: "lk" },
             { n: "Эквадор", c: "ec" }, { n: "Экваториальная Гвинея", c: "gq" }, { n: "Эритрея", c: "er" }, { n: "Эстония", c: "ee" },
             { n: "Эфиопия", c: "et" }, { n: "ЮАР", c: "za" }, { n: "Южный Судан", c: "ss" }, { n: "Ямайка", c: "jm" },
-            { n: "Япония", c: "jp" },
-            { n: "Китай", c: "cn" }, 
-            { n: "Тайвань", c: "tw" }
+            { n: "Япония", c: "jp" }, { n: "Китай", c: "cn" }, { n: "Тайвань", c: "tw" }
         ].sort((a, b) => a.n.localeCompare(b.n));
 
         const playerFlagMap = {
@@ -852,34 +835,34 @@
 
         function getPlayerFlagImg(nationality) {
             const code = playerFlagMap[nationality];
-            if (!code) return `<div style="width:20px; height:14px; display:inline-block; margin-right:8px; background:rgba(255,255,255,0.1); border-radius:2px;"></div>`;
-            return `<img src="https://flagcdn.com/w20/${code}.png" class="flag-icon" alt="${nationality}">`;
+            if (!code) return '<div style="width:20px; height:14px; display:inline-block; margin-right:8px; background:rgba(255,255,255,0.1); border-radius:2px;"></div>';
+            return '<img src="https://flagcdn.com/w20/' + code + '.png" class="flag-icon" alt="' + nationality + '">';
         }
 
         function initCustomSelect() {
-            const trigger = document.getElementById("nat-trigger");
-            const optionsContainer = document.getElementById("nat-options");
-            const display = document.getElementById("selected-nat-display");
+            const trigger = $("nat-trigger");
+            const optionsContainer = $("nat-options");
+            const display = $("selected-nat-display");
             
             optionsContainer.innerHTML = "";
-            countriesList.forEach(c => {
+            countriesList.forEach(function(c) {
                 const div = document.createElement("div");
                 div.className = "custom-option";
-                div.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" class="flag-icon"> ${c.n}`;
-                div.onclick = (e) => {
+                div.innerHTML = '<img src="https://flagcdn.com/w20/' + c.c + '.png" class="flag-icon"> ' + c.n;
+                div.onclick = function(e) {
                     e.stopPropagation();
                     selectedNationality = c.n;
-                    display.innerHTML = `<img src="https://flagcdn.com/w20/${c.c}.png" class="flag-icon"> <span>${c.n}</span>`;
+                    display.innerHTML = '<img src="https://flagcdn.com/w20/' + c.c + '.png" class="flag-icon"> <span>' + c.n + '</span>';
                     optionsContainer.classList.remove("show");
                 };
                 optionsContainer.appendChild(div);
             });
 
-            trigger.onclick = (e) => {
+            trigger.onclick = function(e) {
                 e.stopPropagation();
                 optionsContainer.classList.toggle("show");
             };
-            document.addEventListener("click", () => optionsContainer.classList.remove("show"));
+            document.addEventListener("click", function() { optionsContainer.classList.remove("show"); });
         }
         initCustomSelect();
 
@@ -891,8 +874,8 @@
         function handleImgError(img, type, slug, fallbackChar) {
             const currentExt = img.src.split('.').pop().split('?')[0];
             let nextSrc = '';
-            if (currentExt === 'png') nextSrc = `/static/logos/${type}/${slug}.svg?v=10`;
-            else if (currentExt === 'svg') nextSrc = `/static/logos/${type}/${slug}.webp?v=10`;
+            if (currentExt === 'png') nextSrc = '/static/logos/' + type + '/' + slug + '.svg?v=10';
+            else if (currentExt === 'svg') nextSrc = '/static/logos/' + type + '/' + slug + '.webp?v=10';
             else {
                 img.style.display = 'none';
                 img.nextElementSibling.style.display = 'block';
@@ -901,29 +884,28 @@
             img.src = nextSrc;
         }
 
-        function getLogoHTML(type, name, sizeClass = '') {
+        function getLogoHTML(type, name, sizeClass) {
+            sizeClass = sizeClass || '';
             const slug = slugify(name);
-            const src = `/static/logos/${type}/${slug}.png?v=10`;
+            const src = '/static/logos/' + type + '/' + slug + '.png?v=10';
             const fallbackChar = name ? name.charAt(0) : "?";
-            return `
-                <div class="logo-container ${sizeClass}">
-                    <img src="${src}" class="logo-img" onerror="handleImgError(this, '${type}', '${slug}', '${fallbackChar}')" alt="${name}">
-                    <div class="logo-fallback" style="display:none;">${fallbackChar}</div>
-                </div>
-            `;
+            return '<div class="logo-container ' + sizeClass + '">' +
+                '<img src="' + src + '" class="logo-img" onerror="handleImgError(this, \'' + type + '\', \'' + slug + '\', \'' + fallbackChar + '\')" alt="' + name + '">' +
+                '<div class="logo-fallback" style="display:none;">' + fallbackChar + '</div>' +
+                '</div>';
         }
 
         function renderStars(stars) {
             let html = "";
             const fullStars = Math.floor(stars);
-            for (let i = 0; i < fullStars; i++) html += `<span style="color: #e6c544;">★</span>`;
-            if (stars % 1 !== 0) html += `<span class="star-half">★</span>`;
+            for (let i = 0; i < fullStars; i++) html += '<span style="color: #e6c544;">★</span>';
+            if (stars % 1 !== 0) html += '<span class="star-half">★</span>';
             return html;
         }
 
         function showScreen(name) {
-            document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
-            document.getElementById("screen-" + name).classList.remove("hidden");
+            document.querySelectorAll(".screen").forEach(function(s) { s.classList.add("hidden"); });
+            $("screen-" + name).classList.remove("hidden");
         }
 
         function formatMoney(amount) {
@@ -935,7 +917,7 @@
 
         async function checkManager() {
             try {
-                const res = await fetch(`${API_BASE}/api/manager/${encodeURIComponent(userId)}`);
+                const res = await fetch(API_BASE + '/api/manager/' + encodeURIComponent(userId));
                 const data = await res.json();
                 if (data.has_club) {
                     currentClubId = data.club_id;
@@ -953,7 +935,7 @@
         async function loadData() {
             showScreen("loading");
             try {
-                const res = await fetch(`${API_BASE}/api/clubs`);
+                const res = await fetch(API_BASE + '/api/clubs');
                 allClubs = await res.json();
                 if (!allClubs.length) {
                     tg.showAlert("Клубы не загружены. Выполните /admin/seed."); showScreen("welcome"); return;
@@ -965,48 +947,46 @@
         }
 
         function renderLeagues() {
-            const uniqueLeagues = [...new Set(allClubs.map(c => c.league))].filter(l => l).sort();
-            const grid = document.getElementById("leagues-grid");
+            const uniqueLeagues = Array.from(new Set(allClubs.map(function(c) { return c.league; }))).filter(function(l) { return l; }).sort();
+            const grid = $("leagues-grid");
             grid.innerHTML = "";
-            uniqueLeagues.forEach(league => {
+            uniqueLeagues.forEach(function(league) {
                 const card = document.createElement("div");
                 card.className = "league-card";
-                card.innerHTML = `${getLogoHTML('leagues', league)}<div class="league-name">${league}</div>`;
-                card.onclick = () => openLeague(league);
+                card.innerHTML = getLogoHTML('leagues', league) + '<div class="league-name">' + league + '</div>';
+                card.onclick = function() { openLeague(league); };
                 grid.appendChild(card);
             });
         }
 
         function openLeague(league) {
             leaguesScrollPos = window.scrollY;
-            document.getElementById("selected-league-title").innerText = league;
-            let filtered = allClubs.filter(c => c.league === league);
-            filtered.sort((a, b) => a.name.localeCompare(b.name));
+            $("selected-league-title").innerText = league;
+            let filtered = allClubs.filter(function(c) { return c.league === league; });
+            filtered.sort(function(a, b) { return a.name.localeCompare(b.name); });
 
-            const list = document.getElementById("clubs-list");
-            list.innerHTML = filtered.map(c => `
-                <div class="club-card" data-id="${c.id}" data-name="${c.name}" data-league="${c.league}" data-stars="${c.stars}">
-                    <div class="club-info">
-                        ${getLogoHTML('clubs', c.name)}
-                        <div>
-                            <div class="club-name">${c.name}</div>
-                            <div class="club-meta">${c.players} игроков</div>
-                        </div>
-                    </div>
-                    <div class="club-rating-block">
-                        <div class="club-stars">${renderStars(c.stars)}</div>
-                        <div class="club-ovr">${c.avg_ovr || "—"}</div>
-                    </div>
-                </div>
-            `).join("");
+            const list = $("clubs-list");
+            list.innerHTML = filtered.map(function(c) {
+                return '<div class="club-card" data-id="' + c.id + '" data-name="' + c.name + '" data-league="' + c.league + '" data-stars="' + c.stars + '">' +
+                    '<div class="club-info">' +
+                    getLogoHTML('clubs', c.name) +
+                    '<div>' +
+                    '<div class="club-name">' + c.name + '</div>' +
+                    '<div class="club-meta">' + c.players + ' игроков</div>' +
+                    '</div></div>' +
+                    '<div class="club-rating-block">' +
+                    '<div class="club-stars">' + renderStars(c.stars) + '</div>' +
+                    '<div class="club-ovr">' + (c.avg_ovr || "—") + '</div>' +
+                    '</div></div>';
+            }).join("");
 
-            list.querySelectorAll(".club-card").forEach(el => {
-                el.onclick = () => {
+            list.querySelectorAll(".club-card").forEach(function(el) {
+                el.onclick = function() {
                     const id = el.dataset.id;
                     const name = el.dataset.name;
                     const league = el.dataset.league;
                     const stars = parseFloat(el.dataset.stars);
-                    tg.showConfirm(`Выбрать клуб "${name}"?`, (ok) => {
+                    tg.showConfirm('Выбрать клуб "' + name + '"?', function(ok) {
                         if (ok) selectClub(id, name, league, stars);
                     });
                 };
@@ -1016,9 +996,9 @@
 
         async function selectClub(clubId, clubName, league, stars) {
             try {
-                const res = await fetch(`${API_BASE}/api/select-club`, {
+                const res = await fetch(API_BASE + '/api/select-club', {
                     method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ telegram_id: userId, first_name: userName, club_id: parseInt(clubId, 10) }),
+                    body: JSON.stringify({ telegram_id: userId, first_name: userName, club_id: parseInt(clubId, 10) })
                 });
                 const data = await res.json();
                 if (!res.ok) { tg.showAlert(data.detail || "Ошибка при выборе"); return; }
@@ -1031,55 +1011,55 @@
             currentClubName = clubName; currentLeague = league; currentStars = stars;
             if (clubId) currentClubId = clubId;
 
-            document.getElementById("confirm-club").innerText = clubName;
-            document.getElementById("confirm-league").innerText = league;
-            document.getElementById("confirm-stars").innerHTML = renderStars(stars);
-            document.getElementById("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
-            document.getElementById("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
+            $("confirm-club").innerText = clubName;
+            $("confirm-league").innerText = league;
+            $("confirm-stars").innerHTML = renderStars(stars);
+            $("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
+            $("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
         }
 
         function goToCoachSetup() {
-            const nameInput = document.getElementById("inp-coach-name");
-            if(!nameInput.value) nameInput.value = userName;
-            document.getElementById("setup-club-name").innerHTML = `Клуб: ${currentClubName} (${renderStars(currentStars)})`;
+            const nameInput = $("inp-coach-name");
+            if (!nameInput.value) nameInput.value = userName;
+            $("setup-club-name").innerHTML = 'Клуб: ' + currentClubName + ' (' + renderStars(currentStars) + ')';
             showScreen("coach");
         }
 
         function goToClubSetup() {
-            const coachName = document.getElementById("inp-coach-name").value.trim();
-            const coachAge = parseInt(document.getElementById("inp-coach-age").value);
+            const coachName = $("inp-coach-name").value.trim();
+            const coachAge = parseInt($("inp-coach-age").value);
             if (coachName.length < 3) { tg.showAlert("Введите имя тренера"); return; }
             if (isNaN(coachAge) || coachAge < 18 || coachAge > 100) { tg.showAlert("Введите возраст"); return; }
             updateBudgetDisplay(); showScreen("club-setup");
         }
 
         function updateBudgetDisplay() {
-            const extra = parseInt(document.getElementById("inp-extra-budget").value);
+            const extra = parseInt($("inp-extra-budget").value);
             let multiplier = 3; 
             const l = currentLeague.toLowerCase();
             
-            if (l.includes("premier league")) multiplier = 35;
-            else if (l.includes("laliga") || l.includes("la liga")) multiplier = 25;
-            else if (l.includes("bundesliga") || l.includes("serie a") || l.includes("ligue 1")) multiplier = 15;
-            else if (l.includes("brazilian serie a")) multiplier = 13;
-            else if (l.includes("championship")) multiplier = 25;
-            else if (l.includes("eredivisie") || l.includes("liga portugal") || l.includes("mls") || l.includes("saudi")) multiplier = 10;
-            else if (l.includes("süper lig") || l.includes("super lig")) multiplier = 12;
+            if (l.indexOf("premier league") >= 0) multiplier = 35;
+            else if (l.indexOf("laliga") >= 0 || l.indexOf("la liga") >= 0) multiplier = 25;
+            else if (l.indexOf("bundesliga") >= 0 || l.indexOf("serie a") >= 0 || l.indexOf("ligue 1") >= 0) multiplier = 15;
+            else if (l.indexOf("brazilian serie a") >= 0) multiplier = 13;
+            else if (l.indexOf("championship") >= 0) multiplier = 25;
+            else if (l.indexOf("eredivisie") >= 0 || l.indexOf("liga portugal") >= 0 || l.indexOf("mls") >= 0 || l.indexOf("saudi") >= 0) multiplier = 10;
+            else if (l.indexOf("süper lig") >= 0 || l.indexOf("super lig") >= 0) multiplier = 12;
 
             const base = currentStars * multiplier;
             const total = base + extra;
-            document.getElementById("display-budget").innerText = `Бюджет: ${total} млн $`;
+            $("display-budget").innerText = 'Бюджет: ' + total + ' млн $';
         }
 
         async function finishSetup() {
-            const coachName = document.getElementById("inp-coach-name").value.trim();
-            const coachAge = parseInt(document.getElementById("inp-coach-age").value);
-            const difficulty = document.getElementById("inp-difficulty").value;
-            const extraBudget = parseInt(document.getElementById("inp-extra-budget").value);
+            const coachName = $("inp-coach-name").value.trim();
+            const coachAge = parseInt($("inp-coach-age").value);
+            const difficulty = $("inp-difficulty").value;
+            const extraBudget = parseInt($("inp-extra-budget").value);
 
             try {
-                const res = await fetch(`${API_BASE}/api/save-settings`, {
+                const res = await fetch(API_BASE + '/api/save-settings', {
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         telegram_id: userId, coach_name: coachName, coach_nationality: selectedNationality,
@@ -1088,7 +1068,7 @@
                 });
                 if (res.ok) {
                     managerSetupComplete = true;
-                    document.getElementById("bottom-nav").classList.remove("hidden");
+                    $("bottom-nav").classList.remove("hidden");
                     loadSquad();
                 } else tg.showAlert("Ошибка сохранения");
             } catch(e) { tg.showAlert("Сетевая ошибка"); }
@@ -1096,23 +1076,22 @@
 
         async function ensurePlayersLoaded() {
             if (window.currentPlayers && window.currentPlayers.length) return window.currentPlayers;
-            const res = await fetch(`${API_BASE}/api/clubs/${currentClubId}/players`);
+            const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/players');
             const players = await res.json();
             window.currentPlayers = players;
             return players;
         }
 
-        // === ОФИС ===
         async function loadSquad() {
-            const listContainer = document.getElementById("squad-list");
-            listContainer.innerHTML = `<p style="text-align:center;">⏳ Загружаем игроков...</p>`;
-            document.getElementById("squad-title").innerText = `Офис: ${currentClubName}`;
+            const listContainer = $("squad-list");
+            listContainer.innerHTML = '<p style="text-align:center;">⏳ Загружаем игроков...</p>';
+            $("squad-title").innerText = 'Офис: ' + currentClubName;
             switchTab('office');
 
             try {
                 const players = await ensurePlayersLoaded();
                 if (!players || !players.length) {
-                    listContainer.innerHTML = `<p style="text-align:center;">Нет игроков.</p>`; return;
+                    listContainer.innerHTML = '<p style="text-align:center;">Нет игроков.</p>'; return;
                 }
 
                 const order = {
@@ -1131,87 +1110,83 @@
                     "Right Wing": 13, "RW": 13
                 };
 
-                const getPosWeight = (pos) => {
+                function getPosWeight(pos) {
                     if (!pos) return 99;
                     if (order[pos]) return order[pos];
                     const p = pos.toLowerCase();
-                    if (p.includes("goalkeeper") || p === "gk") return 1;
-                    if (p.includes("left back") || p === "lb" || p.includes("left wing back")) return 2;
-                    if (p.includes("back") || p === "cb") return 3;
-                    if (p.includes("right back") || p === "rb" || p.includes("right wing back")) return 4;
-                    if (p.includes("left mid") || p === "lm") return 5;
-                    if (p.includes("defensive") || p === "cdm") return 6;
-                    if (p.includes("midfield") || p === "cm") return 7;
-                    if (p.includes("attacking mid") || p === "cam") return 8;
-                    if (p.includes("right mid") || p === "rm") return 9;
-                    if (p.includes("left wing") || p === "lw") return 10;
-                    if (p.includes("forward") || p === "cf") return 11;
-                    if (p.includes("striker") || p === "st") return 12;
-                    if (p.includes("right wing") || p === "rw") return 13;
+                    if (p.indexOf("goalkeeper") >= 0 || p === "gk") return 1;
+                    if (p.indexOf("left back") >= 0 || p === "lb" || p.indexOf("left wing back") >= 0) return 2;
+                    if (p.indexOf("back") >= 0 || p === "cb") return 3;
+                    if (p.indexOf("right back") >= 0 || p === "rb" || p.indexOf("right wing back") >= 0) return 4;
+                    if (p.indexOf("left mid") >= 0 || p === "lm") return 5;
+                    if (p.indexOf("defensive") >= 0 || p === "cdm") return 6;
+                    if (p.indexOf("midfield") >= 0 || p === "cm") return 7;
+                    if (p.indexOf("attacking mid") >= 0 || p === "cam") return 8;
+                    if (p.indexOf("right mid") >= 0 || p === "rm") return 9;
+                    if (p.indexOf("left wing") >= 0 || p === "lw") return 10;
+                    if (p.indexOf("forward") >= 0 || p === "cf") return 11;
+                    if (p.indexOf("striker") >= 0 || p === "st") return 12;
+                    if (p.indexOf("right wing") >= 0 || p === "rw") return 13;
                     return 15;
-                };
+                }
 
-                players.sort((a, b) => {
+                players.sort(function(a, b) {
                     const wA = getPosWeight(a.position);
                     const wB = getPosWeight(b.position);
                     if (wA !== wB) return wA - wB;
                     return b.overall - a.overall;
                 });
 
-                listContainer.innerHTML = players.map(p => {
+                listContainer.innerHTML = players.map(function(p) {
                     let ovrClass = "ovr-bronze";
                     if (p.overall >= 75) ovrClass = "ovr-gold";
                     else if (p.overall >= 65) ovrClass = "ovr-silver";
 
                     let shortPos = p.position;
-                    if (p.position.includes("Goalkeeper")) shortPos = "GK";
-                    else if (p.position.includes("Back")) shortPos = "DEF";
-                    else if (p.position.includes("Midfield")) shortPos = "MID";
-                    else if (p.position.includes("Forward") || p.position.includes("Striker") || p.position.includes("Winger")) shortPos = "ATT";
+                    if (p.position.indexOf("Goalkeeper") >= 0) shortPos = "GK";
+                    else if (p.position.indexOf("Back") >= 0) shortPos = "DEF";
+                    else if (p.position.indexOf("Midfield") >= 0) shortPos = "MID";
+                    else if (p.position.indexOf("Forward") >= 0 || p.position.indexOf("Striker") >= 0 || p.position.indexOf("Winger") >= 0) shortPos = "ATT";
 
                     const flagImg = getPlayerFlagImg(p.nationality);
                     const val = formatMoney(p.market_value);
 
-                    return `
-                        <div class="player-row" onclick="openPlayerDetails(${p.id})">
-                            <div class="player-info">
-                                <div class="player-ovr ${ovrClass}">${p.overall}</div>
-                                <div class="player-pos">${shortPos}</div>
-                                <div class="player-name-block">
-                                    <div class="player-name">${p.name}</div>
-                                    <div class="player-meta">${flagImg} ${p.nationality} · ${p.age} лет</div>
-                                </div>
-                            </div>
-                            <div class="player-val">${val}</div>
-                        </div>
-                    `;
+                    return '<div class="player-row" onclick="openPlayerDetails(' + p.id + ')">' +
+                        '<div class="player-info">' +
+                        '<div class="player-ovr ' + ovrClass + '">' + p.overall + '</div>' +
+                        '<div class="player-pos">' + shortPos + '</div>' +
+                        '<div class="player-name-block">' +
+                        '<div class="player-name">' + p.name + '</div>' +
+                        '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет</div>' +
+                        '</div></div>' +
+                        '<div class="player-val">' + val + '</div>' +
+                        '</div>';
                 }).join("");
             } catch (e) {
-                listContainer.innerHTML = `<p style="text-align:center; color:#ff6b6b;">Ошибка: ${e.message}</p>`;
+                listContainer.innerHTML = '<p style="text-align:center; color:#ff6b6b;">Ошибка: ' + e.message + '</p>';
             }
         }
 
         async function openPlayerDetails(playerId) {
-            const p = window.currentPlayers.find(x => x.id === playerId);
+            const p = window.currentPlayers.find(function(x) { return x.id === playerId; });
             if (!p) return;
 
-            document.getElementById("pd-name").innerText = p.name;
-            document.getElementById("pd-club").innerText = currentClubName;
-            document.getElementById("pd-ovr").innerText = p.overall;
-            document.getElementById("pd-pos").innerText = p.position;
-            document.getElementById("pd-age").innerText = p.age + " лет";
-            document.getElementById("pd-nat").innerHTML = `${getPlayerFlagImg(p.nationality)} ${p.nationality}`;
-            document.getElementById("pd-value").innerText = formatMoney(p.market_value);
+            $("pd-name").innerText = p.name;
+            $("pd-club").innerText = currentClubName;
+            $("pd-ovr").innerText = p.overall;
+            $("pd-pos").innerText = p.position;
+            $("pd-age").innerText = p.age + " лет";
+            $("pd-nat").innerHTML = getPlayerFlagImg(p.nationality) + ' ' + p.nationality;
+            $("pd-value").innerText = formatMoney(p.market_value);
             
             const wageK = p.wage ? (p.wage / 1000).toFixed(0) + " тыс. $" : "Неизвестно";
-            document.getElementById("pd-wage").innerText = wageK + " / нед.";
+            $("pd-wage").innerText = wageK + " / нед.";
 
-            // Альтернативные позиции
-            const altDiv = document.getElementById("pd-alt");
+            const altDiv = $("pd-alt");
             if (p.alt_positions && p.alt_positions.length) {
-                altDiv.innerHTML = "Альт. позиции: " + p.alt_positions.map(a => `<span class="alt-pos-badge">${a}</span>`).join("");
+                altDiv.innerHTML = "Альт. позиции: " + p.alt_positions.map(function(a) { return '<span class="alt-pos-badge">' + a + '</span>'; }).join("");
             } else {
-                altDiv.innerHTML = `<span style="color:#8e9eb5;">Нет альтернативных позиций</span>`;
+                altDiv.innerHTML = '<span style="color:#8e9eb5;">Нет альтернативных позиций</span>';
             }
 
             let contractText = "Неизвестно";
@@ -1228,19 +1203,19 @@
                     const m = months % 12;
                     
                     let timeStr = "";
-                    if (y === 0) timeStr = `${m} мес.`;
-                    else if (m === 0) timeStr = `${y} лет`;
-                    else timeStr = `${y} г. ${m} мес.`;
+                    if (y === 0) timeStr = m + " мес.";
+                    else if (m === 0) timeStr = y + " лет";
+                    else timeStr = y + " г. " + m + " мес.";
                     
                     const year = endDate.getFullYear();
-                    contractText = `Действует до 30.06.${year} (${timeStr})`;
+                    contractText = "Действует до 30.06." + year + " (" + timeStr + ")";
                 } else {
                     contractText = "Истек";
                 }
             }
-            document.getElementById("pd-contract").innerText = contractText;
+            $("pd-contract").innerText = contractText;
 
-            const isGK = p.position.includes("Goalkeeper") || p.position === "GK";
+            const isGK = p.position.indexOf("Goalkeeper") >= 0 || p.position === "GK";
             let stats = [];
 
             if (isGK) {
@@ -1262,67 +1237,59 @@
                 ];
             }
 
-            const statsHtml = stats.map(s => `
-                <div style="margin-bottom: 8px;">
-                    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
-                        <span>${s.name}</span>
-                        <span style="font-weight:bold;">${s.val}</span>
-                    </div>
-                    <div class="stat-bar-container">
-                        <div class="stat-bar" style="width: ${s.val}%;"></div>
-                    </div>
-                </div>
-            `).join("");
+            const statsHtml = stats.map(function(s) {
+                return '<div style="margin-bottom: 8px;">' +
+                    '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">' +
+                    '<span>' + s.name + '</span>' +
+                    '<span style="font-weight:bold;">' + s.val + '</span>' +
+                    '</div>' +
+                    '<div class="stat-bar-container">' +
+                    '<div class="stat-bar" style="width: ' + s.val + '%;"></div>' +
+                    '</div></div>';
+            }).join("");
             
-            document.getElementById("pd-stats-container").innerHTML = statsHtml;
-
-            // Тренировки
+            $("pd-stats-container").innerHTML = statsHtml;
             await loadTrainingSection(playerId);
-
             showScreen("player");
         }
 
         async function loadTrainingSection(playerId) {
-            const activeDiv = document.getElementById("pd-training-active");
-            const availableDiv = document.getElementById("pd-training-available");
-            const listDiv = document.getElementById("pd-training-list");
+            const activeDiv = $("pd-training-active");
+            const availableDiv = $("pd-training-available");
+            const listDiv = $("pd-training-list");
 
-            // Проверяем текущую тренировку
-            const statusRes = await fetch(`${API_BASE}/api/player/${playerId}/training-status`);
-            const status = await statusRes.json();
+            try {
+                const statusRes = await fetch(API_BASE + '/api/player/' + playerId + '/training-status');
+                const status = await statusRes.json();
 
-            if (status.active) {
-                activeDiv.classList.remove("hidden");
-                availableDiv.classList.add("hidden");
-                document.getElementById("pd-training-name").innerText = status.program_name;
-                document.getElementById("pd-training-weeks").innerText = status.weeks_left + " нед.";
-            } else {
-                activeDiv.classList.add("hidden");
-                availableDiv.classList.remove("hidden");
-                // Загружаем доступные программы
-                const progRes = await fetch(`${API_BASE}/api/training-programs`);
-                const programs = await progRes.json();
-                listDiv.innerHTML = programs.map(prog => {
-                    const boostText = Object.entries(prog.stat_boosts || {})
-                        .map(([k, v]) => `+${v} ${k}`).join(", ");
-                    const ovrText = prog.ovr_boost ? `+${prog.ovr_boost} OVR` : "";
-                    return `
-                        <div class="training-card" onclick="startTraining(${playerId}, ${prog.id})">
-                            <div class="training-name">${prog.name}</div>
-                            <div class="training-desc">${prog.description}</div>
-                            <div class="training-meta">
-                                <span>${prog.duration_weeks} нед.</span>
-                                <span style="color:#2ecc71;">${[boostText, ovrText].filter(Boolean).join(" | ")}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join("");
-            }
+                if (status.active) {
+                    activeDiv.classList.remove("hidden");
+                    availableDiv.classList.add("hidden");
+                    $("pd-training-name").innerText = status.program_name;
+                    $("pd-training-weeks").innerText = status.weeks_left + " нед.";
+                } else {
+                    activeDiv.classList.add("hidden");
+                    availableDiv.classList.remove("hidden");
+                    const progRes = await fetch(API_BASE + '/api/training-programs');
+                    const programs = await progRes.json();
+                    listDiv.innerHTML = programs.map(function(prog) {
+                        const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) { return '+' + prog.stat_boosts[k] + ' ' + k; }).join(", ");
+                        const ovrText = prog.ovr_boost ? '+' + prog.ovr_boost + ' OVR' : "";
+                        return '<div class="training-card" onclick="startTraining(' + playerId + ', ' + prog.id + ')">' +
+                            '<div class="training-name">' + prog.name + '</div>' +
+                            '<div class="training-desc">' + prog.description + '</div>' +
+                            '<div class="training-meta">' +
+                            '<span>' + prog.duration_weeks + ' нед.</span>' +
+                            '<span style="color:#2ecc71;">' + [boostText, ovrText].filter(Boolean).join(" | ") + '</span>' +
+                            '</div></div>';
+                    }).join("");
+                }
+            } catch (e) { console.error(e); }
         }
 
         async function startTraining(playerId, programId) {
             try {
-                const res = await fetch(`${API_BASE}/api/player/start-training`, {
+                const res = await fetch(API_BASE + '/api/player/start-training', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ player_id: playerId, program_id: programId })
@@ -1334,53 +1301,53 @@
                     const err = await res.json();
                     tg.showAlert("Ошибка: " + (err.detail || res.status));
                 }
-            } catch (e) {
-                tg.showAlert("Сетевая ошибка");
-            }
+            } catch (e) { tg.showAlert("Сетевая ошибка"); }
         }
 
         function switchTab(tabId) {
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('nav-' + tabId).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
+            $('nav-' + tabId).classList.add('active');
             showScreen(tabId);
             if (tabId === 'tactics') {
                 loadTactics();
             }
             window.scrollTo(0, 0);
         }
+        window.switchTab = switchTab;
+        window.openPlayerDetails = openPlayerDetails;
+        window.startTraining = startTraining;
+        window.handleImgError = handleImgError;
 
         // ========================================
         // ============ ВКЛАДКА «СОСТАВ» ==========
         // ========================================
-        // Все схемы из FC 27 с координатами (x, y) в процентах.
-        // y=0 — верх (ворота соперника), y=100 — низ (свои ворота).
         const FORMATIONS = {
             "3-1-4-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "CDM", x: 50, y: 65 },
                 { role: "LM", x: 12, y: 48 }, { role: "CM", x: 38, y: 48 }, { role: "CM", x: 62, y: 48 }, { role: "RM", x: 88, y: 48 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "3-4-1-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "LM", x: 12, y: 55 }, { role: "CM", x: 38, y: 55 }, { role: "CM", x: 62, y: 55 }, { role: "RM", x: 88, y: 55 },
                 { role: "CAM", x: 50, y: 38 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "3-4-2-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "LM", x: 12, y: 55 }, { role: "CM", x: 38, y: 55 }, { role: "CM", x: 62, y: 55 }, { role: "RM", x: 88, y: 55 },
                 { role: "CAM", x: 30, y: 35 }, { role: "CAM", x: 70, y: 35 },
-                { role: "ST", x: 50, y: 18 },
+                { role: "ST", x: 50, y: 18 }
             ],
             "3-4-3 (Линия)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "LM", x: 12, y: 52 }, { role: "CM", x: 38, y: 52 }, { role: "CM", x: 62, y: 52 }, { role: "RM", x: 88, y: 52 },
-                { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 24 },
+                { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 24 }
             ],
             "3-4-3 (Ромб)": [
                 { role: "GK", x: 50, y: 90 },
@@ -1388,20 +1355,20 @@
                 { role: "CDM", x: 50, y: 62 },
                 { role: "CM", x: 25, y: 50 }, { role: "CM", x: 75, y: 50 },
                 { role: "CAM", x: 50, y: 38 },
-                { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 24 },
+                { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 24 }
             ],
             "3-5-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "LWB", x: 10, y: 58 }, { role: "CM", x: 33, y: 58 }, { role: "CM", x: 50, y: 60 }, { role: "CM", x: 67, y: 58 }, { role: "RWB", x: 90, y: 58 },
-                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 },
+                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 }
             ],
             "3-5-1-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 },
                 { role: "LWB", x: 10, y: 58 }, { role: "CM", x: 33, y: 58 }, { role: "CM", x: 50, y: 60 }, { role: "CM", x: 67, y: 58 }, { role: "RWB", x: 90, y: 58 },
                 { role: "CAM", x: 50, y: 35 },
-                { role: "ST", x: 50, y: 18 },
+                { role: "ST", x: 50, y: 18 }
             ],
             "4-1-2-1-2 (Узкая)": [
                 { role: "GK", x: 50, y: 90 },
@@ -1409,7 +1376,7 @@
                 { role: "CDM", x: 50, y: 62 },
                 { role: "CM", x: 30, y: 50 }, { role: "CM", x: 70, y: 50 },
                 { role: "CAM", x: 50, y: 38 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-1-2-1-2 (Широкая)": [
                 { role: "GK", x: 50, y: 90 },
@@ -1417,175 +1384,175 @@
                 { role: "CDM", x: 50, y: 62 },
                 { role: "LM", x: 15, y: 50 }, { role: "RM", x: 85, y: 50 },
                 { role: "CAM", x: 50, y: 38 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-1-3-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 50, y: 62 },
                 { role: "CM", x: 25, y: 48 }, { role: "CM", x: 50, y: 48 }, { role: "CM", x: 75, y: 48 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-1-4-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 50, y: 62 },
                 { role: "LM", x: 15, y: 44 }, { role: "CM", x: 38, y: 44 }, { role: "CM", x: 62, y: 44 }, { role: "RM", x: 85, y: 44 },
-                { role: "ST", x: 50, y: 22 },
+                { role: "ST", x: 50, y: 22 }
             ],
             "4-3-1-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CM", x: 30, y: 60 }, { role: "CM", x: 50, y: 62 }, { role: "CM", x: 70, y: 60 },
                 { role: "CAM", x: 50, y: 40 },
-                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 },
+                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 }
             ],
             "4-3-2-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CM", x: 30, y: 55 }, { role: "CM", x: 50, y: 55 }, { role: "CM", x: 70, y: 55 },
                 { role: "CF", x: 35, y: 35 }, { role: "CF", x: 65, y: 35 },
-                { role: "ST", x: 50, y: 18 },
+                { role: "ST", x: 50, y: 18 }
             ],
             "4-3-3 (Линия)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 75 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 75 },
                 { role: "CM", x: 30, y: 55 }, { role: "CM", x: 50, y: 55 }, { role: "CM", x: 70, y: 55 },
-                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 },
+                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 }
             ],
             "4-3-3 (Удержание)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 30, y: 62 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 62 },
-                { role: "LW", x: 20, y: 28 }, { role: "ST", x: 50, y: 22 }, { role: "RW", x: 80, y: 28 },
+                { role: "LW", x: 20, y: 28 }, { role: "ST", x: 50, y: 22 }, { role: "RW", x: 80, y: 28 }
             ],
             "4-3-3 (Защита)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 80 }, { role: "CB", x: 35, y: 82 }, { role: "CB", x: 65, y: 82 }, { role: "RB", x: 90, y: 80 },
                 { role: "CDM", x: 30, y: 66 }, { role: "CDM", x: 50, y: 64 }, { role: "CDM", x: 70, y: 66 },
-                { role: "LW", x: 20, y: 30 }, { role: "ST", x: 50, y: 24 }, { role: "RW", x: 80, y: 30 },
+                { role: "LW", x: 20, y: 30 }, { role: "ST", x: 50, y: 24 }, { role: "RW", x: 80, y: 30 }
             ],
             "4-3-3 (Атака)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 74 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 74 },
                 { role: "CM", x: 30, y: 50 }, { role: "CAM", x: 50, y: 48 }, { role: "CM", x: 70, y: 50 },
-                { role: "LW", x: 18, y: 22 }, { role: "ST", x: 50, y: 18 }, { role: "RW", x: 82, y: 22 },
+                { role: "LW", x: 18, y: 22 }, { role: "ST", x: 50, y: 18 }, { role: "RW", x: 82, y: 22 }
             ],
             "4-3-3 (Ложная девятка)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 76 },
                 { role: "CM", x: 30, y: 55 }, { role: "CM", x: 50, y: 55 }, { role: "CM", x: 70, y: 55 },
-                { role: "LW", x: 20, y: 28 }, { role: "CF", x: 50, y: 32 }, { role: "RW", x: 80, y: 28 },
+                { role: "LW", x: 20, y: 28 }, { role: "CF", x: 50, y: 32 }, { role: "RW", x: 80, y: 28 }
             ],
             "4-4-1-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "LM", x: 15, y: 52 }, { role: "CM", x: 38, y: 52 }, { role: "CM", x: 62, y: 52 }, { role: "RM", x: 85, y: 52 },
                 { role: "CAM", x: 50, y: 35 },
-                { role: "ST", x: 50, y: 20 },
+                { role: "ST", x: 50, y: 20 }
             ],
             "4-5-1 (Атака)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "LM", x: 10, y: 48 }, { role: "CM", x: 30, y: 50 }, { role: "CAM", x: 50, y: 48 }, { role: "CM", x: 70, y: 50 }, { role: "RM", x: 90, y: 48 },
-                { role: "ST", x: 50, y: 20 },
+                { role: "ST", x: 50, y: 20 }
             ],
             "4-5-1 (Линия)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "LM", x: 10, y: 52 }, { role: "CM", x: 30, y: 52 }, { role: "CM", x: 50, y: 52 }, { role: "CM", x: 70, y: 52 }, { role: "RM", x: 90, y: 52 },
-                { role: "ST", x: 50, y: 22 },
+                { role: "ST", x: 50, y: 22 }
             ],
             "4-2-1-3": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
                 { role: "CAM", x: 50, y: 42 },
-                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 },
+                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 }
             ],
             "4-2-2-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
                 { role: "CAM", x: 25, y: 42 }, { role: "CAM", x: 75, y: 42 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-2-3-1 (Широкая)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
                 { role: "LM", x: 15, y: 42 }, { role: "CAM", x: 50, y: 42 }, { role: "RM", x: 85, y: 42 },
-                { role: "ST", x: 50, y: 22 },
+                { role: "ST", x: 50, y: 22 }
             ],
             "4-2-3-1 (Узкая)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
                 { role: "CAM", x: 25, y: 42 }, { role: "CAM", x: 50, y: 42 }, { role: "CAM", x: 75, y: 42 },
-                { role: "ST", x: 50, y: 22 },
+                { role: "ST", x: 50, y: 22 }
             ],
             "4-2-4": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CM", x: 35, y: 55 }, { role: "CM", x: 65, y: 55 },
-                { role: "LW", x: 15, y: 25 }, { role: "ST", x: 40, y: 20 }, { role: "ST", x: 60, y: 20 }, { role: "RW", x: 85, y: 25 },
+                { role: "LW", x: 15, y: 25 }, { role: "ST", x: 40, y: 20 }, { role: "ST", x: 60, y: 20 }, { role: "RW", x: 85, y: 25 }
             ],
             "4-4-2 (Линия)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "LM", x: 15, y: 52 }, { role: "CM", x: 38, y: 52 }, { role: "CM", x: 62, y: 52 }, { role: "RM", x: 85, y: 52 },
-                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 },
+                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 }
             ],
             "4-4-2 (Удержание)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 80 }, { role: "CB", x: 35, y: 82 }, { role: "CB", x: 65, y: 82 }, { role: "RB", x: 90, y: 80 },
                 { role: "LM", x: 15, y: 58 }, { role: "CM", x: 38, y: 58 }, { role: "CM", x: 62, y: 58 }, { role: "RM", x: 85, y: 58 },
-                { role: "ST", x: 35, y: 28 }, { role: "ST", x: 65, y: 28 },
+                { role: "ST", x: 35, y: 28 }, { role: "ST", x: 65, y: 28 }
             ],
             "4-4-2 (Защита)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LB", x: 10, y: 82 }, { role: "CB", x: 35, y: 84 }, { role: "CB", x: 65, y: 84 }, { role: "RB", x: 90, y: 82 },
                 { role: "LM", x: 15, y: 62 }, { role: "CDM", x: 38, y: 62 }, { role: "CDM", x: 62, y: 62 }, { role: "RM", x: 85, y: 62 },
-                { role: "ST", x: 35, y: 30 }, { role: "ST", x: 65, y: 30 },
+                { role: "ST", x: 35, y: 30 }, { role: "ST", x: 65, y: 30 }
             ],
             "5-1-2-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "CDM", x: 50, y: 62 },
                 { role: "CAM", x: 25, y: 40 }, { role: "CAM", x: 75, y: 40 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "5-2-1-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "CM", x: 35, y: 55 }, { role: "CM", x: 65, y: 55 },
                 { role: "CAM", x: 50, y: 40 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 },
+                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "5-2-2-1": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "CM", x: 35, y: 55 }, { role: "CM", x: 65, y: 55 },
                 { role: "CAM", x: 25, y: 40 }, { role: "CAM", x: 75, y: 40 },
-                { role: "ST", x: 50, y: 20 },
+                { role: "ST", x: 50, y: 20 }
             ],
             "5-2-3": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "CM", x: 35, y: 55 }, { role: "CM", x: 65, y: 55 },
-                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 },
+                { role: "LW", x: 20, y: 25 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 25 }
             ],
             "5-3-2": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "CM", x: 30, y: 54 }, { role: "CM", x: 50, y: 56 }, { role: "CM", x: 70, y: 54 },
-                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 },
+                { role: "ST", x: 35, y: 24 }, { role: "ST", x: 65, y: 24 }
             ],
             "5-4-1 (Линия)": [
                 { role: "GK", x: 50, y: 90 },
                 { role: "LWB", x: 8, y: 76 }, { role: "CB", x: 28, y: 80 }, { role: "CB", x: 50, y: 82 }, { role: "CB", x: 72, y: 80 }, { role: "RWB", x: 92, y: 76 },
                 { role: "LM", x: 15, y: 50 }, { role: "CM", x: 38, y: 50 }, { role: "CM", x: 62, y: 50 }, { role: "RM", x: 85, y: 50 },
-                { role: "ST", x: 50, y: 22 },
+                { role: "ST", x: 50, y: 22 }
             ],
             "5-4-1 (Ромб)": [
                 { role: "GK", x: 50, y: 90 },
@@ -1593,8 +1560,8 @@
                 { role: "CDM", x: 50, y: 62 },
                 { role: "CM", x: 25, y: 50 }, { role: "CM", x: 75, y: 50 },
                 { role: "CAM", x: 50, y: 38 },
-                { role: "ST", x: 50, y: 20 },
-            ],
+                { role: "ST", x: 50, y: 20 }
+            ]
         };
 
         let tacticsState = {
@@ -1603,7 +1570,7 @@
             captain_id: null,
             free_kick_taker_id: null,
             corner_taker_id: null,
-            penalty_taker_id: null,
+            penalty_taker_id: null
         };
         let tacticsLoaded = false;
         let selectedSlotIndex = null;
@@ -1611,25 +1578,25 @@
 
         function getPlayerById(id) {
             if (!window.currentPlayers) return null;
-            return window.currentPlayers.find(p => p.id === id);
+            return window.currentPlayers.find(function(p) { return p.id === id; });
         }
 
         function shortPosOf(pos) {
             if (!pos) return "—";
             const p = pos.toLowerCase();
-            if (p.includes("goalkeeper") || p === "gk") return "GK";
-            if (p.includes("left back") || p === "lb" || p.includes("left wing back")) return "LB";
-            if (p.includes("right back") || p === "rb" || p.includes("right wing back")) return "RB";
-            if (p.includes("centre-back") || p.includes("center-back") || p === "cb") return "CB";
-            if (p.includes("defensive mid") || p === "cdm") return "CDM";
-            if (p.includes("attacking mid") || p === "cam") return "CAM";
-            if (p.includes("left mid") || p === "lm") return "LM";
-            if (p.includes("right mid") || p === "rm") return "RM";
-            if (p.includes("central mid") || p === "cm") return "CM";
-            if (p.includes("left wing") || p === "lw") return "LW";
-            if (p.includes("right wing") || p === "rw") return "RW";
-            if (p.includes("striker") || p === "st") return "ST";
-            if (p.includes("forward") || p === "cf") return "CF";
+            if (p.indexOf("goalkeeper") >= 0 || p === "gk") return "GK";
+            if (p.indexOf("left back") >= 0 || p === "lb" || p.indexOf("left wing back") >= 0) return "LB";
+            if (p.indexOf("right back") >= 0 || p === "rb" || p.indexOf("right wing back") >= 0) return "RB";
+            if (p.indexOf("centre-back") >= 0 || p.indexOf("center-back") >= 0 || p === "cb") return "CB";
+            if (p.indexOf("defensive mid") >= 0 || p === "cdm") return "CDM";
+            if (p.indexOf("attacking mid") >= 0 || p === "cam") return "CAM";
+            if (p.indexOf("left mid") >= 0 || p === "lm") return "LM";
+            if (p.indexOf("right mid") >= 0 || p === "rm") return "RM";
+            if (p.indexOf("central mid") >= 0 || p === "cm") return "CM";
+            if (p.indexOf("left wing") >= 0 || p === "lw") return "LW";
+            if (p.indexOf("right wing") >= 0 || p === "rw") return "RW";
+            if (p.indexOf("striker") >= 0 || p === "st") return "ST";
+            if (p.indexOf("forward") >= 0 || p === "cf") return "CF";
             return pos.slice(0, 3).toUpperCase();
         }
 
@@ -1639,69 +1606,73 @@
             return "bronze";
         }
 
-        // === Штрафы за позицию (зеркально бэкенду) ===
+        // === ШТРАФЫ ЗА ПОЗИЦИЮ ===
         const POSITION_GROUPS = {
-            GK: ["GK"],
-            DEF: ["CB", "LB", "RB", "LWB", "RWB"],
-            MID: ["CDM", "CM", "CAM", "LM", "RM"],
-            ATT: ["LW", "RW", "ST", "CF"],
+            "GK": ["GK"],
+            "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
+            "MID": ["CDM", "CM", "CAM", "LM", "RM"],
+            "ATT": ["LW", "RW", "ST", "CF"]
         };
+
         const POSITION_PENALTY = {
-            ["CM","CDM"]:4, ["CM","CAM"]:4, ["CM","LM"]:6, ["CM","RM"]:6,
-            ["CM","CB"]:10, ["CM","LB"]:11, ["CM","RB"]:11, ["CM","ST"]:8,
-            ["CM","LW"]:9, ["CM","RW"]:9, ["CM","GK"]:45,
-            ["CDM","CM"]:3, ["CDM","CAM"]:6, ["CDM","CB"]:7, ["CDM","LB"]:8,
-            ["CDM","RB"]:8, ["CDM","LM"]:8, ["CDM","RM"]:8, ["CDM","ST"]:12, ["CDM","GK"]:45,
-            ["CAM","CM"]:3, ["CAM","CDM"]:6, ["CAM","ST"]:5, ["CAM","LW"]:6,
-            ["CAM","RW"]:6, ["CAM","LM"]:7, ["CAM","RM"]:7, ["CAM","CB"]:15, ["CAM","GK"]:45,
-            ["ST","CF"]:1, ["ST","CAM"]:7, ["ST","LW"]:5, ["ST","RW"]:5,
-            ["ST","CM"]:10, ["ST","CDM"]:14, ["ST","CB"]:18, ["ST","GK"]:48,
-            ["LW","LM"]:3, ["LW","RW"]:2, ["LW","ST"]:5, ["LW","CAM"]:6,
-            ["LW","CM"]:9, ["LW","LB"]:7, ["LW","RB"]:12, ["LW","CB"]:15, ["LW","GK"]:47,
-            ["RW","RM"]:3, ["RW","LW"]:2, ["RW","ST"]:5, ["RW","CAM"]:6,
-            ["RW","CM"]:9, ["RW","RB"]:7, ["RW","LB"]:12, ["RW","CB"]:15, ["RW","GK"]:47,
-            ["CB","CDM"]:7, ["CB","LB"]:4, ["CB","RB"]:4, ["CB","CM"]:12,
-            ["CB","CAM"]:16, ["CB","ST"]:20, ["CB","GK"]:40,
-            ["LB","LWB"]:2, ["LB","CB"]:4, ["LB","RB"]:5, ["LB","LM"]:4,
-            ["LB","CM"]:11, ["LB","CDM"]:9, ["LB","CAM"]:15, ["LB","ST"]:20, ["LB","GK"]:45,
-            ["RB","RWB"]:2, ["RB","CB"]:4, ["RB","LB"]:5, ["RB","RM"]:4,
-            ["RB","CM"]:11, ["RB","CDM"]:9, ["RB","CAM"]:15, ["RB","ST"]:20, ["RB","GK"]:45,
-            ["GK","CB"]:40, ["GK","CM"]:45, ["GK","ST"]:48,
-            ["LWB","LB"]:2, ["LWB","LM"]:3, ["LWB","CB"]:5,
-            ["RWB","RB"]:2, ["RWB","RM"]:3, ["RWB","CB"]:5,
-            ["LM","LW"]:3, ["LM","CM"]:5, ["LM","CAM"]:6, ["LM","LB"]:4,
-            ["LM","CDM"]:9, ["LM","ST"]:9, ["LM","CB"]:14, ["LM","GK"]:45,
-            ["RM","RW"]:3, ["RM","CM"]:5, ["RM","CAM"]:6, ["RM","RB"]:4,
-            ["RM","CDM"]:9, ["RM","ST"]:9, ["RM","CB"]:14, ["RM","GK"]:45,
+            "CM->CDM": 4, "CM->CAM": 4, "CM->LM": 6, "CM->RM": 6,
+            "CM->CB": 10, "CM->LB": 11, "CM->RB": 11, "CM->ST": 8,
+            "CM->LW": 9, "CM->RW": 9, "CM->GK": 45,
+            "CDM->CM": 3, "CDM->CAM": 6, "CDM->CB": 7, "CDM->LB": 8,
+            "CDM->RB": 8, "CDM->LM": 8, "CDM->RM": 8, "CDM->ST": 12, "CDM->GK": 45,
+            "CAM->CM": 3, "CAM->CDM": 6, "CAM->ST": 5, "CAM->LW": 6,
+            "CAM->RW": 6, "CAM->LM": 7, "CAM->RM": 7, "CAM->CB": 15, "CAM->GK": 45,
+            "ST->CF": 1, "ST->CAM": 7, "ST->LW": 5, "ST->RW": 5,
+            "ST->CM": 10, "ST->CDM": 14, "ST->CB": 18, "ST->GK": 48,
+            "LW->LM": 3, "LW->RW": 2, "LW->ST": 5, "LW->CAM": 6,
+            "LW->CM": 9, "LW->LB": 7, "LW->RB": 12, "LW->CB": 15, "LW->GK": 47,
+            "RW->RM": 3, "RW->LW": 2, "RW->ST": 5, "RW->CAM": 6,
+            "RW->CM": 9, "RW->RB": 7, "RW->LB": 12, "RW->CB": 15, "RW->GK": 47,
+            "CB->CDM": 7, "CB->LB": 4, "CB->RB": 4, "CB->CM": 12,
+            "CB->CAM": 16, "CB->ST": 20, "CB->GK": 40,
+            "LB->LWB": 2, "LB->CB": 4, "LB->RB": 5, "LB->LM": 4,
+            "LB->CM": 11, "LB->CDM": 9, "LB->CAM": 15, "LB->ST": 20, "LB->GK": 45,
+            "RB->RWB": 2, "RB->CB": 4, "RB->LB": 5, "RB->RM": 4,
+            "RB->CM": 11, "RB->CDM": 9, "RB->CAM": 15, "RB->ST": 20, "RB->GK": 45,
+            "GK->CB": 40, "GK->CM": 45, "GK->ST": 48,
+            "LWB->LB": 2, "LWB->LM": 3, "LWB->CB": 5,
+            "RWB->RB": 2, "RWB->RM": 3, "RWB->CB": 5,
+            "LM->LW": 3, "LM->CM": 5, "LM->CAM": 6, "LM->LB": 4,
+            "LM->CDM": 9, "LM->ST": 9, "LM->CB": 14, "LM->GK": 45,
+            "RM->RW": 3, "RM->CM": 5, "RM->CAM": 6, "RM->RB": 4,
+            "RM->CDM": 9, "RM->ST": 9, "RM->CB": 14, "RM->GK": 45
         };
+
         const GROUP_PENALTY = {
-            ["MID","MID"]:5, ["MID","DEF"]:12, ["MID","ATT"]:9, ["MID","GK"]:45,
-            ["DEF","MID"]:11, ["DEF","DEF"]:4, ["DEF","ATT"]:18, ["DEF","GK"]:42,
-            ["ATT","MID"]:8, ["ATT","DEF"]:16, ["ATT","ATT"]:3, ["ATT","GK"]:47,
-            ["GK","DEF"]:40, ["GK","MID"]:45, ["GK","ATT"]:48,
+            "MID->MID": 5, "MID->DEF": 12, "MID->ATT": 9, "MID->GK": 45,
+            "DEF->MID": 11, "DEF->DEF": 4, "DEF->ATT": 18, "DEF->GK": 42,
+            "ATT->MID": 8, "ATT->DEF": 16, "ATT->ATT": 3, "ATT->GK": 47,
+            "GK->DEF": 40, "GK->MID": 45, "GK->ATT": 48
         };
 
         function normalizePos(pos) {
             if (!pos) return "CM";
             const p = pos.toUpperCase();
-            if (p.includes("GOALKEEPER") || p === "GK") return "GK";
-            if (p.includes("LEFT BACK") || p === "LB" || p.includes("LEFT WING BACK")) return "LWB" === p ? "LWB" : "LB";
-            if (p.includes("RIGHT BACK") || p === "RB" || p.includes("RIGHT WING BACK")) return "RWB" === p ? "RWB" : "RB";
-            if (p.includes("CENTRE-BACK") || p.includes("CENTER-BACK") || p === "CB") return "CB";
-            if (p.includes("DEFENSIVE MID") || p === "CDM") return "CDM";
-            if (p.includes("ATTACKING MID") || p === "CAM") return "CAM";
-            if (p.includes("LEFT MID") || p === "LM") return "LM";
-            if (p.includes("RIGHT MID") || p === "RM") return "RM";
-            if (p.includes("CENTRAL MID") || p === "CM") return "CM";
-            if (p.includes("LEFT WING") || p === "LW") return "LW";
-            if (p.includes("RIGHT WING") || p === "RW") return "RW";
-            if (p.includes("STRIKER") || p === "ST" || p.includes("FORWARD")) return "ST";
+            if (p.indexOf("GOALKEEPER") >= 0 || p === "GK") return "GK";
+            if (p === "LWB" || p.indexOf("LEFT WING BACK") >= 0) return "LWB";
+            if (p === "RWB" || p.indexOf("RIGHT WING BACK") >= 0) return "RWB";
+            if (p.indexOf("LEFT BACK") >= 0 || p === "LB") return "LB";
+            if (p.indexOf("RIGHT BACK") >= 0 || p === "RB") return "RB";
+            if (p.indexOf("CENTRE-BACK") >= 0 || p.indexOf("CENTER-BACK") >= 0 || p === "CB") return "CB";
+            if (p.indexOf("DEFENSIVE MID") >= 0 || p === "CDM") return "CDM";
+            if (p.indexOf("ATTACKING MID") >= 0 || p === "CAM") return "CAM";
+            if (p.indexOf("LEFT MID") >= 0 || p === "LM") return "LM";
+            if (p.indexOf("RIGHT MID") >= 0 || p === "RM") return "RM";
+            if (p.indexOf("CENTRAL MID") >= 0 || p === "CM") return "CM";
+            if (p.indexOf("LEFT WING") >= 0 || p === "LW") return "LW";
+            if (p.indexOf("RIGHT WING") >= 0 || p === "RW") return "RW";
+            if (p.indexOf("STRIKER") >= 0 || p === "ST" || p.indexOf("FORWARD") >= 0 || p === "CF") return "ST";
             return "CM";
         }
 
         function groupOf(pos) {
-            for (const [g, list] of Object.entries(POSITION_GROUPS)) {
-                if (list.includes(pos)) return g;
+            for (const g in POSITION_GROUPS) {
+                if (POSITION_GROUPS[g].indexOf(pos) >= 0) return g;
             }
             return "MID";
         }
@@ -1711,13 +1682,11 @@
             const target = normalizePos(targetPos);
             if (native === target) return 0;
             const alts = (altPositions || []).map(normalizePos);
-            if (alts.includes(target)) return 0;
-            const key = [native, target];
-            // Object key join
-            const exact = POSITION_PENALTY[key.join("->")];
+            if (alts.indexOf(target) >= 0) return 0;
+            const exact = POSITION_PENALTY[native + "->" + target];
             if (exact !== undefined) return exact;
-            const ng = groupOf(native), tg = groupOf(target);
-            return GROUP_PENALTY[[ng, tg].join("->")] || 20;
+            const ng = groupOf(native), tgp = groupOf(target);
+            return GROUP_PENALTY[ng + "->" + tgp] || 20;
         }
 
         function effectiveOverall(player, slotPos) {
@@ -1728,44 +1697,44 @@
         function positionFitScore(playerPos, slotRole) {
             const p = (playerPos || "").toLowerCase();
             const r = (slotRole || "").toUpperCase();
-            const direct = () => {
-                if (r === "GK")  return p.includes("goalkeeper") || p === "gk";
-                if (r === "CB")  return p.includes("centre-back") || p.includes("center-back") || p === "cb";
-                if (r === "LB")  return p.includes("left back") || p === "lb" || p.includes("left wing back");
-                if (r === "RB")  return p.includes("right back") || p === "rb" || p.includes("right wing back");
-                if (r === "LWB") return p.includes("left wing back") || p.includes("left back") || p === "lwb" || p === "lb";
-                if (r === "RWB") return p.includes("right wing back") || p.includes("right back") || p === "rwb" || p === "rb";
-                if (r === "CDM") return p.includes("defensive mid") || p === "cdm";
-                if (r === "CM")  return (p.includes("central midfield") && !p.includes("attacking") && !p.includes("defensive")) || p === "cm";
-                if (r === "CAM") return p.includes("attacking mid") || p === "cam";
-                if (r === "LM")  return p.includes("left mid") || p === "lm";
-                if (r === "RM")  return p.includes("right mid") || p === "rm";
-                if (r === "LW")  return p.includes("left wing") || p === "lw";
-                if (r === "RW")  return p.includes("right wing") || p === "rw";
-                if (r === "ST")  return p.includes("striker") || p.includes("forward") || p === "st" || p === "cf";
+            const isDirect = (function() {
+                if (r === "GK") return p.indexOf("goalkeeper") >= 0 || p === "gk";
+                if (r === "CB") return p.indexOf("centre-back") >= 0 || p.indexOf("center-back") >= 0 || p === "cb";
+                if (r === "LB") return p.indexOf("left back") >= 0 || p === "lb" || p.indexOf("left wing back") >= 0;
+                if (r === "RB") return p.indexOf("right back") >= 0 || p === "rb" || p.indexOf("right wing back") >= 0;
+                if (r === "LWB") return p.indexOf("left wing back") >= 0 || p.indexOf("left back") >= 0 || p === "lwb" || p === "lb";
+                if (r === "RWB") return p.indexOf("right wing back") >= 0 || p.indexOf("right back") >= 0 || p === "rwb" || p === "rb";
+                if (r === "CDM") return p.indexOf("defensive mid") >= 0 || p === "cdm";
+                if (r === "CM") return (p.indexOf("central midfield") >= 0 && p.indexOf("attacking") < 0 && p.indexOf("defensive") < 0) || p === "cm";
+                if (r === "CAM") return p.indexOf("attacking mid") >= 0 || p === "cam";
+                if (r === "LM") return p.indexOf("left mid") >= 0 || p === "lm";
+                if (r === "RM") return p.indexOf("right mid") >= 0 || p === "rm";
+                if (r === "LW") return p.indexOf("left wing") >= 0 || p === "lw";
+                if (r === "RW") return p.indexOf("right wing") >= 0 || p === "rw";
+                if (r === "ST") return p.indexOf("striker") >= 0 || p.indexOf("forward") >= 0 || p === "st" || p === "cf";
                 return false;
-            };
-            if (direct()) return 100;
+            })();
+            if (isDirect) return 100;
 
-            const familyOf = (pp) => {
-                if (pp.includes("goalkeeper") || pp === "gk") return "GK";
-                if (pp.includes("back") || pp === "cb" || pp === "lb" || pp === "rb" || pp.includes("wing back")) return "DEF";
-                if (pp.includes("midfield") || pp === "cm" || pp === "cdm" || pp === "cam" || pp === "lm" || pp === "rm") return "MID";
+            function familyOf(pp) {
+                if (pp.indexOf("goalkeeper") >= 0 || pp === "gk") return "GK";
+                if (pp.indexOf("back") >= 0 || pp === "cb" || pp === "lb" || pp === "rb" || pp.indexOf("wing back") >= 0) return "DEF";
+                if (pp.indexOf("midfield") >= 0 || pp === "cm" || pp === "cdm" || pp === "cam" || pp === "lm" || pp === "rm") return "MID";
                 return "ATT";
-            };
+            }
             const slotFamily = {
-                GK:"GK", CB:"DEF", LB:"DEF", RB:"DEF", LWB:"DEF", RWB:"DEF",
-                CDM:"MID", CM:"MID", CAM:"MID", LM:"MID", RM:"MID",
-                LW:"ATT", RW:"ATT", ST:"ATT"
+                "GK":"GK", "CB":"DEF", "LB":"DEF", "RB":"DEF", "LWB":"DEF", "RWB":"DEF",
+                "CDM":"MID", "CM":"MID", "CAM":"MID", "LM":"MID", "RM":"MID",
+                "LW":"ATT", "RW":"ATT", "ST":"ATT"
             }[r];
-            if (r === "LW" && (p.includes("left mid") || p === "lm")) return 70;
-            if (r === "RW" && (p.includes("right mid") || p === "rm")) return 70;
-            if (r === "LM" && (p.includes("left wing") || p === "lw")) return 70;
-            if (r === "RM" && (p.includes("right wing") || p === "rw")) return 70;
+            if (r === "LW" && (p.indexOf("left mid") >= 0 || p === "lm")) return 70;
+            if (r === "RW" && (p.indexOf("right mid") >= 0 || p === "rm")) return 70;
+            if (r === "LM" && (p.indexOf("left wing") >= 0 || p === "lw")) return 70;
+            if (r === "RM" && (p.indexOf("right wing") >= 0 || p === "rw")) return 70;
             if (r === "CAM" && (p === "cm" || p === "cf" || p === "st")) return 60;
             if (r === "CM" && (p === "cam" || p === "cdm")) return 60;
             if (r === "CDM" && p === "cm") return 60;
-            if (r === "CB" && (p === "lb" || p === "rb" || p.includes("defensive mid"))) return 40;
+            if (r === "CB" && (p === "lb" || p === "rb" || p.indexOf("defensive mid") >= 0)) return 40;
             if (r === "ST" && p === "cam") return 50;
 
             return familyOf(p) === slotFamily ? 40 : 0;
@@ -1773,14 +1742,16 @@
 
         function autoAssignStartingXI(players) {
             const formation = FORMATIONS[tacticsState.formation];
-            const availablePlayers = [...players].sort((a, b) => b.overall - a.overall);
+            const availablePlayers = players.slice().sort(function(a, b) { return b.overall - a.overall; });
             const assigned = new Set();
             const newXI = [];
 
-            for (const slot of formation) {
+            for (let i = 0; i < formation.length; i++) {
+                const slot = formation[i];
                 let best = null;
                 let bestScore = -1;
-                for (const p of availablePlayers) {
+                for (let j = 0; j < availablePlayers.length; j++) {
+                    const p = availablePlayers[j];
                     if (assigned.has(p.id)) continue;
                     const fit = positionFitScore(p.position, slot.role);
                     const eff = effectiveOverall(p, slot.role);
@@ -1802,7 +1773,7 @@
             try {
                 const players = await ensurePlayersLoaded();
                 if (!tacticsLoaded) {
-                    const res = await fetch(`${API_BASE}/api/tactics/${userId}`);
+                    const res = await fetch(API_BASE + '/api/tactics/' + userId);
                     let data = {};
                     if (res.ok) data = await res.json();
                     tacticsState.formation = data.formation || "4-3-3 (Линия)";
@@ -1812,7 +1783,11 @@
                     tacticsState.corner_taker_id = data.corner_taker_id || null;
                     tacticsState.penalty_taker_id = data.penalty_taker_id || null;
 
-                    const filled = tacticsState.starting_xi.filter(x => x != null).length;
+                    if (!FORMATIONS[tacticsState.formation]) {
+                        tacticsState.formation = "4-3-3 (Линия)";
+                    }
+
+                    const filled = tacticsState.starting_xi.filter(function(x) { return x != null; }).length;
                     if (filled < 11) {
                         autoAssignStartingXI(players);
                     }
@@ -1822,11 +1797,10 @@
 
                     tacticsLoaded = true;
                 }
-                // Заполняем select формаций
-                const sel = document.getElementById("formation-select");
-                sel.innerHTML = Object.keys(FORMATIONS).map(f =>
-                    `<option value="${f}" ${f === tacticsState.formation ? "selected" : ""}>${f}</option>`
-                ).join("");
+                const sel = $("formation-select");
+                sel.innerHTML = Object.keys(FORMATIONS).map(function(f) {
+                    return '<option value="' + f + '"' + (f === tacticsState.formation ? ' selected' : '') + '>' + f + '</option>';
+                }).join("");
                 renderTactics();
             } catch (e) {
                 console.error(e);
@@ -1841,10 +1815,10 @@
         }
 
         function renderPitch() {
-            const container = document.getElementById("pitch-slots");
-            const formation = FORMATIONS[tacticsState.formation];
+            const container = $("pitch-slots");
+            const formation = FORMATIONS[tacticsState.formation] || [];
             container.innerHTML = "";
-            formation.forEach((slot, idx) => {
+            formation.forEach(function(slot, idx) {
                 const playerId = tacticsState.starting_xi[idx];
                 const player = playerId != null ? getPlayerById(playerId) : null;
                 const isSelected = selectedSlotIndex === idx;
@@ -1856,14 +1830,12 @@
                     ovr = effectiveOverall(player, slot.role);
                     hasPenalty = ovr < player.overall;
                     const oc = ovrClass(ovr);
-                    cardInner = `
-                        <span style="font-size:12px; line-height:1;">${shortPosOf(player.position)}</span>
-                        <div class="slot-ovr-badge ${oc}">${ovr}</div>
-                        ${tacticsState.captain_id === player.id ? '<div class="slot-captain-badge">C</div>' : ''}
-                        ${hasPenalty ? '<div class="slot-warning">!</div>' : ''}
-                    `;
+                    cardInner = '<span style="font-size:12px; line-height:1;">' + shortPosOf(player.position) + '</span>' +
+                        '<div class="slot-ovr-badge ' + oc + '">' + ovr + '</div>' +
+                        (tacticsState.captain_id === player.id ? '<div class="slot-captain-badge">C</div>' : '') +
+                        (hasPenalty ? '<div class="slot-warning">!</div>' : '');
                 } else {
-                    cardInner = `<span>+</span>`;
+                    cardInner = '<span>+</span>';
                 }
 
                 const nameLabel = player
@@ -1875,69 +1847,66 @@
                 div.style.left = slot.x + "%";
                 div.style.top = slot.y + "%";
                 div.dataset.idx = idx;
-                div.innerHTML = `
-                    <div class="slot-role">${slot.role}</div>
-                    <div class="slot-card ${!player ? 'empty' : ''} ${isSelected ? 'selected' : ''}">
-                        ${cardInner}
-                    </div>
-                    <div class="slot-name ${!player ? 'empty' : ''}">${nameLabel}</div>
-                `;
-                div.onclick = () => onSlotClick(idx);
+                div.innerHTML =
+                    '<div class="slot-role">' + slot.role + '</div>' +
+                    '<div class="slot-card ' + (!player ? 'empty' : '') + ' ' + (isSelected ? 'selected' : '') + '">' +
+                    cardInner +
+                    '</div>' +
+                    '<div class="slot-name ' + (!player ? 'empty' : '') + '">' + nameLabel + '</div>';
+                div.onclick = (function(i) { return function() { onSlotClick(i); }; })(idx);
                 container.appendChild(div);
             });
         }
 
         function renderBench() {
-            const benchList = document.getElementById("bench-list");
-            const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
+            const benchList = $("bench-list");
+            const xiSet = new Set(tacticsState.starting_xi.filter(function(x) { return x != null; }));
             const all = window.currentPlayers || [];
-            const bench = all.filter(p => !xiSet.has(p.id));
+            const bench = all.filter(function(p) { return !xiSet.has(p.id); });
 
-            const getFamilyOrder = (pos) => {
+            function getFamilyOrder(pos) {
                 const p = (pos || "").toLowerCase();
-                if (p.includes("goalkeeper") || p === "gk") return 1;
-                if (p.includes("back") || p === "cb" || p === "lb" || p === "rb" || p.includes("wing back")) return 2;
-                if (p.includes("mid") || p === "cm" || p === "cdm" || p === "cam" || p === "lm" || p === "rm") return 3;
+                if (p.indexOf("goalkeeper") >= 0 || p === "gk") return 1;
+                if (p.indexOf("back") >= 0 || p === "cb" || p === "lb" || p === "rb" || p.indexOf("wing back") >= 0) return 2;
+                if (p.indexOf("mid") >= 0 || p === "cm" || p === "cdm" || p === "cam" || p === "lm" || p === "rm") return 3;
                 return 4;
-            };
-            bench.sort((a, b) => {
+            }
+            bench.sort(function(a, b) {
                 const fa = getFamilyOrder(a.position), fb = getFamilyOrder(b.position);
                 if (fa !== fb) return fa - fb;
                 return b.overall - a.overall;
             });
 
-            document.getElementById("bench-count").innerText = `${bench.length} чел.`;
-            benchList.innerHTML = bench.map(p => {
+            $("bench-count").innerText = bench.length + " чел.";
+            benchList.innerHTML = bench.map(function(p) {
                 const isSel = selectedBenchPlayerId === p.id;
-                const effAtNative = effectiveOverall(p, normalizePos(p.position));
-                return `
-                    <div class="bench-card ${isSel ? 'selected' : ''}" onclick="onBenchPlayerClick(${p.id})">
-                        <div class="ovr-mini ${p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze'}">${p.overall}</div>
-                        <div class="bench-name">${p.name}</div>
-                        <div class="bench-pos">${shortPosOf(p.position)}</div>
-                    </div>
-                `;
+                const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
+                return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onBenchPlayerClick(' + p.id + ')">' +
+                    '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
+                    '<div class="bench-name">' + p.name + '</div>' +
+                    '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
+                    '</div>';
             }).join("");
         }
 
         function renderRoleSelects() {
             const xiPlayers = tacticsState.starting_xi
-                .filter(x => x != null)
-                .map(id => getPlayerById(id))
+                .filter(function(x) { return x != null; })
+                .map(function(id) { return getPlayerById(id); })
                 .filter(Boolean);
 
-            const fill = (selectId, currentVal) => {
-                const sel = document.getElementById(selectId);
-                const prev = currentVal ?? (sel.value ? parseInt(sel.value) : null);
+            function fill(selectId, currentVal) {
+                const sel = $(selectId);
+                const prev = currentVal != null ? currentVal : (sel.value ? parseInt(sel.value) : null);
                 sel.innerHTML = '<option value="">—</option>';
-                xiPlayers.forEach(p => {
+                xiPlayers.forEach(function(p) {
                     const opt = document.createElement("option");
                     opt.value = p.id;
-                    opt.textContent = `${p.name} (${p.overall})`;
+                    opt.textContent = p.name + ' (' + p.overall + ')';
                     if (prev === p.id) opt.selected = true;
                     sel.appendChild(opt);
                 });
-            };
+            }
 
             fill("role-captain", tacticsState.captain_id);
             fill("role-fk", tacticsState.free_kick_taker_id);
@@ -1946,15 +1915,15 @@
         }
 
         function updateHint() {
-            const hint = document.getElementById("tactics-hint");
+            const hint = $("tactics-hint");
             hint.classList.remove("active");
             if (selectedSlotIndex !== null) {
                 const slot = FORMATIONS[tacticsState.formation][selectedSlotIndex];
-                hint.textContent = `Слот "${slot.role}" выбран. Нажмите другую позицию или игрока в запасе`;
+                hint.textContent = 'Слот "' + slot.role + '" выбран. Нажмите другую позицию или игрока в запасе';
                 hint.classList.add("active");
             } else if (selectedBenchPlayerId !== null) {
                 const p = getPlayerById(selectedBenchPlayerId);
-                hint.textContent = `${p ? p.name : ""} выбран. Нажмите позицию на поле`;
+                hint.textContent = (p ? p.name : "") + ' выбран. Нажмите позицию на поле';
                 hint.classList.add("active");
             } else {
                 hint.textContent = "Нажмите на слот на поле или на игрока в запасе";
@@ -1982,6 +1951,7 @@
             }
             renderTactics();
         }
+        window.onSlotClick = onSlotClick;
 
         function onBenchPlayerClick(playerId) {
             if (selectedSlotIndex !== null) {
@@ -1995,6 +1965,7 @@
             }
             renderTactics();
         }
+        window.onBenchPlayerClick = onBenchPlayerClick;
 
         function placeBenchPlayerIntoSlot(benchPlayerId, slotIdx) {
             const existingIdx = tacticsState.starting_xi.indexOf(benchPlayerId);
@@ -2007,7 +1978,7 @@
             tacticsState.starting_xi[slotIdx] = benchPlayerId;
         }
 
-        document.getElementById("formation-select").onchange = (e) => {
+        $("formation-select").onchange = function(e) {
             tacticsState.formation = e.target.value;
             const needed = FORMATIONS[tacticsState.formation].length;
             while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
@@ -2017,7 +1988,7 @@
             renderTactics();
         };
 
-        document.getElementById("btn-auto-tactics").onclick = () => {
+        $("btn-auto-tactics").onclick = function() {
             if (!window.currentPlayers) return;
             autoAssignStartingXI(window.currentPlayers);
             selectedSlotIndex = null;
@@ -2025,7 +1996,7 @@
             renderTactics();
         };
 
-        document.getElementById("btn-reset-tactics").onclick = () => {
+        $("btn-reset-tactics").onclick = function() {
             tacticsState.starting_xi = [];
             tacticsState.captain_id = null;
             tacticsState.free_kick_taker_id = null;
@@ -2037,23 +2008,23 @@
             renderTactics();
         };
 
-        document.getElementById("role-captain").onchange = (e) => {
+        $("role-captain").onchange = function(e) {
             tacticsState.captain_id = e.target.value ? parseInt(e.target.value) : null;
             renderPitch();
         };
-        document.getElementById("role-fk").onchange = (e) => {
+        $("role-fk").onchange = function(e) {
             tacticsState.free_kick_taker_id = e.target.value ? parseInt(e.target.value) : null;
         };
-        document.getElementById("role-corner").onchange = (e) => {
+        $("role-corner").onchange = function(e) {
             tacticsState.corner_taker_id = e.target.value ? parseInt(e.target.value) : null;
         };
-        document.getElementById("role-penalty").onchange = (e) => {
+        $("role-penalty").onchange = function(e) {
             tacticsState.penalty_taker_id = e.target.value ? parseInt(e.target.value) : null;
         };
 
-        document.getElementById("btn-save-tactics").onclick = async () => {
+        $("btn-save-tactics").onclick = async function() {
             try {
-                const res = await fetch(`${API_BASE}/api/tactics`, {
+                const res = await fetch(API_BASE + '/api/tactics', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -2063,13 +2034,13 @@
                         captain_id: tacticsState.captain_id,
                         free_kick_taker_id: tacticsState.free_kick_taker_id,
                         corner_taker_id: tacticsState.corner_taker_id,
-                        penalty_taker_id: tacticsState.penalty_taker_id,
+                        penalty_taker_id: tacticsState.penalty_taker_id
                     })
                 });
                 if (res.ok) {
                     tg.showAlert("✅ Состав сохранён!");
                 } else {
-                    const err = await res.json().catch(() => ({}));
+                    const err = await res.json().catch(function() { return {}; });
                     tg.showAlert("Ошибка сохранения: " + (err.detail || res.status));
                 }
             } catch (e) {
@@ -2077,39 +2048,42 @@
             }
         };
 
-        // === НАВИГАЦИЯ ===
-        document.getElementById("btn-start").onclick = async () => {
+        // === НАВИГАЦИЯ (в конце — важно!) ===
+        $("btn-start").onclick = async function() {
             const hasClub = await checkManager();
             if (!hasClub) await loadData();
         };
         
-        document.getElementById("btn-back-leagues").onclick = () => {
+        $("btn-back-leagues").onclick = function() {
             showScreen("leagues");
-            setTimeout(() => window.scrollTo(0, leaguesScrollPos), 10);
+            setTimeout(function() { window.scrollTo(0, leaguesScrollPos); }, 10);
         };
         
-        document.getElementById("btn-continue").onclick = () => {
+        $("btn-continue").onclick = function() {
             if (managerSetupComplete) {
-                document.getElementById("bottom-nav").classList.remove("hidden");
+                $("bottom-nav").classList.remove("hidden");
                 loadSquad();
             } else {
                 goToCoachSetup();
             }
         };
-        document.getElementById("btn-back-to-confirm").onclick = () => showScreen("confirm");
-        document.getElementById("btn-next-club-setup").onclick = goToClubSetup;
-        document.getElementById("btn-back-to-coach").onclick = () => showScreen("coach");
-        document.getElementById("inp-extra-budget").onchange = updateBudgetDisplay;
-        document.getElementById("btn-finish-setup").onclick = finishSetup;
-        document.getElementById("btn-back-to-office").onclick = () => switchTab('office');
+        $("btn-back-to-confirm").onclick = function() { showScreen("confirm"); };
+        $("btn-next-club-setup").onclick = goToClubSetup;
+        $("btn-back-to-coach").onclick = function() { showScreen("coach"); };
+        $("inp-extra-budget").onchange = updateBudgetDisplay;
+        $("btn-finish-setup").onclick = finishSetup;
+        $("btn-back-to-office").onclick = function() { switchTab('office'); };
 
-        document.getElementById("btn-reset").onclick = () => {
-            tg.showConfirm("Сбросить клуб?", async (ok) => {
+        $("btn-reset").onclick = function() {
+            tg.showConfirm("Сбросить клуб?", async function(ok) {
                 if (!ok) return;
-                const res = await fetch(`${API_BASE}/api/reset-club/${userId}`, { method: 'DELETE' });
+                const res = await fetch(API_BASE + '/api/reset-club/' + userId, { method: 'DELETE' });
                 if (res.ok) window.location.reload();
             });
         };
+
+        console.log("Soccery 27 initialized OK. User:", userId);
+    })();
     </script>
 </body>
 </html>
