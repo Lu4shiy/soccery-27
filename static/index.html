@@ -194,9 +194,7 @@
         .training-name { font-weight: bold; font-size: 14px; color: #52a8ff; }
         .training-desc { font-size: 12px; color: #8e9eb5; margin-top: 2px; }
         .training-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: #b9c5d4; }
-        .training-active {
-            background: #1e3a2a; border-color: #2ecc71;
-        }
+        .training-active { background: #1e3a2a; border-color: #2ecc71; }
         .training-active .training-name { color: #2ecc71; }
 
         .alt-pos-badge {
@@ -205,113 +203,54 @@
             font-weight: bold;
         }
 
-        .tactics-topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
+        /* ТАКТИКА */
+        .tactics-topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
         .tactics-topbar h2 { margin: 0; font-size: 20px; }
         .formation-select {
-            background: #232e3c;
-            color: #fff;
-            border: 1px solid #52a8ff;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            outline: none;
-            max-width: 180px;
-            -webkit-appearance: none;
-            appearance: none;
+            background: #232e3c; color: #fff; border: 1px solid #52a8ff; border-radius: 8px;
+            padding: 8px 12px; font-size: 13px; font-weight: bold; cursor: pointer; outline: none; max-width: 180px;
+            -webkit-appearance: none; appearance: none;
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3l3 3 3-3' stroke='%2352a8ff' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            padding-right: 26px;
+            background-repeat: no-repeat; background-position: right 8px center; padding-right: 26px;
         }
-        .tactics-hint {
-            font-size: 11px;
-            color: #8e9eb5;
-            text-align: center;
-            margin: 0 0 10px;
-            min-height: 14px;
-            transition: color 0.2s;
-        }
+        .tactics-hint { font-size: 11px; color: #8e9eb5; text-align: center; margin: 0 0 10px; min-height: 14px; transition: color 0.2s; }
         .tactics-hint.active { color: #52a8ff; font-weight: bold; }
 
         .pitch-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 3 / 4;
-            margin: 0 auto;
-            border-radius: 14px;
-            overflow: hidden;
+            position: relative; width: 100%; max-width: 400px; aspect-ratio: 3 / 4; margin: 0 auto;
+            border-radius: 14px; overflow: hidden;
             background: linear-gradient(180deg, #1f5130 0%, #2b6d3f 50%, #1f5130 100%);
             box-shadow: inset 0 0 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.35);
             border: 2px solid rgba(255,255,255,0.1);
         }
         .pitch-wrapper::before {
-            content: '';
-            position: absolute;
-            inset: 0;
+            content: ''; position: absolute; inset: 0;
             background: repeating-linear-gradient(180deg, transparent 0, transparent 9.09%, rgba(0,0,0,0.07) 9.09%, rgba(0,0,0,0.07) 18.18%);
             pointer-events: none;
         }
-        .pitch-svg {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
+        .pitch-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
         .pitch-center-circle {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 24%;
-            aspect-ratio: 1;
+            position: absolute; top: 50%; left: 50%; width: 24%; aspect-ratio: 1;
             transform: translate(-50%, -50%);
-            border: 1.5px solid rgba(255,255,255,0.22);
-            border-radius: 50%;
-            pointer-events: none;
+            border: 1.5px solid rgba(255,255,255,0.22); border-radius: 50%; pointer-events: none;
         }
 
         .pitch-slot {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            z-index: 2;
-            transition: transform 0.15s;
+            position: absolute; transform: translate(-50%, -50%);
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer; z-index: 2; transition: transform 0.15s;
         }
         .pitch-slot:active { transform: translate(-50%, -50%) scale(0.94); }
 
         .slot-card {
-            width: clamp(34px, 9.5vw, 44px);
-            height: clamp(34px, 9.5vw, 44px);
-            border-radius: 50%;
-            background: rgba(23, 33, 43, 0.9);
-            border: 2px solid rgba(255,255,255,0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 13px;
-            color: #fff;
-            position: relative;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            width: clamp(34px, 9.5vw, 44px); height: clamp(34px, 9.5vw, 44px);
+            border-radius: 50%; background: rgba(23, 33, 43, 0.9);
+            border: 2px solid rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 13px; color: #fff; position: relative; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
         .slot-card.empty {
-            background: rgba(23, 33, 43, 0.55);
-            border-style: dashed;
-            border-color: rgba(255,255,255,0.4);
-            color: rgba(255,255,255,0.6);
-            font-size: 20px;
-            font-weight: normal;
+            background: rgba(23, 33, 43, 0.55); border-style: dashed; border-color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.6); font-size: 20px; font-weight: normal;
         }
         .slot-card.selected {
             border-color: #52a8ff;
@@ -324,198 +263,90 @@
         }
 
         .slot-ovr-badge {
-            position: absolute;
-            bottom: -5px;
-            right: -5px;
-            background: #52a8ff;
-            color: #fff;
-            font-size: 9px;
-            padding: 1px 4px;
-            border-radius: 8px;
-            font-weight: bold;
-            border: 1.5px solid #17212b;
-            min-width: 20px;
-            text-align: center;
+            position: absolute; bottom: -5px; right: -5px;
+            background: #52a8ff; color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 8px;
+            font-weight: bold; border: 1.5px solid #17212b; min-width: 20px; text-align: center;
         }
         .slot-ovr-badge.gold { background: #e6c544; color: #1a1a1a; }
         .slot-ovr-badge.silver { background: #a3a3a3; color: #1a1a1a; }
         .slot-ovr-badge.bronze { background: #b87d4b; color: #1a1a1a; }
 
         .slot-role {
-            position: absolute;
-            top: -9px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 7px;
-            background: #52a8ff;
-            color: #fff;
-            padding: 1px 4px;
-            border-radius: 4px;
-            font-weight: bold;
-            white-space: nowrap;
-            letter-spacing: 0.3px;
+            position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+            font-size: 7px; background: #52a8ff; color: #fff; padding: 1px 4px; border-radius: 4px;
+            font-weight: bold; white-space: nowrap; letter-spacing: 0.3px;
         }
 
         .slot-name {
-            margin-top: 6px;
-            font-size: 8px;
-            font-weight: bold;
-            color: #fff;
-            background: rgba(23, 33, 43, 0.9);
-            padding: 2px 4px;
-            border-radius: 4px;
-            white-space: nowrap;
-            max-width: 64px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-align: center;
+            margin-top: 6px; font-size: 8px; font-weight: bold; color: #fff;
+            background: rgba(23, 33, 43, 0.9); padding: 2px 4px; border-radius: 4px;
+            white-space: nowrap; max-width: 64px; overflow: hidden; text-overflow: ellipsis; text-align: center;
         }
         .slot-name.empty { color: rgba(255,255,255,0.5); font-weight: normal; font-style: italic; }
 
         .slot-captain-badge {
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background: #e6c544;
-            color: #1a1a1a;
-            font-size: 8px;
-            font-weight: bold;
-            padding: 1px 4px;
-            border-radius: 6px;
-            border: 1.5px solid #17212b;
+            position: absolute; top: -6px; right: -6px;
+            background: #e6c544; color: #1a1a1a; font-size: 8px; font-weight: bold;
+            padding: 1px 4px; border-radius: 6px; border: 1.5px solid #17212b;
         }
 
         .slot-warning {
-            position: absolute;
-            top: -6px;
-            left: -6px;
-            background: #e67e22;
-            color: #fff;
-            font-size: 8px;
-            font-weight: bold;
-            padding: 1px 4px;
-            border-radius: 6px;
-            border: 1.5px solid #17212b;
+            position: absolute; top: -6px; left: -6px;
+            background: #e67e22; color: #fff; font-size: 8px; font-weight: bold;
+            padding: 1px 4px; border-radius: 6px; border: 1.5px solid #17212b;
         }
 
+        /* ЗАПАС И РЕЗЕРВ */
         .bench-section { margin-top: 16px; }
         .bench-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #8e9eb5;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            font-size: 14px; font-weight: bold; color: #8e9eb5; margin-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        .bench-title .bench-hint {
-            font-size: 11px;
-            color: #52a8ff;
-            font-weight: normal;
-        }
-        .bench-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 6px;
-        }
+        .bench-title .bench-hint { font-size: 11px; color: #52a8ff; font-weight: normal; }
+        .bench-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
         .bench-card {
-            background: #232e3c;
-            border-radius: 8px;
-            padding: 7px 9px;
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            background: #232e3c; border-radius: 8px; padding: 7px 9px;
+            display: flex; align-items: center; gap: 7px;
+            cursor: pointer; border: 2px solid transparent; transition: background 0.15s, border-color 0.15s, transform 0.1s;
         }
         .bench-card:active { transform: scale(0.97); }
-        .bench-card.selected {
-            border-color: #52a8ff;
-            background: #2f3b4d;
-        }
-        .bench-card .ovr-mini {
-            font-size: 11px;
-            font-weight: bold;
-            padding: 2px 5px;
-            border-radius: 4px;
-            min-width: 24px;
-            text-align: center;
-        }
-        .bench-card .bench-name {
-            font-size: 12px;
-            font-weight: bold;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .bench-card .bench-pos {
-            font-size: 10px;
-            color: #8e9eb5;
-            background: #17212b;
-            padding: 1px 5px;
-            border-radius: 4px;
-            font-weight: bold;
-        }
+        .bench-card.selected { border-color: #52a8ff; background: #2f3b4d; }
+        .bench-card .ovr-mini { font-size: 11px; font-weight: bold; padding: 2px 5px; border-radius: 4px; min-width: 24px; text-align: center; }
+        .bench-card .bench-name { font-size: 12px; font-weight: bold; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bench-card .bench-pos { font-size: 10px; color: #8e9eb5; background: #17212b; padding: 1px 5px; border-radius: 4px; font-weight: bold; }
+        
+        .reserve-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; opacity: 0.7; }
 
-        .roles-section {
-            margin-top: 16px;
-            background: #232e3c;
-            border-radius: 12px;
-            padding: 12px 14px;
-        }
-        .roles-section h3 {
-            margin: 0 0 6px;
-            font-size: 14px;
-            color: #52a8ff;
-        }
-        .role-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #17212b;
-            gap: 10px;
-        }
+        /* СТАНДАРТЫ */
+        .roles-section { margin-top: 16px; background: #232e3c; border-radius: 12px; padding: 12px 14px; }
+        .roles-section h3 { margin: 0 0 6px; font-size: 14px; color: #52a8ff; }
+        .role-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #17212b; gap: 10px; }
         .role-row:last-child { border-bottom: none; }
-        .role-label {
-            font-size: 13px;
-            color: #b9c5d4;
-            flex-shrink: 0;
-        }
+        .role-label { font-size: 13px; color: #b9c5d4; flex-shrink: 0; }
         .role-select {
-            background: #17212b;
-            color: #fff;
-            border: 1px solid #2f3b4d;
-            border-radius: 6px;
-            padding: 6px 8px;
-            font-size: 12px;
-            max-width: 60%;
-            flex-shrink: 1;
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
+            background: #17212b; color: #fff; border: 1px solid #2f3b4d; border-radius: 6px;
+            padding: 6px 8px; font-size: 12px; max-width: 60%; flex-shrink: 1; outline: none;
+            -webkit-appearance: none; appearance: none;
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 3l3 3 3-3' stroke='%238e9eb5' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 6px center;
-            padding-right: 22px;
+            background-repeat: no-repeat; background-position: right 6px center; padding-right: 22px;
         }
         .role-select:focus { border-color: #52a8ff; }
 
-        /* ==== КАСТОМНЫЙ МОДАЛ ==== */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center;
-            z-index: 2000; padding: 20px;
-        }
-        .modal-content {
-            background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px;
-            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-        }
-        .modal-actions {
-            display: flex; flex-direction: column; gap: 10px; margin-top: 20px;
-        }
+        /* МОДАЛ */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        .modal-content { background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+        .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+
+        /* СПОРТЦЕНТР */
+        .competitions-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .competitions-table th, .competitions-table td { padding: 8px; text-align: left; border-bottom: 1px solid #17212b; }
+        .competitions-table th { color: #52a8ff; font-weight: bold; }
+        .competitions-table td { color: #fff; }
+        .continent-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #2f3b4d; color: #8e9eb5; }
+        .continent-UEFA { background: #1a3c5a; color: #52a8ff; }
+        .continent-CONMEBOL { background: #2e4a1a; color: #2ecc71; }
+        .continent-AFC { background: #5a3a1a; color: #e67e22; }
+        .continent-CONCACAF { background: #5a1a3a; color: #e74c3c; }
     </style>
 </head>
 <body>
@@ -688,7 +519,7 @@
                     </div>
                 </div>
                 <div id="pd-training-available">
-                    <p style="font-size:12px;">Доступные программы:</p>
+                    <p style="font-size:12px;">Доступные программы (5 из 14):</p>
                     <div id="pd-training-list" class="training-list"></div>
                 </div>
             </div>
@@ -696,8 +527,17 @@
     </div>
 
     <div id="screen-center" class="screen hidden">
-        <h2>Спортивный центр</h2>
-        <div class="card"><p>Новости, календарь и матчи появятся здесь.</p></div>
+        <h2>🏟 Спортивный центр</h2>
+        <div class="card">
+            <h3>Турниры</h3>
+            <p style="font-size: 12px;">Ваш клуб: <b id="center-club-name" style="color:#52a8ff;"></b> (<span id="center-club-continent"></span>)</p>
+            <table class="competitions-table">
+                <thead>
+                    <tr><th>Турнир</th><th>Континент</th></tr>
+                </thead>
+                <tbody id="competitions-list"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="screen-tactics" class="screen hidden">
@@ -727,10 +567,21 @@
 
         <div class="bench-section">
             <div class="bench-title">
-                <span>Запасные</span>
-                <span class="bench-hint" id="bench-count">0</span>
+                <span>Запас (5-9 игроков)</span>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <button class="btn-secondary" style="padding:2px 8px; font-size:16px;" onclick="adjustBench(-1)">−</button>
+                    <span class="bench-hint" id="bench-count">0</span>
+                    <button class="btn-secondary" style="padding:2px 8px; font-size:16px;" onclick="adjustBench(1)">+</button>
+                </div>
             </div>
             <div id="bench-list" class="bench-grid"></div>
+        </div>
+
+        <div class="bench-section">
+            <div class="bench-title">
+                <span>Резерв (не в заявке)</span>
+            </div>
+            <div id="reserve-list" class="reserve-grid"></div>
         </div>
 
         <div class="roles-section">
@@ -763,7 +614,6 @@
         <div class="nav-item" onclick="switchTab('account')" id="nav-account"><div class="nav-icon">👤</div>Аккаунт</div>
     </div>
 
-    <!-- КАСТОМНЫЙ МОДАЛ -->
     <div id="custom-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 style="margin-top:0;">Несохранённые изменения</h3>
@@ -779,12 +629,10 @@
     <script>
     (function() {
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
-            expand: () => {},
-            showAlert: (msg) => alert(msg),
+            expand: () => {}, showAlert: (msg) => alert(msg),
             showConfirm: (msg, cb) => { if (cb) cb(confirm(msg)); },
             initDataUnsafe: { user: null },
-            enableClosingConfirmation: () => {},
-            disableClosingConfirmation: () => {}
+            enableClosingConfirmation: () => {}, disableClosingConfirmation: () => {}
         };
         try { tg.expand(); } catch (e) { console.warn("tg.expand failed:", e); }
 
@@ -800,12 +648,14 @@
         let currentClubId = null;
         let currentClubName = "";
         let currentLeague = "";
+        let currentContinent = "";
         let currentStars = 0.5;
         let leaguesScrollPos = 0;
         let selectedNationality = "Россия";
         let managerSetupComplete = false;
         let tacticsDirty = false;
         let pendingTabId = null;
+        let globalTrainingPrograms = [];
 
         const STAT_NAMES = {
             "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
@@ -866,27 +716,22 @@
             "England": "gb-eng", "Scotland": "gb-sct", "Wales": "gb-wls", "Northern Ireland": "gb-nir",
             "Russia": "ru", "Spain": "es", "Italy": "it", "Germany": "de", "France": "fr",
             "Portugal": "pt", "Brazil": "br", "Argentina": "ar", "Netherlands": "nl", "Holland": "nl",
-            "Belgium": "be", "Croatia": "hr", "Uruguay": "uy", "Colombia": "co",
-            "Mexico": "mx", "USA": "us", "United States": "us", "Canada": "ca",
-            "Japan": "jp", "South Korea": "kr", "Korea Republic": "kr",
-            "Australia": "au", "Morocco": "ma", "Senegal": "sn", "Nigeria": "ng",
-            "Egypt": "eg", "Algeria": "dz", "Ivory Coast": "ci", "Côte d'Ivoire": "ci",
-            "Ghana": "gh", "Cameroon": "cm", "Sweden": "se", "Norway": "no",
-            "Denmark": "dk", "Finland": "fi", "Iceland": "is", "Poland": "pl",
-            "Czech Republic": "cz", "Czechia": "cz", "Slovakia": "sk", "Hungary": "hu",
-            "Romania": "ro", "Bulgaria": "bg", "Greece": "gr", "Turkey": "tr",
-            "Türkiye": "tr", "Ukraine": "ua", "Serbia": "rs", "Switzerland": "ch",
-            "Austria": "at", "Republic of Ireland": "ie", "Ireland": "ie", "Albania": "al",
-            "Bosnia and Herzegovina": "ba", "North Macedonia": "mk", "Slovenia": "si",
-            "Montenegro": "me", "Kosovo": "xk", "Georgia": "ge", "Armenia": "am",
-            "Azerbaijan": "az", "Kazakhstan": "kz", "Israel": "il", "Iran": "ir",
-            "Iraq": "iq", "Saudi Arabia": "sa", "Qatar": "qa", "UAE": "ae",
-            "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl",
-            "Ecuador": "ec", "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo",
-            "Costa Rica": "cr", "Panama": "pa", "Honduras": "hn", "Jamaica": "jm",
-            "New Zealand": "nz", "South Africa": "za",
-            "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn",
-            "Mali": "ml", "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw"
+            "Belgium": "be", "Croatia": "hr", "Uruguay": "uy", "Colombia": "co", "Mexico": "mx", "USA": "us",
+            "United States": "us", "Canada": "ca", "Japan": "jp", "South Korea": "kr", "Korea Republic": "kr",
+            "Australia": "au", "Morocco": "ma", "Senegal": "sn", "Nigeria": "ng", "Egypt": "eg", "Algeria": "dz",
+            "Ivory Coast": "ci", "Côte d'Ivoire": "ci", "Ghana": "gh", "Cameroon": "cm", "Sweden": "se",
+            "Norway": "no", "Denmark": "dk", "Finland": "fi", "Iceland": "is", "Poland": "pl",
+            "Czech Republic": "cz", "Czechia": "cz", "Slovakia": "sk", "Hungary": "hu", "Romania": "ro",
+            "Bulgaria": "bg", "Greece": "gr", "Turkey": "tr", "Türkiye": "tr", "Ukraine": "ua", "Serbia": "rs",
+            "Switzerland": "ch", "Austria": "at", "Republic of Ireland": "ie", "Ireland": "ie", "Albania": "al",
+            "Bosnia and Herzegovina": "ba", "North Macedonia": "mk", "Slovenia": "si", "Montenegro": "me",
+            "Kosovo": "xk", "Georgia": "ge", "Armenia": "am", "Azerbaijan": "az", "Kazakhstan": "kz",
+            "Israel": "il", "Iran": "ir", "Iraq": "iq", "Saudi Arabia": "sa", "Qatar": "qa", "UAE": "ae",
+            "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl", "Ecuador": "ec",
+            "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo", "Costa Rica": "cr", "Panama": "pa",
+            "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
+            "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
+            "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -899,7 +744,6 @@
             const trigger = $("nat-trigger");
             const optionsContainer = $("nat-options");
             const display = $("selected-nat-display");
-            
             optionsContainer.innerHTML = "";
             countriesList.forEach(function(c) {
                 const div = document.createElement("div");
@@ -913,7 +757,6 @@
                 };
                 optionsContainer.appendChild(div);
             });
-
             trigger.onclick = function(e) {
                 e.stopPropagation();
                 optionsContainer.classList.toggle("show");
@@ -979,6 +822,7 @@
                     currentClubId = data.club_id;
                     currentClubName = data.club_name;
                     currentLeague = data.league;
+                    currentContinent = data.continent;
                     currentStars = data.stars;
                     managerSetupComplete = !!data.is_setup_complete;
                     if (!skipConfirm) {
@@ -1096,7 +940,6 @@
             const extra = parseInt($("inp-extra-budget").value);
             let multiplier = 3; 
             const l = currentLeague.toLowerCase();
-            
             if (l.indexOf("premier league") >= 0) multiplier = 35;
             else if (l.indexOf("laliga") >= 0 || l.indexOf("la liga") >= 0) multiplier = 25;
             else if (l.indexOf("bundesliga") >= 0 || l.indexOf("serie a") >= 0 || l.indexOf("ligue 1") >= 0) multiplier = 15;
@@ -1104,7 +947,6 @@
             else if (l.indexOf("championship") >= 0) multiplier = 25;
             else if (l.indexOf("eredivisie") >= 0 || l.indexOf("liga portugal") >= 0 || l.indexOf("mls") >= 0 || l.indexOf("saudi") >= 0) multiplier = 10;
             else if (l.indexOf("süper lig") >= 0 || l.indexOf("super lig") >= 0) multiplier = 12;
-
             const base = currentStars * multiplier;
             const total = base + extra;
             $("display-budget").innerText = 'Бюджет: ' + total + ' млн $';
@@ -1152,21 +994,7 @@
                     listContainer.innerHTML = '<p style="text-align:center;">Нет игроков.</p>'; return;
                 }
 
-                const order = {
-                    "Goalkeeper": 1, "GK": 1,
-                    "Left Back": 2, "LWB": 2, "LB": 2,
-                    "Centre-Back": 3, "Center-Back": 3, "CB": 3,
-                    "Right Back": 4, "RWB": 4, "RB": 4,
-                    "Left Midfield": 5, "LM": 5,
-                    "Central Defensive Midfield": 6, "CDM": 6,
-                    "Central Midfield": 7, "CM": 7,
-                    "Central Attacking Midfield": 8, "CAM": 8,
-                    "Right Midfield": 9, "RM": 9,
-                    "Left Wing": 10, "LW": 10,
-                    "Centre-Forward": 11, "CF": 11,
-                    "Striker": 12, "ST": 12,
-                    "Right Wing": 13, "RW": 13
-                };
+                const order = {"Goalkeeper": 1, "GK": 1, "Left Back": 2, "LWB": 2, "LB": 2, "Centre-Back": 3, "Center-Back": 3, "CB": 3, "Right Back": 4, "RWB": 4, "RB": 4, "Left Midfield": 5, "LM": 5, "Central Defensive Midfield": 6, "CDM": 6, "Central Midfield": 7, "CM": 7, "Central Attacking Midfield": 8, "CAM": 8, "Right Midfield": 9, "RM": 9, "Left Wing": 10, "LW": 10, "Centre-Forward": 11, "CF": 11, "Striker": 12, "ST": 12, "Right Wing": 13, "RW": 13};
 
                 function getPosWeight(pos) {
                     if (!pos) return 99;
@@ -1251,20 +1079,16 @@
             if (p.contract_until) {
                 const startDate = new Date('2026-08-01');
                 const endDate = new Date(p.contract_until);
-                
                 if (endDate > startDate) {
                     let months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
                     months -= startDate.getMonth();
                     months += endDate.getMonth();
-                    
                     const y = Math.floor(months / 12);
                     const m = months % 12;
-                    
                     let timeStr = "";
                     if (y === 0) timeStr = m + " мес.";
                     else if (m === 0) timeStr = y + " лет";
                     else timeStr = y + " г. " + m + " мес.";
-                    
                     const year = endDate.getFullYear();
                     contractText = "Действует до 30.06." + year + " (" + timeStr + ")";
                 } else {
@@ -1328,15 +1152,21 @@
                 } else {
                     activeDiv.classList.add("hidden");
                     availableDiv.classList.remove("hidden");
-                    const progRes = await fetch(API_BASE + '/api/training-programs');
-                    let programs = await progRes.json();
+                    
+                    if (!globalTrainingPrograms.length) {
+                        const progRes = await fetch(API_BASE + '/api/training-programs');
+                        globalTrainingPrograms = await progRes.json();
+                    }
 
-                    programs = programs.filter(function(prog) {
+                    let filtered = globalTrainingPrograms.filter(function(prog) {
                         const isGKProg = prog.position_focus === "GK";
                         return isGK ? isGKProg : !isGKProg;
                     });
 
-                    listDiv.innerHTML = programs.map(function(prog) {
+                    // Берем 5 случайных
+                    filtered = filtered.sort(() => 0.5 - Math.random()).slice(0, 5);
+
+                    listDiv.innerHTML = filtered.map(function(prog) {
                         const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) {
                             return '+' + prog.stat_boosts[k] + ' ' + (STAT_NAMES[k] || k);
                         }).join(", ");
@@ -1394,6 +1224,8 @@
                     .then(data => {
                         if (data.coach_name) $("inp-account-coach-name").value = data.coach_name;
                     });
+            } else if (tabId === 'center') {
+                loadCompetitions();
             }
             window.scrollTo(0, 0);
         }
@@ -1408,6 +1240,57 @@
         window.handleImgError = handleImgError;
         window.onSlotClick = onSlotClick;
         window.onBenchPlayerClick = onBenchPlayerClick;
+
+        // === СПОРТЦЕНТР ===
+        async function loadCompetitions() {
+            $("center-club-name").innerText = currentClubName;
+            $("center-club-continent").innerText = currentContinent;
+            
+            const tbody = $("competitions-list");
+            tbody.innerHTML = "<tr><td colspan='2'>Загрузка...</td></tr>";
+            
+            // Имитация списка турниров для клуба
+            const tournaments = [
+                { name: currentLeague, continent: currentContinent },
+                { name: "Национальный Кубок", continent: currentContinent },
+                { name: "Национальный Суперкубок", continent: currentContinent },
+                { name: "UEFA Champions League", continent: "UEFA" },
+                { name: "UEFA Europa League", continent: "UEFA" },
+                { name: "UEFA Conference League", continent: "UEFA" },
+                { name: "UEFA Super Cup", continent: "UEFA" },
+                { name: "FIFA Intercontinental Cup", continent: "World" },
+                { name: "FIFA Club World Cup", continent: "World" }
+            ];
+
+            // Фильтруем по континенту клуба (если клуб не из Европы, убираем еврокубки)
+            let filtered = tournaments.filter(t => {
+                if (t.continent === "World") return true;
+                if (t.continent === currentContinent) return true;
+                if (currentContinent === "UEFA" && t.continent === "UEFA") return true;
+                // Если клуб из КОНМЕБОЛ, добавляем Либертадорес
+                if (currentContinent === "CONMEBOL" && t.name === "UEFA Champions League") return false; // Убираем ЛЧ
+                return false;
+            });
+
+            if (currentContinent === "CONMEBOL") {
+                filtered.push({ name: "CONMEBOL Libertadores", continent: "CONMEBOL" });
+                filtered.push({ name: "CONMEBOL Sudamericana", continent: "CONMEBOL" });
+            }
+
+            // Сортируем: сначала внутренние, потом континентальные, потом мировые
+            filtered.sort((a, b) => {
+                if (a.continent === currentContinent && b.continent !== currentContinent) return -1;
+                if (b.continent === currentContinent && a.continent !== currentContinent) return 1;
+                return 0;
+            });
+
+            tbody.innerHTML = filtered.map(t => `
+                <tr>
+                    <td>${t.name}</td>
+                    <td><span class="continent-badge continent-${t.continent}">${t.continent}</span></td>
+                </tr>
+            `).join("");
+        }
 
         // === МОДАЛ ===
         $("modal-btn-stay").onclick = function() {
@@ -1682,6 +1565,7 @@
         let tacticsState = {
             formation: "4-3-3 (Линия)",
             starting_xi: [],
+            bench: [],
             captain_id: null,
             free_kick_taker_id: null,
             corner_taker_id: null,
@@ -1690,6 +1574,7 @@
         let tacticsLoaded = false;
         let selectedSlotIndex = null;
         let selectedBenchPlayerId = null;
+        let benchTargetSize = 7; // 5-9
 
         function getPlayerById(id) {
             if (!window.currentPlayers) return null;
@@ -1729,32 +1614,20 @@
         };
 
         const POSITION_PENALTY = {
-            "CM->CDM": 4, "CM->CAM": 4, "CM->LM": 6, "CM->RM": 6,
-            "CM->CB": 10, "CM->LB": 11, "CM->RB": 11, "CM->ST": 8,
-            "CM->LW": 9, "CM->RW": 9, "CM->GK": 45,
-            "CDM->CM": 3, "CDM->CAM": 6, "CDM->CB": 7, "CDM->LB": 8,
-            "CDM->RB": 8, "CDM->LM": 8, "CDM->RM": 8, "CDM->ST": 12, "CDM->GK": 45,
-            "CAM->CM": 3, "CAM->CDM": 6, "CAM->ST": 5, "CAM->LW": 6,
-            "CAM->RW": 6, "CAM->LM": 7, "CAM->RM": 7, "CAM->CB": 15, "CAM->GK": 45,
-            "ST->CF": 1, "ST->CAM": 7, "ST->LW": 5, "ST->RW": 5,
-            "ST->CM": 10, "ST->CDM": 14, "ST->CB": 18, "ST->GK": 48,
-            "LW->LM": 3, "LW->RW": 2, "LW->ST": 5, "LW->CAM": 6,
-            "LW->CM": 9, "LW->LB": 7, "LW->RB": 12, "LW->CB": 15, "LW->GK": 47,
-            "RW->RM": 3, "RW->LW": 2, "RW->ST": 5, "RW->CAM": 6,
-            "RW->CM": 9, "RW->RB": 7, "RW->LB": 12, "RW->CB": 15, "RW->GK": 47,
-            "CB->CDM": 7, "CB->LB": 4, "CB->RB": 4, "CB->CM": 12,
-            "CB->CAM": 16, "CB->ST": 20, "CB->GK": 40,
-            "LB->LWB": 2, "LB->CB": 4, "LB->RB": 5, "LB->LM": 4,
-            "LB->CM": 11, "LB->CDM": 9, "LB->CAM": 15, "LB->ST": 20, "LB->GK": 45,
-            "RB->RWB": 2, "RB->CB": 4, "RB->LB": 5, "RB->RM": 4,
-            "RB->CM": 11, "RB->CDM": 9, "RB->CAM": 15, "RB->ST": 20, "RB->GK": 45,
+            "CM->CDM": 4, "CM->CAM": 4, "CM->LM": 6, "CM->RM": 6, "CM->CB": 10, "CM->LB": 11, "CM->RB": 11, "CM->ST": 8, "CM->LW": 9, "CM->RW": 9, "CM->GK": 45,
+            "CDM->CM": 3, "CDM->CAM": 6, "CDM->CB": 7, "CDM->LB": 8, "CDM->RB": 8, "CDM->LM": 8, "CDM->RM": 8, "CDM->ST": 12, "CDM->GK": 45,
+            "CAM->CM": 3, "CAM->CDM": 6, "CAM->ST": 5, "CAM->LW": 6, "CAM->RW": 6, "CAM->LM": 7, "CAM->RM": 7, "CAM->CB": 15, "CAM->GK": 45,
+            "ST->CF": 1, "ST->CAM": 7, "ST->LW": 5, "ST->RW": 5, "ST->CM": 10, "ST->CDM": 14, "ST->CB": 18, "ST->GK": 48,
+            "LW->LM": 3, "LW->RW": 2, "LW->ST": 5, "LW->CAM": 6, "LW->CM": 9, "LW->LB": 7, "LW->RB": 12, "LW->CB": 15, "LW->GK": 47,
+            "RW->RM": 3, "RW->LW": 2, "RW->ST": 5, "RW->CAM": 6, "RW->CM": 9, "RW->RB": 7, "RW->LB": 12, "RW->CB": 15, "RW->GK": 47,
+            "CB->CDM": 7, "CB->LB": 4, "CB->RB": 4, "CB->CM": 12, "CB->CAM": 16, "CB->ST": 20, "CB->GK": 40,
+            "LB->LWB": 2, "LB->CB": 4, "LB->RB": 5, "LB->LM": 4, "LB->CM": 11, "LB->CDM": 9, "LB->CAM": 15, "LB->ST": 20, "LB->GK": 45,
+            "RB->RWB": 2, "RB->CB": 4, "RB->LB": 5, "RB->RM": 4, "RB->CM": 11, "RB->CDM": 9, "RB->CAM": 15, "RB->ST": 20, "RB->GK": 45,
             "GK->CB": 40, "GK->CM": 45, "GK->ST": 48,
             "LWB->LB": 2, "LWB->LM": 3, "LWB->CB": 5,
             "RWB->RB": 2, "RWB->RM": 3, "RWB->CB": 5,
-            "LM->LW": 3, "LM->CM": 5, "LM->CAM": 6, "LM->LB": 4,
-            "LM->CDM": 9, "LM->ST": 9, "LM->CB": 14, "LM->GK": 45,
-            "RM->RW": 3, "RM->CM": 5, "RM->CAM": 6, "RM->RB": 4,
-            "RM->CDM": 9, "RM->ST": 9, "RM->CB": 14, "RM->GK": 45
+            "LM->LW": 3, "LM->CM": 5, "LM->CAM": 6, "LM->LB": 4, "LM->CDM": 9, "LM->ST": 9, "LM->CB": 14, "LM->GK": 45,
+            "RM->RW": 3, "RM->CM": 5, "RM->CAM": 6, "RM->RB": 4, "RM->CDM": 9, "RM->ST": 9, "RM->CB": 14, "RM->GK": 45
         };
 
         const GROUP_PENALTY = {
@@ -1892,6 +1765,7 @@
                     if (res.ok) data = await res.json();
                     tacticsState.formation = data.formation || "4-3-3 (Линия)";
                     tacticsState.starting_xi = Array.isArray(data.starting_xi) ? data.starting_xi : [];
+                    tacticsState.bench = Array.isArray(data.bench) ? data.bench : [];
                     tacticsState.captain_id = data.captain_id || null;
                     tacticsState.free_kick_taker_id = data.free_kick_taker_id || null;
                     tacticsState.corner_taker_id = data.corner_taker_id || null;
@@ -1908,6 +1782,16 @@
                     const needed = FORMATIONS[tacticsState.formation].length;
                     while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
                     while (tacticsState.starting_xi.length > needed) tacticsState.starting_xi.pop();
+
+                    // Инициализация запаса, если пусто
+                    if (tacticsState.bench.length === 0) {
+                        const allInXI = new Set(tacticsState.starting_xi.filter(x => x != null));
+                        const rest = players.filter(p => !allInXI.has(p.id));
+                        tacticsState.bench = rest.slice(0, 7).map(p => p.id);
+                    }
+                    benchTargetSize = tacticsState.bench.length;
+                    if (benchTargetSize < 5) benchTargetSize = 5;
+                    if (benchTargetSize > 9) benchTargetSize = 9;
 
                     tacticsLoaded = true;
                 }
@@ -1974,9 +1858,18 @@
 
         function renderBench() {
             const benchList = $("bench-list");
+            const reserveList = $("reserve-list");
+            
             const xiSet = new Set(tacticsState.starting_xi.filter(function(x) { return x != null; }));
+            const benchSet = new Set(tacticsState.bench.filter(function(x) { return x != null; }));
+            
             const all = window.currentPlayers || [];
-            const bench = all.filter(function(p) { return !xiSet.has(p.id); });
+            
+            // Собираем тех, кто на лавке
+            const benchPlayers = tacticsState.bench.map(id => getPlayerById(id)).filter(Boolean);
+            
+            // Резерв — все, кто не в основе и не в запасе
+            const reserve = all.filter(function(p) { return !xiSet.has(p.id) && !benchSet.has(p.id); });
 
             function getFamilyOrder(pos) {
                 const p = (pos || "").toLowerCase();
@@ -1985,17 +1878,26 @@
                 if (p.indexOf("mid") >= 0 || p === "cm" || p === "cdm" || p === "cam" || p === "lm" || p === "rm") return 3;
                 return 4;
             }
-            bench.sort(function(a, b) {
+            reserve.sort(function(a, b) {
                 const fa = getFamilyOrder(a.position), fb = getFamilyOrder(b.position);
                 if (fa !== fb) return fa - fb;
                 return b.overall - a.overall;
             });
 
-            $("bench-count").innerText = bench.length + " чел.";
-            benchList.innerHTML = bench.map(function(p) {
+            $("bench-count").innerText = benchPlayers.length + " чел.";
+            benchList.innerHTML = benchPlayers.map(function(p) {
                 const isSel = selectedBenchPlayerId === p.id;
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
                 return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onBenchPlayerClick(' + p.id + ')">' +
+                    '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
+                    '<div class="bench-name">' + p.name + '</div>' +
+                    '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
+                    '</div>';
+            }).join("");
+
+            reserveList.innerHTML = reserve.map(function(p) {
+                const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
+                return '<div class="bench-card" onclick="onReservePlayerClick(' + p.id + ')">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
                     '<div class="bench-name">' + p.name + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
@@ -2089,6 +1991,22 @@
             renderTactics();
         }
 
+        function onReservePlayerClick(playerId) {
+            // Автоматически добавляем в запас, если есть место
+            if (tacticsState.bench.length >= benchTargetSize) {
+                tg.showAlert("Скамейка заполнена (максимум " + benchTargetSize + "). Сначала уберите кого-то в резерв.");
+                return;
+            }
+            tacticsState.bench.push(playerId);
+            // Убираем из основы, если вдруг был
+            const xiIdx = tacticsState.starting_xi.indexOf(playerId);
+            if (xiIdx >= 0) tacticsState.starting_xi[xiIdx] = null;
+            markDirty();
+            renderTactics();
+        }
+
+        window.onReservePlayerClick = onReservePlayerClick;
+
         function placeBenchPlayerIntoSlot(benchPlayerId, slotIdx) {
             const existingIdx = tacticsState.starting_xi.indexOf(benchPlayerId);
             if (existingIdx >= 0 && existingIdx !== slotIdx) {
@@ -2097,8 +2015,42 @@
                 tacticsState.starting_xi[existingIdx] = tmp;
                 return;
             }
+            // Игрок с лавки — просто кладём в слот, удаляя из лавки
+            const benchIdx = tacticsState.bench.indexOf(benchPlayerId);
+            if (benchIdx >= 0) tacticsState.bench.splice(benchIdx, 1);
+            // Если в слоте кто-то был — отправляем на лавку
+            if (tacticsState.starting_xi[slotIdx] != null) {
+                tacticsState.bench.push(tacticsState.starting_xi[slotIdx]);
+            }
             tacticsState.starting_xi[slotIdx] = benchPlayerId;
         }
+
+        function adjustBench(delta) {
+            const newSize = benchTargetSize + delta;
+            if (newSize < 5) { tg.showAlert("В заявке должно быть минимум 5 игроков в запасе."); return; }
+            if (newSize > 9) { tg.showAlert("Максимум 9 игроков в запасе."); return; }
+            
+            benchTargetSize = newSize;
+            
+            // Если уменьшаем — лишних в резерв
+            while (tacticsState.bench.length > benchTargetSize) {
+                tacticsState.bench.pop();
+            }
+            // Если увеличиваем — добираем из резерва
+            if (tacticsState.bench.length < benchTargetSize) {
+                const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
+                const benchSet = new Set(tacticsState.bench);
+                const reserve = (window.currentPlayers || []).filter(p => !xiSet.has(p.id) && !benchSet.has(p.id));
+                reserve.sort((a,b) => b.overall - a.overall);
+                for (const p of reserve) {
+                    if (tacticsState.bench.length >= benchTargetSize) break;
+                    tacticsState.bench.push(p.id);
+                }
+            }
+            markDirty();
+            renderTactics();
+        }
+        window.adjustBench = adjustBench;
 
         $("formation-select").onchange = function(e) {
             tacticsState.formation = e.target.value;
@@ -2122,11 +2074,18 @@
 
         $("btn-reset-tactics").onclick = function() {
             tacticsState.starting_xi = [];
+            tacticsState.bench = [];
             tacticsState.captain_id = null;
             tacticsState.free_kick_taker_id = null;
             tacticsState.corner_taker_id = null;
             tacticsState.penalty_taker_id = null;
             autoAssignStartingXI(window.currentPlayers || []);
+            
+            // Заполняем запас
+            const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
+            const rest = (window.currentPlayers || []).filter(p => !xiSet.has(p.id));
+            tacticsState.bench = rest.slice(0, benchTargetSize).map(p => p.id);
+
             selectedSlotIndex = null;
             selectedBenchPlayerId = null;
             markDirty();
@@ -2160,6 +2119,7 @@
                         telegram_id: userId,
                         formation: tacticsState.formation,
                         starting_xi: tacticsState.starting_xi,
+                        bench: tacticsState.bench,
                         captain_id: tacticsState.captain_id,
                         free_kick_taker_id: tacticsState.free_kick_taker_id,
                         corner_taker_id: tacticsState.corner_taker_id,
@@ -2252,9 +2212,8 @@
             });
         };
 
-        // === АВТО-ВХОД ===
         async function initApp() {
-            const hasClub = await checkManager(true); // true = не показывать экран подтверждения
+            const hasClub = await checkManager(true);
             if (hasClub && managerSetupComplete) {
                 $("bottom-nav").classList.remove("hidden");
                 loadSquad();
