@@ -16,7 +16,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from sqlalchemy import (
-    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float, inspect, text
+    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float, text
 )
 from sqlalchemy.orm import declarative_base, Session
 
@@ -68,9 +68,8 @@ class Player(Base):
     gk_positioning = Column(Integer)
     gk_reflexes = Column(Integer)
 
-    # === НОВЫЕ ПОЛЯ ===
     alt_positions = Column(String, default="[]")
-    training_program_id = Column(Integer, ForeignKey("training_programs.id"), nullable=True)
+    training_program_id = Column(Integer, nullable=True) # Убрали жесткую связь FK для простоты миграции
     training_started_at = Column(DateTime, nullable=True)
 
 
@@ -111,76 +110,56 @@ class TrainingProgram(Base):
     position_focus = Column(String, nullable=True)
     stat_boosts = Column(String, default="{}")
     ovr_boost = Column(Integer, default=0)
+    is_goalkeeper = Column(Integer, default=0) # <--- ДОБАВЛЕНО, чтобы соответствовать БД
 
 
 Base.metadata.create_all(bind=engine)
 
-# === АВТОМИГРАЦИЯ БАЗЫ ДАННЫХ ===
-def run_migrations():
-    inspector = inspect(engine)
-    if 'players' in inspector.get_table_names():
-        columns = [c['name'] for c in inspector.get_columns('players')]
-        with engine.begin() as conn:
-            if 'alt_positions' not in columns:
-                try:
-                    conn.execute(text("ALTER TABLE players ADD COLUMN alt_positions VARCHAR DEFAULT '[]'"))
-                    print("Migrated: added alt_positions")
-                except Exception as e:
-                    print("Migration failed (alt_positions):", e)
-            if 'training_program_id' not in columns:
-                try:
-                    conn.execute(text("ALTER TABLE players ADD COLUMN training_program_id INTEGER"))
-                    print("Migrated: added training_program_id")
-                except Exception as e:
-                    print("Migration failed (training_program_id):", e)
-            if 'training_started_at' not in columns:
-                try:
-                    conn.execute(text("ALTER TABLE players ADD COLUMN training_started_at TIMESTAMP"))
-                    print("Migrated: added training_started_at")
-                except Exception as e:
-                    print("Migration failed (training_started_at):", e)
+# --- АВТОМАТИЧЕСКАЯ МИГРАЦИЯ БД ---
+# Добавляем новые колонки в существующие таблицы, если их нет
+with engine.begin() as conn:
+    try:
+        conn.execute(text("ALTER TABLE training_programs ADD COLUMN IF NOT EXISTS is_goalkeeper INTEGER DEFAULT 0"))
+    except Exception as e: print("Migration is_goalkeeper:", e)
+    try:
+        conn.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS alt_positions VARCHAR DEFAULT '[]'"))
+    except Exception as e: print("Migration alt_positions:", e)
+    try:
+        conn.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS training_program_id INTEGER"))
+    except Exception as e: print("Migration training_program_id:", e)
+    try:
+        conn.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS training_started_at TIMESTAMP"))
+    except Exception as e: print("Migration training_started_at:", e)
 
-run_migrations()
 
-# === Инициализация программ тренировок ===
 def seed_training_programs():
     db = Session(engine)
     try:
         if db.query(TrainingProgram).count() == 0:
             programs = [
-                TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +2 к скорости.",
-                                duration_weeks=2, stat_boosts=json.dumps({"pace": 2})),
-                TrainingProgram(name="Ударная техника", description="Отработка ударов. +2 к удару.",
-                                duration_weeks=3, stat_boosts=json.dumps({"shooting": 2})),
-                TrainingProgram(name="Пас в движении", description="Быстрые комбинации. +2 к пасу.",
-                                duration_weeks=3, stat_boosts=json.dumps({"passing": 2})),
-                TrainingProgram(name="Дриблинг 1-в-1", description="Обводка и контроль мяча. +2 к дриблингу.",
-                                duration_weeks=4, stat_boosts=json.dumps({"dribbling": 2})),
-                TrainingProgram(name="Оборонительная стойка", description="Отбор и позиционная игра. +2 к защите.",
-                                duration_weeks=4, stat_boosts=json.dumps({"defending": 2})),
-                TrainingProgram(name="Физическая мощь", description="Работа в зале. +2 к физике.",
-                                duration_weeks=4, stat_boosts=json.dumps({"physicality": 2})),
-                TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. +3 к OVR.",
-                                duration_weeks=12, ovr_boost=3, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
-                TrainingProgram(name="Освоение новой позиции (лёгкая)", description="Открывает смежную позицию.",
-                                duration_weeks=16, position_focus="adjacent"),
-                TrainingProgram(name="Освоение новой позиции (сложная)", description="Открывает дальнюю позицию.",
-                                duration_weeks=32, position_focus="far"),
-                TrainingProgram(name="Фундаментальная переподготовка", description="Смена амплуа. Открывает любую позицию.",
-                                duration_weeks=80, position_focus="any"),
-                TrainingProgram(name="Воспитание лидера", description="Капитанские качества. +5 к OVR, +2 пас, +2 физика.",
-                                duration_weeks=52, ovr_boost=5, stat_boosts=json.dumps({"passing": 2, "physicality": 2})),
+                TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +2 к скорости.", duration_weeks=2, stat_boosts=json.dumps({"pace": 2})),
+                TrainingProgram(name="Ударная техника", description="Отработка ударов. +2 к удару.", duration_weeks=3, stat_boosts=json.dumps({"shooting": 2})),
+                TrainingProgram(name="Пас в движении", description="Быстрые комбинации. +2 к пасу.", duration_weeks=3, stat_boosts=json.dumps({"passing": 2})),
+                TrainingProgram(name="Дриблинг 1-в-1", description="Обводка и контроль мяча. +2 к дриблингу.", duration_weeks=4, stat_boosts=json.dumps({"dribbling": 2})),
+                TrainingProgram(name="Оборонительная стойка", description="Отбор и позиционная игра. +2 к защите.", duration_weeks=4, stat_boosts=json.dumps({"defending": 2})),
+                TrainingProgram(name="Физическая мощь", description="Работа в зале. +2 к физике.", duration_weeks=4, stat_boosts=json.dumps({"physicality": 2})),
+                TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. +3 к OVR.", duration_weeks=12, ovr_boost=3, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
+                TrainingProgram(name="Освоение новой позиции (лёгкая)", description="Открывает смежную позицию.", duration_weeks=16, position_focus="adjacent"),
+                TrainingProgram(name="Освоение новой позиции (сложная)", description="Открывает дальнюю позицию.", duration_weeks=32, position_focus="far"),
+                TrainingProgram(name="Фундаментальная переподготовка", description="Смена амплуа. Открывает любую позицию.", duration_weeks=80, position_focus="any"),
+                TrainingProgram(name="Воспитание лидера", description="Капитанские качества. +5 к OVR, +2 пас, +2 физика.", duration_weeks=52, ovr_boost=5, stat_boosts=json.dumps({"passing": 2, "physicality": 2})),
             ]
             for p in programs:
                 db.add(p)
             db.commit()
+    except Exception as e:
+        print("Ошибка инициализации тренировок:", e)
     finally:
         db.close()
 
 seed_training_programs()
 
 
-# === Штрафы за позицию ===
 POSITION_GROUPS = {
     "GK": ["GK"],
     "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
@@ -310,18 +289,10 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
                 alts.append(random.choice(candidates))
         else:
             adjacent_map = {
-                "CM": ["CDM", "CAM", "LM", "RM"],
-                "CDM": ["CM", "CB"],
-                "CAM": ["CM", "ST", "LW", "RW"],
-                "ST": ["CF", "CAM", "LW", "RW"],
-                "LW": ["LM", "ST", "RW"],
-                "RW": ["RM", "ST", "LW"],
-                "CB": ["CDM", "LB", "RB"],
-                "LB": ["LWB", "CB", "LM"],
-                "RB": ["RWB", "CB", "RM"],
-                "LM": ["LW", "CM", "LB"],
-                "RM": ["RW", "CM", "RB"],
-                "GK": [],
+                "CM": ["CDM", "CAM", "LM", "RM"], "CDM": ["CM", "CB"], "CAM": ["CM", "ST", "LW", "RW"],
+                "ST": ["CF", "CAM", "LW", "RW"], "LW": ["LM", "ST", "RW"], "RW": ["RM", "ST", "LW"],
+                "CB": ["CDM", "LB", "RB"], "LB": ["LWB", "CB", "LM"], "RB": ["RWB", "CB", "RM"],
+                "LM": ["LW", "CM", "LB"], "RM": ["RW", "CM", "RB"], "GK": [],
             }
             candidates = [p for p in adjacent_map.get(native, []) if p not in alts]
             if candidates:
@@ -360,11 +331,7 @@ def get_clubs():
     db = Session(engine)
     try:
         rows = (
-            db.query(
-                Club.id, Club.name, Club.league, Club.stars,
-                func.count(Player.id).label("players"),
-                func.avg(Player.overall_rating).label("avg_ovr"),
-            )
+            db.query(Club.id, Club.name, Club.league, Club.stars, func.count(Player.id).label("players"), func.avg(Player.overall_rating).label("avg_ovr"))
             .outerjoin(Player, Player.club_id == Club.id)
             .group_by(Club.id)
             .order_by(Club.league, Club.name)
@@ -478,10 +445,8 @@ def get_club_players(club_id: int):
             result.append({
                 "id": p.id, "name": p.name, "position": p.position, "age": p.age,
                 "overall": p.overall_rating, "nationality": p.nationality,
-                "market_value": p.market_value or 0,
-                "wage": p.wage or 0,
-                "contract_until": p.contract_until,
-                "alt_positions": alts,
+                "market_value": p.market_value or 0, "wage": p.wage or 0,
+                "contract_until": p.contract_until, "alt_positions": alts,
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
                 "dribbling": p.dribbling or 50, "defending": p.defending or 50, "physicality": p.physicality or 50,
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10,
@@ -501,10 +466,8 @@ def get_training_programs():
         return [
             {
                 "id": p.id, "name": p.name, "description": p.description,
-                "duration_weeks": p.duration_weeks,
-                "position_focus": p.position_focus,
-                "stat_boosts": json.loads(p.stat_boosts or "{}"),
-                "ovr_boost": p.ovr_boost,
+                "duration_weeks": p.duration_weeks, "position_focus": p.position_focus,
+                "stat_boosts": json.loads(p.stat_boosts or "{}"), "ovr_boost": p.ovr_boost,
             }
             for p in programs
         ]
@@ -522,22 +485,14 @@ def start_training(req: StartTrainingRequest):
     db = Session(engine)
     try:
         player = db.query(Player).filter_by(id=req.player_id).first()
-        if not player:
-            raise HTTPException(status_code=404, detail="Игрок не найден")
-        if player.training_program_id:
-            raise HTTPException(status_code=400, detail="Игрок уже на тренировке")
+        if not player: raise HTTPException(status_code=404, detail="Игрок не найден")
+        if player.training_program_id: raise HTTPException(status_code=400, detail="Игрок уже на тренировке")
         prog = db.query(TrainingProgram).filter_by(id=req.program_id).first()
-        if not prog:
-            raise HTTPException(status_code=404, detail="Программа не найдена")
+        if not prog: raise HTTPException(status_code=404, detail="Программа не найдена")
         player.training_program_id = prog.id
         player.training_started_at = datetime.utcnow()
         db.commit()
-        end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
-        return {
-            "status": "ok",
-            "program_name": prog.name,
-            "end_date": end_date.isoformat(),
-        }
+        return {"status": "ok", "program_name": prog.name}
     finally:
         db.close()
 
@@ -547,22 +502,15 @@ def training_status(player_id: int):
     db = Session(engine)
     try:
         player = db.query(Player).filter_by(id=player_id).first()
-        if not player:
-            raise HTTPException(status_code=404, detail="Игрок не найден")
+        if not player: raise HTTPException(status_code=404, detail="Игрок не найден")
         apply_training_if_done(player, db)
         if not player.training_program_id:
             return {"active": False}
         prog = db.query(TrainingProgram).filter_by(id=player.training_program_id).first()
-        if not prog:
-            return {"active": False}
+        if not prog: return {"active": False}
         end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
         weeks_left = max(0, (end_date - datetime.utcnow()).days // 7)
-        return {
-            "active": True,
-            "program_name": prog.name,
-            "weeks_left": weeks_left,
-            "end_date": end_date.isoformat(),
-        }
+        return {"active": True, "program_name": prog.name, "weeks_left": weeks_left}
     finally:
         db.close()
 
@@ -572,29 +520,16 @@ def get_tactics(telegram_id: str):
     db = Session(engine)
     try:
         m = db.query(Manager).filter_by(telegram_id=telegram_id).first()
-        if not m:
-            raise HTTPException(status_code=404, detail="Менеджер не найден")
+        if not m: raise HTTPException(status_code=404, detail="Менеджер не найден")
         t = db.query(Tactic).filter_by(manager_id=m.id).first()
         if not t:
-            return {
-                "formation": "4-3-3 (Линия)",
-                "starting_xi": [],
-                "captain_id": None,
-                "free_kick_taker_id": None,
-                "corner_taker_id": None,
-                "penalty_taker_id": None,
-            }
-        try:
-            xi = json.loads(t.starting_xi or "[]")
-        except Exception:
-            xi = []
+            return {"formation": "4-3-3 (Линия)", "starting_xi": [], "captain_id": None, "free_kick_taker_id": None, "corner_taker_id": None, "penalty_taker_id": None}
+        try: xi = json.loads(t.starting_xi or "[]")
+        except: xi = []
         return {
-            "formation": t.formation or "4-3-3 (Линия)",
-            "starting_xi": xi,
-            "captain_id": t.captain_id,
-            "free_kick_taker_id": t.free_kick_taker_id,
-            "corner_taker_id": t.corner_taker_id,
-            "penalty_taker_id": t.penalty_taker_id,
+            "formation": t.formation or "4-3-3 (Линия)", "starting_xi": xi,
+            "captain_id": t.captain_id, "free_kick_taker_id": t.free_kick_taker_id,
+            "corner_taker_id": t.corner_taker_id, "penalty_taker_id": t.penalty_taker_id,
         }
     finally:
         db.close()
@@ -615,8 +550,7 @@ def save_tactics(req: SaveTacticsRequest):
     db = Session(engine)
     try:
         m = db.query(Manager).filter_by(telegram_id=req.telegram_id).first()
-        if not m:
-            raise HTTPException(status_code=404, detail="Менеджер не найден")
+        if not m: raise HTTPException(status_code=404, detail="Менеджер не найден")
         t = db.query(Tactic).filter_by(manager_id=m.id).first()
         if not t:
             t = Tactic(manager_id=m.id)
@@ -633,7 +567,6 @@ def save_tactics(req: SaveTacticsRequest):
         db.close()
 
 
-# --- TELEGRAM БОТ ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
