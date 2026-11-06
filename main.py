@@ -10,14 +10,14 @@ from typing import Optional, List
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from sqlalchemy import (
-    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float
+    create_engine, Column, Integer, String, ForeignKey, DateTime, func, Float, text
 )
 from sqlalchemy.orm import declarative_base, Session
 
@@ -119,9 +119,28 @@ Base.metadata.create_all(bind=engine)
 def seed_training_programs():
     db = Session(engine)
     try:
+        # 1. Принудительно срезаем все OVR-бусты до 1
+        db.query(TrainingProgram).filter(TrainingProgram.ovr_boost > 1).update({TrainingProgram.ovr_boost: 1})
+        
+        # 2. Проверяем наличие вратарских тренировок
+        gk_count = db.query(TrainingProgram).filter(TrainingProgram.position_focus == "GK").count()
+        if gk_count == 0:
+            gk_progs = [
+                TrainingProgram(name="Вратарская реакция", description="Отработка реакции и прыгучести. +1 к реакции (REF), +1 к прыжку (DIV).",
+                                duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
+                TrainingProgram(name="Игра на выходах", description="Чтение игры и позиционирование. +1 к позиции (POS), +1 к хватке (HAN).",
+                                duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
+                TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции (REF).",
+                                duration_weeks=2, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1})),
+                TrainingProgram(name="Пенальти и стандарты", description="Спецподготовка к сериям пенальти. +1 к позиции (POS), +1 к реакции (REF).",
+                                duration_weeks=5, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_reflexes": 1})),
+            ]
+            for p in gk_progs:
+                db.add(p)
+        
+        # 3. Инициализация базовых тренировок, если таблица пуста
         if db.query(TrainingProgram).count() == 0:
             programs = [
-                # Полевые — быстрые
                 TrainingProgram(name="Скоростная работа", description="Спринты и ускорения. +1 к скорости.",
                                 duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
                 TrainingProgram(name="Ударная техника", description="Отработка ударов. +1 к удару.",
@@ -134,7 +153,6 @@ def seed_training_programs():
                                 duration_weeks=4, stat_boosts=json.dumps({"defending": 1})),
                 TrainingProgram(name="Физическая мощь", description="Работа в зале. +1 к физике.",
                                 duration_weeks=4, stat_boosts=json.dumps({"physicality": 1})),
-                # Полевые — средние
                 TrainingProgram(name="Комплексная работа", description="Всестороннее развитие. Шанс +1 к OVR.",
                                 duration_weeks=12, ovr_boost=1, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
                 TrainingProgram(name="Освоение новой позиции (лёгкая)", description="Открывает смежную позицию.",
@@ -145,24 +163,10 @@ def seed_training_programs():
                                 duration_weeks=80, position_focus="any"),
                 TrainingProgram(name="Воспитание лидера", description="Капитанские качества. Шанс +1 к OVR, +1 пас, +1 физика.",
                                 duration_weeks=52, ovr_boost=1, stat_boosts=json.dumps({"passing": 1, "physicality": 1})),
-
-                # === НОВЫЕ: ВРАТАРСКИЕ ТРЕНИРОВКИ ===
-                TrainingProgram(name="Вратарская реакция", description="Отработка реакции и прыгучести. +1 к реакции (REF), +1 к прыжку (DIV).",
-                                duration_weeks=3, position_focus="GK",
-                                stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
-                TrainingProgram(name="Игра на выходах", description="Чтение игры и позиционирование. +1 к позиции (POS), +1 к хватке (HAN).",
-                                duration_weeks=4, position_focus="GK",
-                                stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
-                TrainingProgram(name="Удары с дистанции", description="Парирование дальних ударов. +1 к реакции (REF).",
-                                duration_weeks=2, position_focus="GK",
-                                stat_boosts=json.dumps({"gk_reflexes": 1})),
-                TrainingProgram(name="Пенальти и стандарты", description="Спецподготовка к сериям пенальти. +1 к позиции (POS), +1 к реакции (REF).",
-                                duration_weeks=5, position_focus="GK",
-                                stat_boosts=json.dumps({"gk_positioning": 1, "gk_reflexes": 1})),
             ]
             for p in programs:
                 db.add(p)
-            db.commit()
+        db.commit()
     finally:
         db.close()
 
@@ -285,7 +289,7 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
                 if random.random() < 0.6:
                     setattr(player, stat, current + 1)
 
-    # Бонус к OVR (максимум +1, с шансом 35%)
+    # Бонус к OVR (ЖЕСТКО +1, с шансом 35%)
     if prog.ovr_boost and prog.ovr_boost > 0:
         if random.random() < 0.35:
             player.overall_rating = (player.overall_rating or 50) + 1
@@ -324,7 +328,6 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
             if candidates:
                 alts.append(random.choice(candidates))
         elif prog.position_focus == "GK":
-            # Вратарские тренировки не добавляют альтернативную позицию
             pass
         player.alt_positions = json.dumps(alts)
 
@@ -642,12 +645,11 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Кнопка "Open" как в популярных Mini Apps
     web_app_url = "https://soccery-27.onrender.com/app"
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Открыть Soccery 27", web_app=WebAppInfo(url=web_app_url))]
-        ]
+    # ReplyKeyboardMarkup создает именно ту синюю кнопку "Open" снизу
+    keyboard = types.ReplyKeyboardMarkup(
+        keyboard=[[types.KeyboardButton(text="🚀 Открыть Soccery 27", web_app=types.WebAppInfo(url=web_app_url))]],
+        resize_keyboard=True
     )
     await message.answer(
         "Добро пожаловать в Soccery 27!\nНажми кнопку ниже, чтобы начать карьеру.",
@@ -661,6 +663,16 @@ async def start_bot():
 
 @app.on_event("startup")
 async def on_startup():
+    # Фикс схемы БД (добавляем колонку, если таблица создалась в старой версии)
+    db = Session(engine)
+    try:
+        db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS formation VARCHAR DEFAULT '4-3-3 (Линия)';"))
+        db.commit()
+    except Exception as e:
+        print("Ошибка миграции тактик:", e)
+    finally:
+        db.close()
+
     asyncio.create_task(start_bot())
 
 
