@@ -125,103 +125,119 @@ Base.metadata.create_all(bind=engine)
 def init_db():
     db = Session(engine)
     try:
-        # Миграции
+        # Добавляем колонки, если их нет (миграции)
         db.execute(text("ALTER TABLE clubs ADD COLUMN IF NOT EXISTS continent VARCHAR DEFAULT 'UEFA';"))
         db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
         db.commit()
-        
-        # Континенты (упрощенно)
+
+        # ПОЛНАЯ ПЕРЕЗАПИСЬ ТУРНИРОВ (чтобы исправить старые баги)
+        db.execute(text("DROP TABLE IF EXISTS club_tournaments CASCADE;"))
+        db.execute(text("DROP TABLE IF EXISTS tournaments CASCADE;"))
+        db.commit()
+        Base.metadata.tables['tournaments'].create(bind=engine)
+        Base.metadata.tables['club_tournaments'].create(bind=engine)
+
+        # Назначаем континенты (если не назначены)
         for c in db.query(Club).all():
             l = (c.league or "").lower()
-            if "brazil" in l or "argentin" in l or "libertadores" in l: c.continent = "CONMEBOL"
+            if "brazil" in l or "argentin" in l: c.continent = "CONMEBOL"
             elif "mls" in l or "mexico" in l: c.continent = "CONCACAF"
             elif "saudi" in l or "japan" in l or "korea" in l or "australia" in l: c.continent = "AFC"
             else: c.continent = "UEFA"
         db.commit()
 
-        # Создаем базовые турниры, если их нет
-        if db.query(Tournament).count() == 0:
-            base_tournaments = [
-                # UEFA
-                {"name": "UEFA Champions League", "continent": "UEFA", "type": "Continental"},
-                {"name": "UEFA Europa League", "continent": "UEFA", "type": "Continental"},
-                {"name": "UEFA Conference League", "continent": "UEFA", "type": "Continental"},
-                {"name": "UEFA Super Cup", "continent": "UEFA", "type": "Continental"},
-                # World
-                {"name": "FIFA Intercontinental Cup", "continent": "World", "type": "World"},
-                {"name": "FIFA Club World Cup", "continent": "World", "type": "World"},
-                # CONMEBOL
-                {"name": "CONMEBOL Libertadores", "continent": "CONMEBOL", "type": "Continental"},
-                {"name": "CONMEBOL Sudamericana", "continent": "CONMEBOL", "type": "Continental"},
-            ]
-            for t in base_tournaments:
-                db.add(Tournament(**t))
-            db.commit()
-
-        # Автоматическая привязка турниров к клубам
-        tour_map = {t.name: t.id for t in db.query(Tournament).all()}
+        # 1. Создаем базовые турниры
+        tournaments_to_add = []
         
-        # 1. Создаем национальные чемпионаты и кубки для всех лиг
-        all_leagues = sorted(list(set(c.league for c in db.query(Club).all() if c.league)))
-        for league_name in all_leagues:
-            # Чемпионат
-            if league_name not in tour_map:
-                new_tour = Tournament(name=league_name, continent="Domestic", type="League")
-                db.add(new_tour)
-                db.commit()
-                tour_map[league_name] = new_tour.id
-            
-            # Кубок (упрощенное название)
-            cup_name = league_name + " Cup"
-            if cup_name not in tour_map:
-                new_cup = Tournament(name=cup_name, continent="Domestic", type="Cup")
-                db.add(new_cup)
-                db.commit()
-                tour_map[cup_name] = new_cup.id
+        # Континентальные
+        for c, t_list in [
+            ("UEFA", [("UEFA Champions League", "Continental"), ("UEFA Europa League", "Continental"), ("UEFA Conference League", "Continental")]),
+            ("CONMEBOL", [("CONMEBOL Libertadores", "Continental"), ("CONMEBOL Sudamericana", "Continental")]),
+            ("CONCACAF", [("CONCACAF Champions Cup", "Continental")]),
+            ("AFC", [("AFC Champions League Elite", "Continental")]),
+            ("World", [("FIFA Intercontinental Cup", "World"), ("FIFA Club World Cup", "World")])
+        ]:
+            for name, t_type in t_list:
+                tournaments_to_add.append(Tournament(name=name, continent=c, type=t_type))
 
-        # 2. Привязываем клубы к их чемпионатам и кубкам
-        if db.query(ClubTournament).count() == 0:
-            for club in db.query(Club).all():
-                league = club.league
-                if not league: continue
+        # Национальные лиги (уникальные)
+        unique_leagues = set(cl.league for cl in db.query(Club).all() if cl.league)
+        for l in unique_leagues:
+            tournaments_to_add.append(Tournament(name=l, continent="Domestic", type="League"))
 
-                # Добавляем в свою лигу
-                if league in tour_map:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[league]))
-                
-                # Добавляем в кубок
-                cup_name = league + " Cup"
-                if cup_name in tour_map:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[cup_name]))
+        # Национальные кубки (маппинг)
+        cup_map = {
+            "Premier League": ["FA Cup", "EFL Cup"],
+            "Championship": ["FA Cup", "EFL Cup"],
+            "LaLiga": ["Copa del Rey"],
+            "Bundesliga": ["DFB-Pokal"],
+            "2. Bundesliga": ["DFB-Pokal"],
+            "3. Liga": ["DFB-Pokal"],
+            "Serie A": ["Coppa Italia"],
+            "Ligue 1": ["Coupe de France"],
+            "Eredivisie": ["KNVB Cup"],
+            "Liga Portugal": ["Taça de Portugal"],
+            "Süper Lig": ["Türkiye Kupası"],
+        }
+        # Для лиг, которых нет в маппинге, создаем "Кубок [Название лиги]"
+        for l in unique_leagues:
+            if l not in cup_map:
+                cup_map[l] = [f"{l} Cup"]
 
-                # 3. Еврокубки (по континентам и силе клуба)
-                if club.continent == "UEFA":
-                    # Условно: если звезды >= 4.5, то ЛЧ; иначе ЛЕ/ЛК
-                    if club.stars >= 4.5:
-                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
-                    elif club.stars >= 3.5:
-                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
-                    else:
-                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+        for cups in cup_map.values():
+            for cup_name in cups:
+                if cup_name not in [t.name for t in tournaments_to_add]:
+                    tournaments_to_add.append(Tournament(name=cup_name, continent="Domestic", type="Cup"))
 
-                elif club.continent == "CONMEBOL":
-                    if club.stars >= 4.0:
-                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
-                    else:
-                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Sudamericana"]))
-            
-            db.commit()
+        for t in tournaments_to_add:
+            db.add(t)
+        db.commit()
 
-        # 4. Мировые турниры для топ-клубов
-        top_clubs = ["Paris Saint-Germain", "Real Madrid", "Bayern München", "Manchester City", "Chelsea", "Palmeiras", "Flamengo", "Al Hilal", "Inter Miami", "Boca Juniors", "Auckland City", "Al Ahly", "Mamelodi Sundowns"]
-        for club_name in top_clubs:
-            # Ищем по частичному совпадению, чтобы не зависеть от точного названия
-            club = db.query(Club).filter(Club.name.ilike(f"%{club_name}%")).first()
-            if club:
-                if "FIFA Intercontinental Cup" in tour_map:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Intercontinental Cup"]))
-                if "FIFA Club World Cup" in tour_map:
+        # Получаем ID всех турниров
+        tour_map = {t.name: t.id for t in db.query(Tournament).all()}
+
+        # 2. Привязываем клубы
+        for club in db.query(Club).all():
+            stars = club.stars or 2.0
+
+            # --- Национальные турниры ---
+            # Чемпионат (строго по названию лиги)
+            if club.league in tour_map:
+                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[club.league]))
+
+            # Кубок
+            cups_for_league = cup_map.get(club.league, [f"{club.league} Cup"])
+            for c_name in cups_for_league:
+                if c_name in tour_map:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c_name]))
+
+            # --- Континентальные турниры ---
+            if club.continent == "UEFA":
+                if stars >= 4.5:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
+                elif stars >= 3.5:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
+                else:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+            
+            elif club.continent == "CONMEBOL":
+                if stars >= 4.0:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
+                else:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Sudamericana"]))
+            
+            elif club.continent == "CONCACAF":
+                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONCACAF Champions Cup"]))
+                if stars >= 4.0:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
+            
+            elif club.continent == "AFC":
+                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["AFC Champions League Elite"]))
+                if stars >= 4.5:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
+
         db.commit()
 
     except Exception as e:
