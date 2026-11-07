@@ -615,9 +615,9 @@ class SelectClubRequest(BaseModel):
     club_id: int
 
 def generate_fixtures_for_club(club_id: int, db: Session):
-    db.query(Fixture).filter((Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)).delete()
-    db.commit()
-    
+    if db.query(Fixture).filter((Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)).count() > 0:
+        return
+        
     start_date = date(2026, 8, 20)
     end_date = date(2027, 5, 31)
     season_days = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
@@ -649,13 +649,20 @@ def generate_fixtures_for_club(club_id: int, db: Session):
                     h_id = club_id if is_home else opp.id
                     a_id = opp.id if is_home else club_id
                     
-                    db.add(Fixture(
-                        date=d.strftime("%Y-%m-%d"),
-                        tournament_id=t.id,
-                        home_club_id=h_id,
-                        away_club_id=a_id,
-                        is_played=0
-                    ))
+                    exists = db.query(Fixture).filter(
+                        Fixture.date == d.strftime("%Y-%m-%d"),
+                        ((Fixture.home_club_id == h_id) & (Fixture.away_club_id == a_id)) |
+                        ((Fixture.home_club_id == a_id) & (Fixture.away_club_id == h_id))
+                    ).first()
+                    
+                    if not exists:
+                        db.add(Fixture(
+                            date=d.strftime("%Y-%m-%d"),
+                            tournament_id=t.id,
+                            home_club_id=h_id,
+                            away_club_id=a_id,
+                            is_played=0
+                        ))
                     used_days.add(d)
                 break
     db.commit()
@@ -900,6 +907,7 @@ def get_schedule(year: int, month: int, club_id: int = None):
         
         fixtures = []
         if club_id:
+            generate_fixtures_for_club(club_id, db)
             fixtures = db.query(Fixture).filter(
                 Fixture.date >= start_str,
                 Fixture.date <= end_str,
@@ -1090,9 +1098,17 @@ def reset_game(req: dict):
     
     db = Session(engine)
     try:
-        # Сброс менеджеров, тактик, времени
-        db.query(Manager).delete()
+        db.query(MatchEvent).delete()
+        db.query(Fixture).delete()
         db.query(Tactic).delete()
+        db.query(Manager).delete()
+        
+        db.query(Player).update({
+            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+            Player.fitness: "green", Player.morale: "green"
+        }, synchronize_session=False)
+        
         state = db.query(GameState).first()
         if state: state.current_date = "2026-08-01"
         db.commit()
@@ -1275,9 +1291,45 @@ async def cmd_admin_month(message: types.Message):
         else:
             new_date = date(curr.year, curr.month, last_day)
             
+        unplayed = db.query(Fixture).filter(Fixture.date <= new_date.strftime("%Y-%m-%d"), Fixture.is_played == 0).all()
+        for fx in unplayed:
+            simulate_match(fx.id, db)
+            
         state.current_date = new_date.strftime("%Y-%m-%d")
         db.commit()
         await message.answer(f"⏩ Промотан месяц.\nТекущая дата: {state.current_date}")
+    db.close()
+
+@dp.message(Command("date"))
+async def cmd_admin_date(message: types.Message, command: CommandObject):
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
+        await message.answer("⛔ У вас нет прав для этой команды.")
+        return
+    if not command.args:
+        await message.answer("⚠️ Укажите дату в формате ГГГГ-ММ-ДД. Пример: /date 2026-09-15")
+        return
+    try:
+        new_date = datetime.strptime(command.args.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer("⚠️ Неверный формат даты. Используйте ГГГГ-ММ-ДД.")
+        return
+    
+    db = Session(engine)
+    state = db.query(GameState).first()
+    if state:
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        if new_date < curr:
+            await message.answer("⚠️ Нельзя промотать время назад.")
+            db.close()
+            return
+        
+        unplayed = db.query(Fixture).filter(Fixture.date <= new_date.strftime("%Y-%m-%d"), Fixture.is_played == 0).all()
+        for fx in unplayed:
+            simulate_match(fx.id, db)
+            
+        state.current_date = new_date.strftime("%Y-%m-%d")
+        db.commit()
+        await message.answer(f"⏩ Установлена дата: {state.current_date}")
     db.close()
 
 async def start_bot():

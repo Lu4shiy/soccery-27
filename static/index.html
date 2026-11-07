@@ -1748,6 +1748,7 @@
                     });
                     if (res.ok) {
                         tg.showAlert("Карьера сброшена.");
+                        localStorage.removeItem('soccery_user_id');
                         window.location.reload();
                     }
                 });
