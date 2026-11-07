@@ -342,10 +342,21 @@
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .calendar-title { font-size: 18px; font-weight: bold; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-        .cal-day { background: #17212b; padding: 8px 4px; border-radius: 6px; font-size: 12px; position: relative; }
-        .cal-day.match { border-bottom: 3px solid #52a8ff; }
-        .cal-day.rest { border-bottom: 3px solid #2ecc71; }
+        .cal-day { 
+            background: #17212b; padding: 4px 2px; border-radius: 6px; font-size: 12px; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            min-height: 58px; border-bottom: 3px solid transparent;
+        }
+        .cal-date { font-size: 10px; color: #8e9eb5; width: 100%; text-align: center; margin-bottom: 2px; }
+        .cal-day.match { border: 1px solid #52a8ff; background: rgba(82,168,255,0.05); border-bottom: 3px solid #52a8ff; }
         .cal-day.training { border-bottom: 3px solid #e6c544; }
+        .cal-day.rest { border-bottom: 3px solid #2ecc71; }
+        .cal-match-info { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; }
+        .cal-tour { font-size: 7px; color: #52a8ff; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-opp .logo-container-mini { width: 14px; height: 14px; margin-right: 0; padding: 1px; border-radius: 3px; }
+        .cal-opp .logo-container-mini .logo-img { padding: 0; }
+        .cal-opp .logo-container-mini .logo-fallback { font-size: 8px; }
+        .cal-ha { font-size: 8px; font-weight: bold; color: #fff; }
         .cal-day.today { background: #2f3b4d; border: 1px solid #52a8ff; }
 
         .tour-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1393,7 +1404,8 @@
             container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
             
             try {
-                const res = await fetch(API_BASE + `/api/game/schedule?year=${calYear}&month=${calMonth}`);
+                const res = await fetch(`${API_BASE}/api/game/schedule?year=${calYear}&month=${calMonth}&club_id=${currentClubId}`);
+                if (!res.ok) throw new Error("Network response was not ok");
                 const days = await res.json();
                 
                 container.innerHTML = "";
@@ -1408,14 +1420,28 @@
                 days.forEach(d => {
                     const dayNum = parseInt(d.date.split("-")[2]);
                     let cls = "cal-day";
-                    if (d.type === "match") cls += " match";
-                    else if (d.type === "training") cls += " training";
-                    else cls += " rest";
+                    let inner = `<div class="cal-date">${dayNum}</div>`;
                     
-                    container.innerHTML += `<div class="${cls}">${dayNum}</div>`;
+                    if (d.type === "match") {
+                        cls += " match";
+                        const oppLogo = getLogoHTML('clubs', d.opponent_name || "").replace('logo-container', 'logo-container-mini');
+                        const ha = d.is_home ? "Д" : "В";
+                        const tourShort = (d.tournament_name || "").substring(0, 4);
+                        inner += `<div class="cal-match-info">
+                                    <div class="cal-tour">${tourShort}</div>
+                                    <div class="cal-opp">${oppLogo}</div>
+                                    <div class="cal-ha">${ha}</div>
+                                  </div>`;
+                    } else if (d.type === "training") {
+                        cls += " training";
+                    } else {
+                        cls += " rest";
+                    }
+                    
+                    container.innerHTML += `<div class="${cls}">${inner}</div>`;
                 });
             } catch (e) {
-                container.innerHTML = "Ошибка загрузки";
+                container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
             }
         }
 
@@ -1494,10 +1520,31 @@
                 const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
                 const stats = await statRes.json();
                 
-                if ($("stat-scorers")) $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                if ($("stat-assists")) $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                if ($("stat-rating")) $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                if ($("stat-clean-sheets")) $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+                const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
+
+                if (!stats.scorers || stats.scorers.length === 0) {
+                    $("stat-scorers").innerHTML = emptyHtml;
+                } else {
+                    $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                }
+
+                if (!stats.assists || stats.assists.length === 0) {
+                    $("stat-assists").innerHTML = emptyHtml;
+                } else {
+                    $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                }
+
+                if (!stats.rating || stats.rating.length === 0) {
+                    $("stat-rating").innerHTML = emptyHtml;
+                } else {
+                    $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                }
+
+                if (!stats.clean_sheets || stats.clean_sheets.length === 0) {
+                    $("stat-clean-sheets").innerHTML = emptyHtml;
+                } else {
+                    $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+                }
 
             } catch (e) {
                 table.innerHTML = "<tr><td>Ошибка загрузки данных</td></tr>";

@@ -135,7 +135,9 @@ class GameDay(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(String, unique=True, index=True)
     type = Column(String) # 'match', 'rest', 'training'
-    description = Column(String, nullable=True)
+    opponent_id = Column(Integer, ForeignKey("clubs.id"), nullable=True)
+    is_home = Column(Integer, default=1)
+    tournament_name = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -334,18 +336,41 @@ def init_db():
         db.commit()
 
         # Генерация базового расписания на сезон (Август - Май)
+        # Генерация базового расписания на сезон (Август - Май)
         if db.query(GameDay).count() == 0:
             start = date(2026, 8, 1)
             end = date(2027, 5, 31)
-            delta = end - start
-            for i in range(delta.days + 1):
-                d = start + timedelta(days=i)
-                # Рандомно назначаем типы дней (для визуала)
-                r = random.random()
-                if r < 0.25: day_type = "match"
-                elif r < 0.45: day_type = "training"
-                else: day_type = "rest"
-                db.add(GameDay(date=d.strftime("%Y-%m-%d"), type=day_type))
+            
+            curr = start
+            while curr <= end:
+                month_days = []
+                d = curr
+                while d.month == curr.month:
+                    month_days.append(d)
+                    d += timedelta(days=1)
+                
+                num_matches = random.randint(2, 7)
+                match_indices = []
+                while len(match_indices) < num_matches:
+                    idx = random.randint(0, len(month_days) - 1)
+                    if all(abs(idx - m) >= 2 for m in match_indices):
+                        match_indices.append(idx)
+                
+                for i, day in enumerate(month_days):
+                    date_str = day.strftime("%Y-%m-%d")
+                    if i in match_indices:
+                        # Временно ставим заглушку, соперник определится при запросе клуба
+                        db.add(GameDay(date=date_str, type="match"))
+                    else:
+                        r = random.random()
+                        if r < 0.3: day_type = "training"
+                        else: day_type = "rest"
+                        db.add(GameDay(date=date_str, type=day_type))
+                
+                if curr.month == 12:
+                    curr = date(curr.year + 1, 1, 1)
+                else:
+                    curr = date(curr.year, curr.month + 1, 1)
             db.commit()
 
     except Exception as e:
@@ -466,7 +491,6 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
 
     player.training_program_id = None
     player.training_started_at = None
-    db.commit()
     return True
 
 app = FastAPI()
@@ -585,8 +609,10 @@ def get_club_players(club_id: int):
     try:
         players = db.query(Player).filter(Player.club_id == club_id).order_by(Player.overall_rating.desc()).all()
         result = []
+        changed = False
         for p in players:
-            apply_training_if_done(p, db)
+            if apply_training_if_done(p, db):
+                changed = True
             alts = json.loads(p.alt_positions or "[]")
             result.append({
                 "id": p.id, "name": p.name, "position": p.position, "age": p.age,
@@ -598,6 +624,8 @@ def get_club_players(club_id: int):
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10, "gk_kicking": p.gk_kicking or 10,
                 "gk_positioning": p.gk_positioning or 10, "gk_reflexes": p.gk_reflexes or 10
             })
+        if changed:
+            db.commit()
         return result
     finally:
         db.close()
@@ -719,19 +747,28 @@ def get_game_time():
         db.close()
 
 @app.get("/api/game/schedule")
-def get_schedule(year: int, month: int):
+def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
-        start_str = f"{year}-{month:02d}-01"
-        # Получаем все дни месяца
         days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
-        return [{"date": d.date, "type": d.type, "description": d.description} for d in days]
+        result = []
+        for d in days:
+            entry = {"date": d.date, "type": d.type}
+            if d.type == "match" and club_id:
+                my_club = db.query(Club).filter(Club.id == club_id).first()
+                if my_club:
+                    opp = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).order_by(func.random()).first()
+                    if opp:
+                        entry["opponent_name"] = opp.name
+                        entry["is_home"] = random.choice([True, False])
+                        entry["tournament_name"] = my_club.league
+            result.append(entry)
+        return result
     finally:
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/standings")
 def get_standings(tournament_id: int):
-    # Заглушка: возвращаем фейковые данные для визуала
     db = Session(engine)
     try:
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
@@ -740,18 +777,11 @@ def get_standings(tournament_id: int):
         clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).limit(20).all()
         standings = []
         for i, c in enumerate(clubs):
-            mp = random.randint(10, 20)
-            w = random.randint(2, mp-2)
-            d = random.randint(0, mp-w)
-            l = mp - w - d
-            gf = random.randint(10, 40)
-            ga = random.randint(5, 30)
-            pts = w * 3 + d
             standings.append({
-                "pos": i + 1, "club_name": c.name, "mp": mp, "w": w, "d": d, "l": l,
-                "gf": gf, "ga": ga, "gd": gf - ga, "pts": pts
+                "pos": i + 1, "club_name": c.name, "mp": 0, "w": 0, "d": 0, "l": 0,
+                "gf": 0, "ga": 0, "gd": 0, "pts": 0
             })
-        standings.sort(key=lambda x: (-x["pts"], -x["gd"]))
+        standings.sort(key=lambda x: x["club_name"])
         for i, s in enumerate(standings):
             s["pos"] = i + 1
         return {"type": tour.type, "standings": standings}
@@ -760,12 +790,11 @@ def get_standings(tournament_id: int):
 
 @app.get("/api/tournaments/{tournament_id}/stats")
 def get_stats(tournament_id: int):
-    # Заглушка для бомбардиров и т.д.
     return {
-        "scorers": [{"player": "Игрок 1", "team": "Команда А", "val": 15}, {"player": "Игрок 2", "team": "Команда Б", "val": 12}],
-        "assists": [{"player": "Игрок 3", "team": "Команда В", "val": 10}],
-        "rating": [{"player": "Игрок 4", "team": "Команда А", "val": 8.5}],
-        "clean_sheets": [{"team": "Команда А", "val": 10}]
+        "scorers": [],
+        "assists": [],
+        "rating": [],
+        "clean_sheets": []
     }
 
 # === АДМИН ЭНДПОИНТЫ ===
