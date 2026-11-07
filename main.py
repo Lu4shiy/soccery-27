@@ -127,6 +127,84 @@ UCL_TEAMS = ["Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchest
 UEL_TEAMS = ["Crystal Palace", "Bournemouth", "Sunderland", "Milan", "Juventus", "Real Sociedad", "Celta de Vigo", "Bayer Leverkusen", "Hoffenheim", "Marseille", "Rennes", "Benfica", "Torreense", "AZ Alkmaar", "Anderlecht", "Union Saint-Gilloise", "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "Sturm Graz", "Olympiacos", "Ararat-Armenia", "Dinamo Zagreb", "Ludogorets"]
 UECL_TEAMS = ["Atalanta", "Braga", "Ajax", "Freiburg", "Monaco", "Copenhagen", "Midtjylland", "Crvena Zvezda", "Gent", "Panathinaikos", "Pafos", "Brighton", "Lugano", "Getafe", "Twente", "KuPS", "Borac Banja Luka", "Sint-Truiden", "Lincoln Red Imps", "Brann", "Hearts", "Kairat", "Trabzonspor", "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec", "Nordsjælland", "Inter Escaldes", "Aarhus", "Thun", "CSKA Sofia", "Kauno Žalgiris", "Mjällby", "Iberia 1999", "Egnatia"]
 
+# 🔥 ИСПРАВЛЕНИЕ: Единый маппинг кубков для дивизионов одной страны (реальные названия)
+COUNTRY_CUPS = {
+    # Англия
+    "premier league": ["FA Cup", "EFL Cup"],
+    "championship": ["FA Cup", "EFL Cup"],
+    "efl league one": ["FA Cup", "EFL Cup"],
+    "efl league two": ["FA Cup", "EFL Cup"],
+    # Испания
+    "laliga": ["Copa del Rey"],
+    "la liga": ["Copa del Rey"],
+    "laliga 2": ["Copa del Rey"],
+    # Германия
+    "bundesliga": ["DFB-Pokal"],
+    "2. bundesliga": ["DFB-Pokal"],
+    "3. liga": ["DFB-Pokal"],
+    # Италия
+    "serie a": ["Coppa Italia"],
+    "serie b": ["Coppa Italia"],
+    # Франция
+    "ligue 1": ["Coupe de France"],
+    "ligue 2": ["Coupe de France"],
+    # Нидерланды
+    "eredivisie": ["KNVB Beker"],
+    "eerste divisie": ["KNVB Beker"],
+    # Португалия
+    "liga portugal": ["Taça de Portugal"],
+    "liga portugal 2": ["Taça de Portugal"],
+    # Турция
+    "süper lig": ["Türkiye Kupası"],
+    "tff first league": ["Türkiye Kupası"],
+    # Швеция
+    "allsvenskan": ["Svenska Cupen"],
+    "superettan": ["Svenska Cupen"],
+    # Норвегия
+    "eliteserien": ["NM-Cup"],
+    "obos-ligaen": ["NM-Cup"],
+    # Дания
+    "superliga": ["Landspokalturneringen"],
+    "1. division": ["Landspokalturneringen"],
+    # Шотландия
+    "scottish premiership": ["Scottish FA Cup", "Scottish League Cup"],
+    "scottish championship": ["Scottish FA Cup", "Scottish League Cup"],
+    # Бельгия
+    "pro league": ["Beker van België"],
+    "challenger pro league": ["Beker van België"],
+    # Австрия
+    "austrian bundesliga": ["ÖFB-Cup"],
+    "2. liga": ["ÖFB-Cup"],
+    # Швейцария
+    "super league": ["Schweizer Cup"],
+    "challenge league": ["Schweizer Cup"],
+    # Греция
+    "super league 1": ["Kipelo Ellados"],
+    "super league 2": ["Kipelo Ellados"],
+    # Чехия
+    "chance liga": ["Pohár FAČR"],
+    "fotbalová národní liga": ["Pohár FAČR"],
+    # Хорватия
+    "supersport hnl": ["Hrvatski nogometni kup"],
+    "first nhl": ["Hrvatski nogometni kup"],
+    # Сербия
+    "mozzart bet super liga": ["Kup Srbije"],
+    "prva liga": ["Kup Srbije"],
+    # Румыния
+    "superliga": ["Cupa României"],
+    "liga 2": ["Cupa României"],
+    # Польша
+    "pko bp ekstraklasa": ["Puchar Polski"],
+    "fortuna 1 liga": ["Puchar Polski"],
+    # Украина
+    "ukrainian premier league": ["Kubok Ukrajiny"],
+    "persha liha": ["Kubok Ukrajiny"],
+    # Россия
+    "russian premier league": ["Kubok Rossii"],
+    "russian football national league": ["Kubok Rossii"],
+}
+
+# 🔥 ИСПРАВЛЕНИЕ: Список стран для континента (показываем сразу, без перезагрузки)
 def clean_name(n):
     n = unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8')
     return n.lower().replace(" ", "").replace("-", "").replace(".", "").replace("fc", "").replace("cf", "")
@@ -174,25 +252,21 @@ def rebuild_tournaments():
         for l in unique_leagues:
             tour_names.add((l, "Domestic", "League"))
 
+        # 🔥 ИСПРАВЛЕНИЕ: Используем COUNTRY_CUPS для реальных названий
         cup_map = {}
         for l in unique_leagues:
-            cups = []
             ll = l.lower()
-            if "premier league" in ll or "championship" in ll: cups = ["FA Cup", "EFL Cup"]
-            elif "laliga" in ll or "la liga" in ll: cups = ["Copa del Rey"]
-            elif "bundesliga" in ll or "3. liga" in ll: cups = ["DFB-Pokal"]
-            elif "serie a" in ll: cups = ["Coppa Italia"]
-            elif "ligue 1" in ll: cups = ["Coupe de France"]
-            elif "eredivisie" in ll: cups = ["KNVB Cup"]
-            elif "liga portugal" in ll: cups = ["Taça de Portugal"]
-            elif "süper lig" in ll: cups = ["Türkiye Kupası"]
-            elif "allsvenskan" in ll or "superettan" in ll: cups = ["Svenska Cupen"]
-            elif "eliteserien" in ll: cups = ["Norwegian Cup"]
-            else: cups = [f"{l} Cup"]
+            real_cups = None
+            for key, cups in COUNTRY_CUPS.items():
+                if key in ll:
+                    real_cups = cups
+                    break
+            if not real_cups:
+                real_cups = [f"{l} Cup"]
+            cup_map[l] = real_cups
             
-            for cup in cups:
+            for cup in real_cups:
                 tour_names.add((cup, "Domestic", "Cup"))
-            cup_map[l] = cups
 
         for name, cont, t_type in tour_names:
             if not db.query(Tournament).filter_by(name=name).first():
@@ -213,14 +287,16 @@ def rebuild_tournaments():
                 if c in tour_map:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
 
+            # 🔥 ИСПРАВЛЕНИЕ: Убираем рандомную ЛК для тех, кого нет в списках
             if club.continent == "UEFA":
                 if is_in_list(club.name, UCL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
                 elif is_in_list(club.name, UEL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
-                else:
+                elif is_in_list(club.name, UECL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
+                # Если клуба нет ни в одном списке, он не участвует в еврокубках
             
             elif club.continent == "CONMEBOL":
                 if club.stars >= 4.0:

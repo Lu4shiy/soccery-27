@@ -1241,20 +1241,30 @@
         // === СПОРТЦЕНТР ===
         async function loadCompetitions() {
             $("center-club-name").innerText = currentClubName;
-            $("center-club-continent").innerText = currentContinent;
             
             const tbody = $("competitions-list");
             tbody.innerHTML = "<tr><td colspan='2'>Загрузка...</td></tr>";
             
             try {
+                // Добавлен параметр ?t=Date.now() чтобы сбросить кэш браузера
                 const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments?t=' + Date.now());
                 const tournaments = await res.json();
+                
+                // 🔥 ИСПРАВЛЕНИЕ: Мгновенно подтягиваем континент из ответа сервера, 
+                // чтобы не было пустых скобок при первом заходе
+                const managerRes = await fetch(API_BASE + '/api/manager/' + encodeURIComponent(userId));
+                const managerData = await managerRes.json();
+                if (managerData.continent) {
+                    currentContinent = managerData.continent;
+                }
+                $("center-club-continent").innerText = currentContinent || "UEFA";
                 
                 if (!tournaments.length) {
                     tbody.innerHTML = "<tr><td colspan='2'>Нет данных о турнирах.</td></tr>";
                     return;
                 }
 
+                // Сортируем: сначала национальные лиги, потом кубки, потом континентальные, потом мировые
                 tournaments.sort((a, b) => {
                     if (a.continent === "Domestic" && b.continent !== "Domestic") return -1;
                     if (b.continent === "Domestic" && a.continent !== "Domestic") return 1;
