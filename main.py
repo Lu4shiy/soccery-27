@@ -202,6 +202,53 @@ COUNTRY_CUPS = {
     # Россия
     "russian premier league": ["Kubok Rossii"],
     "russian football national league": ["Kubok Rossii"],
+    # 🔥 ИСПРАВЛЕНИЕ: Добавлены недостающие лиги
+    # Ирландия
+    "league of ireland premier division": ["FAI Cup"],
+    "league of ireland first division": ["FAI Cup"],
+    # Северная Ирландия
+    "nifl premiership": ["Irish Cup"],
+    "nifl championship": ["Irish Cup"],
+    # Уэльс
+    "cymru premier": ["Welsh Cup"],
+    "cymru north": ["Welsh Cup"],
+    "cymru south": ["Welsh Cup"],
+    # Финляндия
+    "veikkausliiga": ["Finnish Cup"],
+    "ykkosliiga": ["Finnish Cup"],
+    # Исландия
+    "besta deild karla": ["Icelandic Cup"],
+    "1. deild karla": ["Icelandic Cup"],
+    # Словакия
+    "slovak super liga": ["Slovenský pohár"],
+    # Словения
+    "prvaliga": ["Pokal Slovenije"],
+    # Венгрия
+    "nb i": ["Magyar Kupa"],
+    # Болгария
+    "efbet liga": ["Kupa na Balgariya"],
+    # Израиль
+    "ligat ha'al": ["Gvia HaMedina"],
+    # Кипр
+    "cyta championship": ["Kypriako Kypello"],
+    # Казахстан
+    "kazakhstan premier league": ["Kazakhstan Cup"],
+    # Азербайджан
+    "misli premier league": ["Azerbaijan Cup"],
+    # Армения
+    "armenian premier league": ["Armenian Cup"],
+    # Грузия
+    "erovnuli liga": ["Georgian Cup"],
+    # Молдова
+    "super liga": ["Cupa Moldovei"],
+    # Беларусь
+    "vysheyshaya liga": ["Kubak Belarusi"],
+    # Латвия
+    "virslīga": ["Latvijas Kauss"],
+    # Литва
+    "a lyga": ["Lietuvos Taurė"],
+    # Эстония
+    "meistriliiga": ["Eesti Karikas"],
 }
 
 # 🔥 ИСПРАВЛЕНИЕ: Список стран для континента (показываем сразу, без перезагрузки)
@@ -243,7 +290,7 @@ def rebuild_tournaments():
             ("CONMEBOL", ["CONMEBOL Libertadores", "CONMEBOL Sudamericana"]),
             ("CONCACAF", ["CONCACAF Champions Cup"]),
             ("AFC", ["AFC Champions League Elite"]),
-            ("World", ["FIFA Intercontinental Cup", "FIFA Club World Cup"])
+            ("World", ["FIFA Intercontinental Cup"])  # 🔥 Убран FIFA Club World Cup
         ]:
             for name in t_list:
                 tour_names.add((name, c, "Continental" if c != "World" else "World"))
@@ -287,34 +334,26 @@ def rebuild_tournaments():
                 if c in tour_map:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
 
-            # 🔥 ИСПРАВЛЕНИЕ: Убираем рандомную ЛК для тех, кого нет в списках
             if club.continent == "UEFA":
                 if is_in_list(club.name, UCL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
                 elif is_in_list(club.name, UEL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
                 elif is_in_list(club.name, UECL_TEAMS):
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
-                # Если клуба нет ни в одном списке, он не участвует в еврокубках
             
             elif club.continent == "CONMEBOL":
                 if club.stars >= 4.0:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
                 else:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Sudamericana"]))
             
             elif club.continent == "CONCACAF":
                 db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONCACAF Champions Cup"]))
-                if club.stars >= 4.0:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
             
             elif club.continent == "AFC":
                 db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["AFC Champions League Elite"]))
-                if club.stars >= 4.5:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["FIFA Club World Cup"]))
-
+                
         db.commit()
         print("✅ Турниры успешно пересозданы.")
     except Exception as e:
