@@ -746,17 +746,56 @@ def get_game_time():
     finally:
         db.close()
 
+# === РАСПИСАНИЕ И ВРЕМЯ ===
+@app.get("/api/game/time")
+def get_game_time():
+    db = Session(engine)
+    try:
+        state = db.query(GameState).first()
+        return {"current_date": state.current_date if state else "2026-08-01", "season": state.season if state else "2026/27"}
+    finally:
+        db.close()
+
 @app.get("/api/game/schedule")
 def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
+        import calendar
+        num_days = calendar.monthrange(year, month)[1]
+        
+        # Получаем существующие дни
         days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
+        
+        # Если дней меньше, чем должно быть в месяце, генерируем недостающие
+        if len(days) < num_days:
+            num_matches = random.randint(2, 7)
+            match_indices = []
+            while len(match_indices) < num_matches:
+                idx = random.randint(1, num_days)
+                if all(abs(idx - m) >= 2 for m in match_indices):
+                    match_indices.append(idx)
+            
+            for day in range(1, num_days + 1):
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                existing = db.query(GameDay).filter_by(date=date_str).first()
+                if not existing:
+                    if day in match_indices:
+                        db.add(GameDay(date=date_str, type="match"))
+                    else:
+                        r = random.random()
+                        day_type = "training" if r < 0.3 else "rest"
+                        db.add(GameDay(date=date_str, type=day_type))
+            db.commit()
+            days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
+
         result = []
         for d in days:
             entry = {"date": d.date, "type": d.type}
             if d.type == "match" and club_id:
                 my_club = db.query(Club).filter(Club.id == club_id).first()
                 if my_club:
+                    # Делаем выбор соперника и дома/в гостях детерминированным для этой даты
+                    random.seed(d.date)
                     opp = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).order_by(func.random()).first()
                     if opp:
                         entry["opponent_name"] = opp.name
