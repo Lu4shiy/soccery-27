@@ -693,6 +693,12 @@
     </div>
 
     <script>
+    // Ловим ошибки, чтобы они не ломали кнопки
+    window.onerror = function(msg, url, line, col, error) {
+        alert("Ошибка JS: " + msg + "\nСтрока: " + line);
+        return false;
+    };
+
     (function() {
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
             expand: () => {}, showAlert: (msg) => alert(msg),
@@ -708,7 +714,9 @@
         const userName = (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.first_name) || "Игрок";
         const API_BASE = window.location.origin;
         const $ = (id) => document.getElementById(id);
-        $("user-name").innerText = "Привет, " + userName + "!";
+        
+        const nameEl = $("user-name");
+        if (nameEl) nameEl.innerText = "Привет, " + userName + "!";
 
         let allClubs = [];
         let currentClubId = null;
@@ -724,9 +732,8 @@
         let pendingTabId = null;
         let globalTrainingPrograms = [];
         
-        // Календарь
         let calYear = 2026;
-        let calMonth = 8; // Август (1-12)
+        let calMonth = 8;
         let currentTours = [];
 
         const STAT_NAMES = {
@@ -817,6 +824,8 @@
             const trigger = $("nat-trigger");
             const optionsContainer = $("nat-options");
             const display = $("selected-nat-display");
+            if (!trigger || !optionsContainer || !display) return;
+            
             optionsContainer.innerHTML = "";
             countriesList.forEach(function(c) {
                 const div = document.createElement("div");
@@ -855,6 +864,7 @@
             }
             img.src = nextSrc;
         }
+        window.handleImgError = handleImgError;
 
         function getLogoHTML(type, name, sizeClass) {
             sizeClass = sizeClass || '';
@@ -877,7 +887,8 @@
 
         function showScreen(name) {
             document.querySelectorAll(".screen").forEach(function(s) { s.classList.add("hidden"); });
-            $("screen-" + name).classList.remove("hidden");
+            const el = $("screen-" + name);
+            if (el) el.classList.remove("hidden");
         }
 
         function formatMoney(amount) {
@@ -899,11 +910,11 @@
                     currentStars = data.stars;
                     managerSetupComplete = !!data.is_setup_complete;
                     isAdmin = !!data.is_admin;
-                    
-                    if (isAdmin) {
-                        $("admin-block").classList.remove("hidden");
-                    } else {
-                        $("admin-block").classList.add("hidden");
+
+                    const ab = $("admin-block");
+                    if (ab) {
+                        if (isAdmin) ab.classList.remove("hidden");
+                        else ab.classList.add("hidden");
                     }
 
                     if (!skipConfirm) {
@@ -932,6 +943,7 @@
         function renderLeagues() {
             const uniqueLeagues = Array.from(new Set(allClubs.map(function(c) { return c.league; }))).filter(function(l) { return l; }).sort();
             const grid = $("leagues-grid");
+            if (!grid) return;
             grid.innerHTML = "";
             uniqueLeagues.forEach(function(league) {
                 const card = document.createElement("div");
@@ -944,11 +956,14 @@
 
         function openLeague(league) {
             leaguesScrollPos = window.scrollY;
-            $("selected-league-title").innerText = league;
+            const titleEl = $("selected-league-title");
+            if (titleEl) titleEl.innerText = league;
+            
             let filtered = allClubs.filter(function(c) { return c.league === league; });
             filtered.sort(function(a, b) { return a.name.localeCompare(b.name); });
 
             const list = $("clubs-list");
+            if (!list) return;
             list.innerHTML = filtered.map(function(c) {
                 return '<div class="club-card" data-id="' + c.id + '" data-name="' + c.name + '" data-league="' + c.league + '" data-stars="' + c.stars + '">' +
                     '<div class="club-info">' +
@@ -994,18 +1009,18 @@
             currentClubName = clubName; currentLeague = league; currentStars = stars;
             if (clubId) currentClubId = clubId;
 
-            $("confirm-club").innerText = clubName;
-            $("confirm-league").innerText = league;
-            $("confirm-stars").innerHTML = renderStars(stars);
-            $("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
-            $("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
+            if ($("confirm-club")) $("confirm-club").innerText = clubName;
+            if ($("confirm-league")) $("confirm-league").innerText = league;
+            if ($("confirm-stars")) $("confirm-stars").innerHTML = renderStars(stars);
+            if ($("confirm-logo")) $("confirm-logo").innerHTML = getLogoHTML('clubs', clubName, 'logo-large');
+            if ($("btn-continue")) $("btn-continue").innerText = isNew ? "Продолжить" : "Играть";
             showScreen("confirm");
         }
 
         function goToCoachSetup() {
             const nameInput = $("inp-coach-name");
-            if (!nameInput.value) nameInput.value = userName;
-            $("setup-club-name").innerHTML = 'Клуб: ' + currentClubName + ' (' + renderStars(currentStars) + ')';
+            if (nameInput && !nameInput.value) nameInput.value = userName;
+            if ($("setup-club-name")) $("setup-club-name").innerHTML = 'Клуб: ' + currentClubName + ' (' + renderStars(currentStars) + ')';
             showScreen("coach");
         }
 
@@ -1018,7 +1033,9 @@
         }
 
         function updateBudgetDisplay() {
-            const extra = parseInt($("inp-extra-budget").value);
+            const extraEl = $("inp-extra-budget");
+            if (!extraEl) return;
+            const extra = parseInt(extraEl.value);
             let multiplier = 3; 
             const l = currentLeague.toLowerCase();
             if (l.indexOf("premier league") >= 0) multiplier = 35;
@@ -1030,7 +1047,7 @@
             else if (l.indexOf("süper lig") >= 0 || l.indexOf("super lig") >= 0) multiplier = 12;
             const base = currentStars * multiplier;
             const total = base + extra;
-            $("display-budget").innerText = 'Бюджет: ' + total + ' млн $';
+            if ($("display-budget")) $("display-budget").innerText = 'Бюджет: ' + total + ' млн $';
         }
 
         async function finishSetup() {
@@ -1049,7 +1066,7 @@
                 });
                 if (res.ok) {
                     managerSetupComplete = true;
-                    $("bottom-nav").classList.remove("hidden");
+                    if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
                     loadSquad();
                 } else tg.showAlert("Ошибка сохранения");
             } catch(e) { tg.showAlert("Сетевая ошибка"); }
@@ -1065,8 +1082,9 @@
 
         async function loadSquad() {
             const listContainer = $("squad-list");
+            if (!listContainer) return;
             listContainer.innerHTML = '<p style="text-align:center;">⏳ Загружаем игроков...</p>';
-            $("squad-title").innerText = 'Офис: ' + currentClubName;
+            if ($("squad-title")) $("squad-title").innerText = 'Офис: ' + currentClubName;
             switchTab('office');
 
             try {
@@ -1133,27 +1151,30 @@
                 listContainer.innerHTML = '<p style="text-align:center; color:#ff6b6b;">Ошибка: ' + e.message + '</p>';
             }
         }
+        window.loadSquad = loadSquad;
 
         async function openPlayerDetails(playerId) {
             const p = window.currentPlayers.find(function(x) { return x.id === playerId; });
             if (!p) return;
 
-            $("pd-name").innerText = p.name;
-            $("pd-club").innerText = currentClubName;
-            $("pd-ovr").innerText = p.overall;
-            $("pd-pos").innerText = p.position;
-            $("pd-age").innerText = p.age + " лет";
-            $("pd-nat").innerHTML = getPlayerFlagImg(p.nationality) + ' ' + p.nationality;
-            $("pd-value").innerText = formatMoney(p.market_value);
+            if ($("pd-name")) $("pd-name").innerText = p.name;
+            if ($("pd-club")) $("pd-club").innerText = currentClubName;
+            if ($("pd-ovr")) $("pd-ovr").innerText = p.overall;
+            if ($("pd-pos")) $("pd-pos").innerText = p.position;
+            if ($("pd-age")) $("pd-age").innerText = p.age + " лет";
+            if ($("pd-nat")) $("pd-nat").innerHTML = getPlayerFlagImg(p.nationality) + ' ' + p.nationality;
+            if ($("pd-value")) $("pd-value").innerText = formatMoney(p.market_value);
             
             const wageK = p.wage ? (p.wage / 1000).toFixed(0) + " тыс. $" : "Неизвестно";
-            $("pd-wage").innerText = wageK + " / нед.";
+            if ($("pd-wage")) $("pd-wage").innerText = wageK + " / нед.";
 
             const altDiv = $("pd-alt");
-            if (p.alt_positions && p.alt_positions.length) {
-                altDiv.innerHTML = "Альт. позиции: " + p.alt_positions.map(function(a) { return '<span class="alt-pos-badge">' + a + '</span>'; }).join("");
-            } else {
-                altDiv.innerHTML = '<span style="color:#8e9eb5;">Нет альтернативных позиций</span>';
+            if (altDiv) {
+                if (p.alt_positions && p.alt_positions.length) {
+                    altDiv.innerHTML = "Альт. позиции: " + p.alt_positions.map(function(a) { return '<span class="alt-pos-badge">' + a + '</span>'; }).join("");
+                } else {
+                    altDiv.innerHTML = '<span style="color:#8e9eb5;">Нет альтернативных позиций</span>';
+                }
             }
 
             let contractText = "Неизвестно";
@@ -1176,7 +1197,7 @@
                     contractText = "Истек";
                 }
             }
-            $("pd-contract").innerText = contractText;
+            if ($("pd-contract")) $("pd-contract").innerText = contractText;
 
             const isGK = p.position.indexOf("Goalkeeper") >= 0 || p.position === "GK";
             let stats = [];
@@ -1211,10 +1232,11 @@
                     '</div></div>';
             }).join("");
             
-            $("pd-stats-container").innerHTML = statsHtml;
+            if ($("pd-stats-container")) $("pd-stats-container").innerHTML = statsHtml;
             await loadTrainingSection(playerId, isGK);
             showScreen("player");
         }
+        window.openPlayerDetails = openPlayerDetails;
 
         async function loadTrainingSection(playerId, isGK) {
             const activeDiv = $("pd-training-active");
@@ -1226,13 +1248,13 @@
                 const status = await statusRes.json();
 
                 if (status.active) {
-                    activeDiv.classList.remove("hidden");
-                    availableDiv.classList.add("hidden");
-                    $("pd-training-name").innerText = status.program_name;
-                    $("pd-training-weeks").innerText = status.weeks_left + " нед.";
+                    if (activeDiv) activeDiv.classList.remove("hidden");
+                    if (availableDiv) availableDiv.classList.add("hidden");
+                    if ($("pd-training-name")) $("pd-training-name").innerText = status.program_name;
+                    if ($("pd-training-weeks")) $("pd-training-weeks").innerText = status.weeks_left + " нед.";
                 } else {
-                    activeDiv.classList.add("hidden");
-                    availableDiv.classList.remove("hidden");
+                    if (activeDiv) activeDiv.classList.add("hidden");
+                    if (availableDiv) availableDiv.classList.remove("hidden");
                     
                     if (!globalTrainingPrograms.length) {
                         const progRes = await fetch(API_BASE + '/api/training-programs');
@@ -1244,22 +1266,23 @@
                         return isGK ? isGKProg : !isGKProg;
                     });
 
-                    // Берем 5 случайных
                     filtered = filtered.sort(() => 0.5 - Math.random()).slice(0, 5);
 
-                    listDiv.innerHTML = filtered.map(function(prog) {
-                        const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) {
-                            return '+' + prog.stat_boosts[k] + ' ' + (STAT_NAMES[k] || k);
-                        }).join(", ");
-                        const ovrText = prog.ovr_boost > 0 ? 'шанс +1 OVR' : "";
-                        return '<div class="training-card" onclick="startTraining(' + playerId + ', ' + prog.id + ')">' +
-                            '<div class="training-name">' + prog.name + '</div>' +
-                            '<div class="training-desc">' + prog.description + '</div>' +
-                            '<div class="training-meta">' +
-                            '<span>' + prog.duration_weeks + ' нед.</span>' +
-                            '<span style="color:#2ecc71;">' + [boostText, ovrText].filter(Boolean).join(" | ") + '</span>' +
-                            '</div></div>';
-                    }).join("");
+                    if (listDiv) {
+                        listDiv.innerHTML = filtered.map(function(prog) {
+                            const boostText = Object.keys(prog.stat_boosts || {}).map(function(k) {
+                                return '+' + prog.stat_boosts[k] + ' ' + (STAT_NAMES[k] || k);
+                            }).join(", ");
+                            const ovrText = prog.ovr_boost > 0 ? 'шанс +1 OVR' : "";
+                            return '<div class="training-card" onclick="startTraining(' + playerId + ', ' + prog.id + ')">' +
+                                '<div class="training-name">' + prog.name + '</div>' +
+                                '<div class="training-desc">' + prog.description + '</div>' +
+                                '<div class="training-meta">' +
+                                '<span>' + prog.duration_weeks + ' нед.</span>' +
+                                '<span style="color:#2ecc71;">' + [boostText, ovrText].filter(Boolean).join(" | ") + '</span>' +
+                                '</div></div>';
+                        }).join("");
+                    }
                 }
             } catch (e) { console.error(e); }
         }
@@ -1282,12 +1305,12 @@
                 }
             } catch (e) { tg.showAlert("Сетевая ошибка"); }
         }
+        window.startTraining = startTraining;
 
-        // === СПОРТЦЕНТР ===
         function switchTab(tabId) {
             if (currentScreenIsTactics() && tabId !== 'tactics' && tacticsDirty) {
                 pendingTabId = tabId;
-                $("custom-modal").classList.remove("hidden");
+                if ($("custom-modal")) $("custom-modal").classList.remove("hidden");
                 return;
             }
             _doSwitchTab(tabId);
@@ -1295,32 +1318,38 @@
 
         function _doSwitchTab(tabId) {
             document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
-            $('nav-' + tabId).classList.add('active');
+            const navEl = $('nav-' + tabId);
+            if (navEl) navEl.classList.add('active');
+            
             showScreen(tabId);
             
             if (tabId === 'tactics') {
                 loadTactics();
             } else if (tabId === 'account') {
-                $("account-club-name").innerText = currentClubName;
+                if ($("account-club-name")) $("account-club-name").innerText = currentClubName;
                 fetch(API_BASE + '/api/manager/' + userId)
                     .then(r => r.json())
                     .then(data => {
-                        if (data.coach_name) $("inp-account-coach-name").value = data.coach_name;
+                        if (data.coach_name && $("inp-account-coach-name")) $("inp-account-coach-name").value = data.coach_name;
                     });
             } else if (tabId === 'center') {
-                $("center-main-menu").classList.remove("hidden");
-                $("center-schedule").classList.add("hidden");
-                $("center-tournaments-list").classList.add("hidden");
-                $("center-tournament-detail").classList.add("hidden");
+                if ($("center-main-menu")) $("center-main-menu").classList.remove("hidden");
+                if ($("center-schedule")) $("center-schedule").classList.add("hidden");
+                if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
+                if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
                 fetchGameTime();
             }
             window.scrollTo(0, 0);
         }
 
         function currentScreenIsTactics() {
-            return !$("screen-tactics").classList.contains("hidden");
+            const el = $("screen-tactics");
+            return el && !el.classList.contains("hidden");
         }
 
+        window.switchTab = switchTab;
+
+        // СПОРТЦЕНТР
         async function fetchGameTime() {
             try {
                 const res = await fetch(API_BASE + '/api/game/time');
@@ -1328,28 +1357,28 @@
                 const parts = data.current_date.split("-");
                 calYear = parseInt(parts[0]);
                 calMonth = parseInt(parts[1]);
-                $("current-game-date").innerText = data.current_date;
+                if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
             } catch (e) { console.error(e); }
         }
 
-        $("btn-open-schedule").onclick = function() {
-            $("center-main-menu").classList.add("hidden");
-            $("center-schedule").classList.remove("hidden");
+        if ($("btn-open-schedule")) $("btn-open-schedule").onclick = function() {
+            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+            if ($("center-schedule")) $("center-schedule").classList.remove("hidden");
             renderCalendar();
         };
 
-        $("btn-back-to-sc").onclick = function() {
-            $("center-main-menu").classList.remove("hidden");
-            $("center-schedule").classList.add("hidden");
+        if ($("btn-back-to-sc")) $("btn-back-to-sc").onclick = function() {
+            if ($("center-main-menu")) $("center-main-menu").classList.remove("hidden");
+            if ($("center-schedule")) $("center-schedule").classList.add("hidden");
         };
 
-        $("btn-prev-month").onclick = function() {
+        if ($("btn-prev-month")) $("btn-prev-month").onclick = function() {
             calMonth--;
             if (calMonth < 1) { calMonth = 12; calYear--; }
             renderCalendar();
         };
 
-        $("btn-next-month").onclick = function() {
+        if ($("btn-next-month")) $("btn-next-month").onclick = function() {
             calMonth++;
             if (calMonth > 12) { calMonth = 1; calYear++; }
             renderCalendar();
@@ -1357,9 +1386,10 @@
 
         async function renderCalendar() {
             const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
-            $("cal-title").innerText = months[calMonth - 1] + " " + calYear;
+            if ($("cal-title")) $("cal-title").innerText = months[calMonth - 1] + " " + calYear;
             
             const container = $("calendar-days");
+            if (!container) return;
             container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
             
             try {
@@ -1369,7 +1399,7 @@
                 container.innerHTML = "";
                 
                 const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
-                const offset = firstDay === 0 ? 6 : firstDay - 1; // Сдвиг для Пн-Вс
+                const offset = firstDay === 0 ? 6 : firstDay - 1;
                 
                 for (let i = 0; i < offset; i++) {
                     container.innerHTML += `<div></div>`;
@@ -1389,11 +1419,12 @@
             }
         }
 
-        $("btn-open-tournaments").onclick = async function() {
-            $("center-main-menu").classList.add("hidden");
-            $("center-tournaments-list").classList.remove("hidden");
+        if ($("btn-open-tournaments")) $("btn-open-tournaments").onclick = async function() {
+            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.remove("hidden");
             
             const container = $("tour-list-container");
+            if (!container) return;
             container.innerHTML = "Загрузка...";
             
             try {
@@ -1410,24 +1441,25 @@
             }
         };
 
-        $("btn-back-to-sc2").onclick = function() {
-            $("center-main-menu").classList.remove("hidden");
-            $("center-tournaments-list").classList.add("hidden");
+        if ($("btn-back-to-sc2")) $("btn-back-to-sc2").onclick = function() {
+            if ($("center-main-menu")) $("center-main-menu").classList.remove("hidden");
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
         };
 
         window.openTournament = async function(id, name) {
-            $("center-tournaments-list").classList.add("hidden");
-            $("center-tournament-detail").classList.remove("hidden");
-            $("detail-tour-name").innerText = name;
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
+            if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
+            if ($("detail-tour-name")) $("detail-tour-name").innerText = name;
             
             document.querySelectorAll('.sc-tab').forEach((el, i) => {
                 if (i === 0) el.classList.add("active");
                 else el.classList.remove("active");
             });
-            $("tour-tab-table").classList.remove("hidden");
-            $("tour-tab-stats").classList.add("hidden");
+            if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
+            if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
 
             const table = $("standings-table");
+            if (!table) return;
             table.innerHTML = "<tr><td>Загрузка...</td></tr>";
             
             try {
@@ -1462,10 +1494,10 @@
                 const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
                 const stats = await statRes.json();
                 
-                $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+                if ($("stat-scorers")) $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                if ($("stat-assists")) $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                if ($("stat-rating")) $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                if ($("stat-clean-sheets")) $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
 
             } catch (e) {
                 table.innerHTML = "<tr><td>Ошибка загрузки данных</td></tr>";
@@ -1475,22 +1507,22 @@
         window.switchTourTab = function(tab) {
             document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
             if (tab === 'table') {
-                document.querySelectorAll('.sc-tab')[0].classList.add("active");
-                $("tour-tab-table").classList.remove("hidden");
-                $("tour-tab-stats").classList.add("hidden");
+                if (document.querySelectorAll('.sc-tab')[0]) document.querySelectorAll('.sc-tab')[0].classList.add("active");
+                if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
+                if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
             } else {
-                document.querySelectorAll('.sc-tab')[1].classList.add("active");
-                $("tour-tab-table").classList.add("hidden");
-                $("tour-tab-stats").classList.remove("hidden");
+                if (document.querySelectorAll('.sc-tab')[1]) document.querySelectorAll('.sc-tab')[1].classList.add("active");
+                if ($("tour-tab-table")) $("tour-tab-table").classList.add("hidden");
+                if ($("tour-tab-stats")) $("tour-tab-stats").classList.remove("hidden");
             }
         };
 
-        $("btn-back-to-tours").onclick = function() {
-            $("center-tournaments-list").classList.remove("hidden");
-            $("center-tournament-detail").classList.add("hidden");
+        if ($("btn-back-to-tours")) $("btn-back-to-tours").onclick = function() {
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.remove("hidden");
+            if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
         };
 
-        $("btn-admin-skip").onclick = async function() {
+        if ($("btn-admin-skip")) $("btn-admin-skip").onclick = async function() {
             tg.showConfirm("Промотать 1 игровой месяц для всех?", async (ok) => {
                 if (!ok) return;
                 const res = await fetch(API_BASE + '/api/admin/advance-month', {
@@ -1508,7 +1540,7 @@
             });
         };
 
-        $("btn-admin-reset").onclick = function() {
+        if ($("btn-admin-reset")) $("btn-admin-reset").onclick = function() {
             tg.showConfirm("ВНИМАНИЕ! Это сбросит карьеру у ВСЕХ игроков. Продолжить?", function(ok1) {
                 if (!ok1) return;
                 tg.showConfirm("Точно уверен? Это действие нельзя отменить.", async function(ok2) {
@@ -1526,7 +1558,7 @@
             });
         };
 
-        // === ТАКТИКА ===
+        // ТАКТИКА
         const FORMATIONS = {
             "3-1-4-2": [
                 { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
@@ -1933,9 +1965,11 @@
                     tacticsLoaded = true;
                 }
                 const sel = $("formation-select");
-                sel.innerHTML = Object.keys(FORMATIONS).map(function(f) {
-                    return '<option value="' + f + '"' + (f === tacticsState.formation ? ' selected' : '') + '>' + f + '</option>';
-                }).join("");
+                if (sel) {
+                    sel.innerHTML = Object.keys(FORMATIONS).map(function(f) {
+                        return '<option value="' + f + '"' + (f === tacticsState.formation ? ' selected' : '') + '>' + f + '</option>';
+                    }).join("");
+                }
                 renderTactics();
             } catch (e) {
                 console.error(e);
@@ -1951,6 +1985,7 @@
 
         function renderPitch() {
             const container = $("pitch-slots");
+            if (!container) return;
             const formation = FORMATIONS[tacticsState.formation] || [];
             container.innerHTML = "";
             formation.forEach(function(slot, idx) {
@@ -1996,6 +2031,7 @@
         function renderBench() {
             const benchList = $("bench-list");
             const reserveList = $("reserve-list");
+            if (!benchList || !reserveList) return;
             
             const xiSet = new Set(tacticsState.starting_xi.filter(function(x) { return x != null; }));
             const benchSet = new Set(tacticsState.bench.filter(function(x) { return x != null; }));
@@ -2018,7 +2054,7 @@
                 return b.overall - a.overall;
             });
 
-            $("bench-count").innerText = benchPlayers.length + " чел.";
+            if ($("bench-count")) $("bench-count").innerText = benchPlayers.length + " чел.";
             benchList.innerHTML = benchPlayers.map(function(p) {
                 const isSel = selectedBenchPlayerId === p.id;
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
@@ -2047,6 +2083,7 @@
 
             function fill(selectId, currentVal) {
                 const sel = $(selectId);
+                if (!sel) return;
                 const prev = currentVal != null ? currentVal : (sel.value ? parseInt(sel.value) : null);
                 sel.innerHTML = '<option value="">—</option>';
                 xiPlayers.forEach(function(p) {
@@ -2066,6 +2103,7 @@
 
         function updateHint() {
             const hint = $("tactics-hint");
+            if (!hint) return;
             hint.classList.remove("active");
             if (selectedSlotIndex !== null) {
                 const slot = FORMATIONS[tacticsState.formation][selectedSlotIndex];
@@ -2110,6 +2148,7 @@
             }
             renderTactics();
         }
+        window.onSlotClick = onSlotClick;
 
         function onBenchPlayerClick(playerId) {
             if (selectedSlotIndex !== null) {
@@ -2124,6 +2163,7 @@
             }
             renderTactics();
         }
+        window.onBenchPlayerClick = onBenchPlayerClick;
 
         function onReservePlayerClick(playerId) {
             if (tacticsState.bench.length >= benchTargetSize) {
@@ -2136,7 +2176,6 @@
             markDirty();
             renderTactics();
         }
-
         window.onReservePlayerClick = onReservePlayerClick;
 
         function placeBenchPlayerIntoSlot(benchPlayerId, slotIdx) {
@@ -2180,7 +2219,7 @@
         }
         window.adjustBench = adjustBench;
 
-        $("formation-select").onchange = function(e) {
+        if ($("formation-select")) $("formation-select").onchange = function(e) {
             tacticsState.formation = e.target.value;
             const needed = FORMATIONS[tacticsState.formation].length;
             while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
@@ -2191,7 +2230,7 @@
             renderTactics();
         };
 
-        $("btn-auto-tactics").onclick = function() {
+        if ($("btn-auto-tactics")) $("btn-auto-tactics").onclick = function() {
             if (!window.currentPlayers) return;
             autoAssignStartingXI(window.currentPlayers);
             selectedSlotIndex = null;
@@ -2200,7 +2239,7 @@
             renderTactics();
         };
 
-        $("btn-reset-tactics").onclick = function() {
+        if ($("btn-reset-tactics")) $("btn-reset-tactics").onclick = function() {
             tacticsState.starting_xi = [];
             tacticsState.bench = [];
             tacticsState.captain_id = null;
@@ -2219,20 +2258,20 @@
             renderTactics();
         };
 
-        $("role-captain").onchange = function(e) {
+        if ($("role-captain")) $("role-captain").onchange = function(e) {
             tacticsState.captain_id = e.target.value ? parseInt(e.target.value) : null;
             markDirty();
             renderPitch();
         };
-        $("role-fk").onchange = function(e) {
+        if ($("role-fk")) $("role-fk").onchange = function(e) {
             tacticsState.free_kick_taker_id = e.target.value ? parseInt(e.target.value) : null;
             markDirty();
         };
-        $("role-corner").onchange = function(e) {
+        if ($("role-corner")) $("role-corner").onchange = function(e) {
             tacticsState.corner_taker_id = e.target.value ? parseInt(e.target.value) : null;
             markDirty();
         };
-        $("role-penalty").onchange = function(e) {
+        if ($("role-penalty")) $("role-penalty").onchange = function(e) {
             tacticsState.penalty_taker_id = e.target.value ? parseInt(e.target.value) : null;
             markDirty();
         };
@@ -2268,7 +2307,7 @@
             }
         }
 
-        $("btn-save-tactics").onclick = async function() {
+        if ($("btn-save-tactics")) $("btn-save-tactics").onclick = async function() {
             const btn = $("btn-save-tactics");
             btn.innerText = "Сохранение...";
             const success = await doSaveTactics();
@@ -2276,8 +2315,8 @@
             if (success) tg.showAlert("✅ Состав сохранён!");
         };
 
-        // === АККАУНТ ===
-        $("btn-save-account-name").onclick = async function() {
+        // АККАУНТ
+        if ($("btn-save-account-name")) $("btn-save-account-name").onclick = async function() {
             const newName = $("inp-account-coach-name").value.trim();
             if (newName.length < 3) return tg.showAlert("Слишком короткое имя");
             try {
@@ -2290,7 +2329,7 @@
             } catch(e) { tg.showAlert("Сетевая ошибка"); }
         };
 
-        $("btn-change-club").onclick = function() {
+        if ($("btn-change-club")) $("btn-change-club").onclick = function() {
             tg.showConfirm("Вы уверены, что хотите сменить клуб? Прогресс текущей карьеры будет сброшен.", async function(ok) {
                 if (!ok) return;
                 const res = await fetch(API_BASE + '/api/reset-club/' + userId, { method: 'DELETE' });
@@ -2301,33 +2340,33 @@
             });
         };
 
-        // === НАВИГАЦИЯ ===
-        $("btn-start").onclick = async function() {
+        // НАВИГАЦИЯ
+        if ($("btn-start")) $("btn-start").onclick = async function() {
             const hasClub = await checkManager(false);
             if (!hasClub) await loadData();
         };
         
-        $("btn-back-leagues").onclick = function() {
+        if ($("btn-back-leagues")) $("btn-back-leagues").onclick = function() {
             showScreen("leagues");
             setTimeout(function() { window.scrollTo(0, leaguesScrollPos); }, 10);
         };
         
-        $("btn-continue").onclick = function() {
+        if ($("btn-continue")) $("btn-continue").onclick = function() {
             if (managerSetupComplete) {
-                $("bottom-nav").classList.remove("hidden");
+                if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
                 loadSquad();
             } else {
                 goToCoachSetup();
             }
         };
-        $("btn-back-to-confirm").onclick = function() { showScreen("confirm"); };
-        $("btn-next-club-setup").onclick = goToClubSetup;
-        $("btn-back-to-coach").onclick = function() { showScreen("coach"); };
-        $("inp-extra-budget").onchange = updateBudgetDisplay;
-        $("btn-finish-setup").onclick = finishSetup;
-        $("btn-back-to-office").onclick = function() { switchTab('office'); };
+        if ($("btn-back-to-confirm")) $("btn-back-to-confirm").onclick = function() { showScreen("confirm"); };
+        if ($("btn-next-club-setup")) $("btn-next-club-setup").onclick = goToClubSetup;
+        if ($("btn-back-to-coach")) $("btn-back-to-coach").onclick = function() { showScreen("coach"); };
+        if ($("inp-extra-budget")) $("inp-extra-budget").onchange = updateBudgetDisplay;
+        if ($("btn-finish-setup")) $("btn-finish-setup").onclick = finishSetup;
+        if ($("btn-back-to-office")) $("btn-back-to-office").onclick = function() { switchTab('office'); };
 
-        $("btn-reset").onclick = function() {
+        if ($("btn-reset")) $("btn-reset").onclick = function() {
             tg.showConfirm("Сбросить клуб?", async function(ok) {
                 if (!ok) return;
                 const res = await fetch(API_BASE + '/api/reset-club/' + userId, { method: 'DELETE' });
@@ -2338,10 +2377,34 @@
             });
         };
 
+        // МОДАЛКА
+        if ($("modal-btn-stay")) $("modal-btn-stay").onclick = function() {
+            if ($("custom-modal")) $("custom-modal").classList.add("hidden");
+            pendingTabId = null;
+        };
+        if ($("modal-btn-exit")) $("modal-btn-exit").onclick = function() {
+            if ($("custom-modal")) $("custom-modal").classList.add("hidden");
+            tacticsDirty = false;
+            tg.disableClosingConfirmation();
+            if (pendingTabId) _doSwitchTab(pendingTabId);
+            pendingTabId = null;
+        };
+        if ($("modal-btn-save")) $("modal-btn-save").onclick = async function() {
+            const btn = $("modal-btn-save");
+            btn.innerText = "Сохранение...";
+            const success = await doSaveTactics();
+            btn.innerText = "Сохранить и выйти";
+            if (success) {
+                if ($("custom-modal")) $("custom-modal").classList.add("hidden");
+                if (pendingTabId) _doSwitchTab(pendingTabId);
+                pendingTabId = null;
+            }
+        };
+
         async function initApp() {
             const hasClub = await checkManager(true);
             if (hasClub && managerSetupComplete) {
-                $("bottom-nav").classList.remove("hidden");
+                if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
                 loadSquad();
             } else if (hasClub && !managerSetupComplete) {
                 goToCoachSetup();
