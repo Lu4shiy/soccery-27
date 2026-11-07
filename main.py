@@ -336,7 +336,7 @@ def init_db():
 
         db.commit()
 
-        # Генерация базового расписания на сезон (Август - Май)
+        # Генерация базового расписания на сезон (Август - Июль)
         if db.query(GameDay).count() == 0:
             start = date(2026, 8, 1)
             end = date(2027, 7, 31)
@@ -349,23 +349,32 @@ def init_db():
                     month_days.append(d)
                     d += timedelta(days=1)
                 
-                # Летом (июнь, июль) матчей нет
                 is_summer = curr.month in [6, 7]
                 
-                num_matches = 0 if is_summer else random.randint(2, 7)
-                match_indices = []
-                while len(match_indices) < num_matches:
-                    idx = random.randint(0, len(month_days) - 1)
-                    day_date = month_days[idx]
-                    if is_summer: break
-                    if curr.month == 8 and day_date.day < 20: continue
-                    if all(abs(idx - m) >= 2 for m in match_indices):
-                        match_indices.append(idx)
+                # Определяем допустимые дни для матчей
+                valid_days = []
+                for md in month_days:
+                    if is_summer: continue
+                    if curr.month == 8 and md.day < 20: continue
+                    valid_days.append(md)
                 
-                for i, day in enumerate(month_days):
+                max_possible = max(1, len(valid_days) // 2) if valid_days else 0
+                num_matches = 0 if is_summer else min(random.randint(2, 7), max_possible)
+                
+                # Выбираем дни матчей
+                match_days = []
+                candidates = valid_days[:]
+                random.shuffle(candidates)
+                for cand in candidates:
+                    if len(match_days) >= num_matches: break
+                    if all(abs(cand.day - m.day) >= 2 for m in match_days):
+                        match_days.append(cand)
+                
+                match_days_set = {md.day for md in match_days}
+                
+                for day in month_days:
                     date_str = day.strftime("%Y-%m-%d")
-                    if i in match_indices:
-                        # Временно ставим заглушку, соперник определится при запросе клуба
+                    if day.day in match_days_set:
                         db.add(GameDay(date=date_str, type="match"))
                     else:
                         r = random.random()
@@ -767,42 +776,66 @@ def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
         num_days = calendar.monthrange(year, month)[1]
+        is_summer = month in [6, 7]
         
-        # Получаем существующие дни
-        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
+        # Определяем допустимые для матчей дни
+        valid_match_days = []
+        for day in range(1, num_days + 1):
+            if is_summer: continue
+            if month == 8 and day < 20: continue
+            valid_match_days.append(day)
         
-        # Если дней меньше, чем должно быть в месяце, генерируем недостающие
-        if len(days) < num_days:
-            is_summer = month in [6, 7]
-            num_matches = 0 if is_summer else random.randint(2, 7)
-            match_indices = []
-            while len(match_indices) < num_matches:
-                idx = random.randint(1, num_days)
-                if is_summer: break
-                if month == 8 and idx < 20: continue
-                if all(abs(idx - m) >= 2 for m in match_indices):
-                    match_indices.append(idx)
-            
+        # Существующие дни в БД
+        existing_dates = {d.date for d in db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()}
+        
+        # Генерируем недостающие дни
+        if len(existing_dates) < num_days:
             for day in range(1, num_days + 1):
                 date_str = f"{year}-{month:02d}-{day:02d}"
-                existing = db.query(GameDay).filter_by(date=date_str).first()
-                if not existing:
-                    if day in match_indices:
-                        db.add(GameDay(date=date_str, type="match"))
-                    else:
-                        r = random.random()
-                        day_type = "training" if r < 0.3 else "rest"
-                        db.add(GameDay(date=date_str, type=day_type))
+                if date_str not in existing_dates:
+                    r = random.random()
+                    day_type = "training" if r < 0.3 else "rest"
+                    db.add(GameDay(date=date_str, type=day_type))
             db.commit()
-            days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
-
+        
+        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
+        
+        # Сбрасываем некорректные матчи (лето или август до 20-го)
+        for d in days:
+            if d.type != "match": continue
+            day_num = int(d.date.split("-")[2])
+            if is_summer or (month == 8 and day_num < 20):
+                r = random.random()
+                d.type = "training" if r < 0.3 else "rest"
+        db.commit()
+        
+        # Добавляем матчи, если их нет (только для допустимых месяцев)
+        if valid_match_days:
+            current_match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match"]
+            max_possible = max(1, len(valid_match_days) // 2)
+            target = min(random.randint(2, 7), max_possible)
+            
+            if len(current_match_days) < target:
+                needed = target - len(current_match_days)
+                candidates = [d for d in days if d.type != "match" and int(d.date.split("-")[2]) in valid_match_days]
+                random.shuffle(candidates)
+                
+                for cand in candidates:
+                    if needed <= 0: break
+                    cand_day = int(cand.date.split("-")[2])
+                    if all(abs(cand_day - cm) >= 2 for cm in current_match_days):
+                        cand.type = "match"
+                        current_match_days.append(cand_day)
+                        needed -= 1
+                db.commit()
+                days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
+        
         result = []
         for d in days:
             entry = {"date": d.date, "type": d.type}
             if d.type == "match" and club_id:
                 my_club = db.query(Club).filter(Club.id == club_id).first()
                 if my_club:
-                    # Делаем выбор соперника и дома/в гостях детерминированным для этой даты
                     random.seed(d.date)
                     opps = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).all()
                     if opps:
@@ -810,7 +843,7 @@ def get_schedule(year: int, month: int, club_id: int = None):
                         entry["opponent_name"] = opp.name
                         entry["is_home"] = random.choice([True, False])
                         entry["tournament_name"] = my_club.league
-                    random.seed() # Сбрасываем seed
+                    random.seed()
             result.append(entry)
         return result
     finally:
@@ -823,7 +856,7 @@ def get_standings(tournament_id: int):
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
         
-        clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).limit(20).all()
+        clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).all()
         standings = []
         for i, c in enumerate(clubs):
             standings.append({
@@ -845,6 +878,53 @@ def get_stats(tournament_id: int):
         "rating": [],
         "clean_sheets": []
     }
+
+@app.get("/api/tournaments/{tournament_id}/bracket")
+def get_bracket(tournament_id: int):
+    db = Session(engine)
+    try:
+        tour = db.query(Tournament).filter_by(id=tournament_id).first()
+        if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
+        
+        clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).order_by(Club.name).all()
+        
+        if not clubs:
+            return {"type": tour.type, "rounds": []}
+        
+        n = len(clubs)
+        size = 2
+        while size < n and size < 64:
+            size *= 2
+        if size < 4:
+            size = 4
+        
+        teams = [c.name for c in clubs[:size]]
+        while len(teams) < size:
+            teams.append("TBD")
+        
+        rounds = []
+        round_names = {2: "Финал", 4: "1/2 финала", 8: "1/4 финала", 16: "1/8 финала", 32: "1/16 финала", 64: "1/32 финала"}
+        
+        num_in_round = size
+        is_first = True
+        while num_in_round >= 2:
+            round_name = round_names.get(num_in_round, f"1/{num_in_round-1} финала")
+            num_matches = num_in_round // 2
+            matches = []
+            for i in range(num_matches):
+                if is_first:
+                    t1 = teams[i*2] if i*2 < len(teams) else "TBD"
+                    t2 = teams[i*2 + 1] if i*2 + 1 < len(teams) else "TBD"
+                else:
+                    t1, t2 = "TBD", "TBD"
+                matches.append({"team1": t1, "team2": t2, "score1": None, "score2": None})
+            rounds.append({"name": round_name, "matches": matches})
+            num_in_round //= 2
+            is_first = False
+        
+        return {"type": tour.type, "rounds": rounds}
+    finally:
+        db.close()
 
 # === АДМИН ЭНДПОИНТЫ ===
 @app.post("/api/admin/advance-month")

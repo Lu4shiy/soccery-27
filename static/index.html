@@ -1477,6 +1477,30 @@
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
         };
 
+        window.renderBracket = function(data) {
+            const container = $("tour-tab-table");
+            if (!container) return;
+            if (!data.rounds || data.rounds.length === 0) {
+                container.innerHTML = "<div style='color:#8e9eb5;'>Данные отсутствуют</div>";
+                return;
+            }
+            let html = "";
+            data.rounds.forEach(round => {
+                html += `<div style="margin-bottom: 16px;">`;
+                html += `<div style="color: #52a8ff; font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #2f3b4d;">${round.name}</div>`;
+                round.matches.forEach(m => {
+                    const score = (m.score1 !== null && m.score2 !== null) ? `${m.score1} : ${m.score2}` : "—";
+                    html += `<div style="background: #17212b; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="flex:1; text-align:right; margin-right:8px;">${m.team1}</span>
+                        <span style="color:#52a8ff; font-weight:bold; min-width:40px; text-align:center;">${score}</span>
+                        <span style="flex:1; margin-left:8px;">${m.team2}</span>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            container.innerHTML = html;
+        };
+
         window.openTournament = async function(id, name) {
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
             if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
@@ -1489,70 +1513,71 @@
             if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
             if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
 
-            const table = $("standings-table");
-            if (!table) return;
-            table.innerHTML = "<tr><td>Загрузка...</td></tr>";
+            const container = $("tour-tab-table");
+            if (!container) return;
+            container.innerHTML = "<div style='color:#8e9eb5;'>Загрузка...</div>";
             
             try {
-                const res = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
-                const data = await res.json();
+                // Узнаем тип турнира
+                const stRes = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
+                const stData = await stRes.json();
+                const tourType = stData.type || "League";
                 
-                if (data.standings && data.standings.length > 0) {
-                    table.innerHTML = `
-                        <tr>
-                            <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
-                            <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
-                            <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
-                        </tr>
-                    ` + data.standings.map(s => `
-                        <tr>
-                            <td class="num">${s.pos}</td>
-                            <td>${s.club_name}</td>
-                            <td class="num">${s.mp}</td>
-                            <td class="num">${s.w}</td>
-                            <td class="num">${s.d}</td>
-                            <td class="num">${s.l}</td>
-                            <td class="num">${s.gf}</td>
-                            <td class="num">${s.ga}</td>
-                            <td class="num">${s.gd}</td>
-                            <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
-                        </tr>
-                    `).join("");
+                // Обновляем лейбл вкладки
+                const firstTab = document.querySelectorAll('.sc-tab')[0];
+                if (firstTab) firstTab.innerText = (tourType === "Cup") ? "Сетка" : "Таблица";
+                
+                // Рендерим основной контент
+                if (tourType === "Cup") {
+                    const brRes = await fetch(API_BASE + `/api/tournaments/${id}/bracket`);
+                    const brData = await brRes.json();
+                    renderBracket(brData);
                 } else {
-                    table.innerHTML = "<tr><td>Нет данных</td></tr>";
+                    if (stData.standings && stData.standings.length > 0) {
+                        container.innerHTML = `<table class="stats-table">
+                            <tr>
+                                <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
+                                <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
+                                <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
+                            </tr>
+                            ${stData.standings.map(s => `<tr>
+                                <td class="num">${s.pos}</td>
+                                <td>${s.club_name}</td>
+                                <td class="num">${s.mp}</td>
+                                <td class="num">${s.w}</td>
+                                <td class="num">${s.d}</td>
+                                <td class="num">${s.l}</td>
+                                <td class="num">${s.gf}</td>
+                                <td class="num">${s.ga}</td>
+                                <td class="num">${s.gd}</td>
+                                <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
+                            </tr>`).join("")}
+                        </table>`;
+                    } else {
+                        container.innerHTML = "<div style='color:#8e9eb5;'>Нет данных</div>";
+                    }
                 }
 
+                // Статистика
                 const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
                 const stats = await statRes.json();
-                
                 const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
 
-                if (!stats.scorers || stats.scorers.length === 0) {
-                    $("stat-scorers").innerHTML = emptyHtml;
-                } else {
-                    $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                }
+                if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
+                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
-                if (!stats.assists || stats.assists.length === 0) {
-                    $("stat-assists").innerHTML = emptyHtml;
-                } else {
-                    $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                }
+                if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
+                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
-                if (!stats.rating || stats.rating.length === 0) {
-                    $("stat-rating").innerHTML = emptyHtml;
-                } else {
-                    $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-                }
+                if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
+                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
-                if (!stats.clean_sheets || stats.clean_sheets.length === 0) {
-                    $("stat-clean-sheets").innerHTML = emptyHtml;
-                } else {
-                    $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
-                }
+                if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
+                else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
 
             } catch (e) {
-                table.innerHTML = "<tr><td>Ошибка загрузки данных</td></tr>";
+                console.error(e);
+                container.innerHTML = "<div style='color:#ff6b6b;'>Ошибка загрузки данных</div>";
             }
         };
 
