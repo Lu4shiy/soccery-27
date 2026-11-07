@@ -1440,9 +1440,10 @@
                         const oppLogo = getSmallLogo(d.opponent_name || "");
                         const ha = d.is_home ? "Д" : "В";
                         const tourShort = (d.tournament_name || "").substring(0, 4);
-                        inner += `<div class="cal-match-info">
+                        inner += `<div class="cal-match-info" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
                                     <div class="cal-tour">${tourShort}</div>
                                     <div class="cal-opp">${oppLogo}</div>
+                                    <div style="font-size:6px; color:#fff; text-align:center; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; margin-top:1px;">${d.opponent_name}</div>
                                     <div class="cal-ha">${ha}</div>
                                   </div>`;
                     } else if (d.type === "training") {
