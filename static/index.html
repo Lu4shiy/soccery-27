@@ -1333,9 +1333,13 @@
             if (navEl) navEl.classList.add('active');
             
             if (tabId === 'tactics') {
-                await loadTactics(); // Ждем полной загрузки данных перед показом экрана
+                await loadTactics();
             } else if (tabId === 'account') {
                 if ($("account-club-name")) $("account-club-name").innerText = currentClubName;
+                if ($("admin-block")) {
+                    if (isAdmin) $("admin-block").classList.remove("hidden");
+                    else $("admin-block").classList.add("hidden");
+                }
                 fetch(API_BASE + '/api/manager/' + userId)
                     .then(r => r.json())
                     .then(data => {
@@ -1428,7 +1432,7 @@
                     
                     if (d.type === "match") {
                         cls += " match";
-                        const oppLogo = getLogoHTML('clubs', d.opponent_name || "").replace('logo-container', 'logo-container-mini');
+                        const oppLogo = getSmallLogo(d.opponent_name || "");
                         const ha = d.is_home ? "Д" : "В";
                         const tourShort = (d.tournament_name || "").substring(0, 4);
                         inner += `<div class="cal-match-info">

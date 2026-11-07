@@ -778,77 +778,78 @@ def get_schedule(year: int, month: int, club_id: int = None):
     try:
         num_days = calendar.monthrange(year, month)[1]
         is_summer = month in [6, 7]
-        
-        valid_match_days = []
+
+        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
+        existing_dates = {d.date: d for d in days}
+
+        for day in range(1, num_days + 1):
+            date_str = f"{year}-{month:02d}-{day:02d}"
+            if date_str not in existing_dates:
+                new_day = GameDay(date=date_str, type="rest")
+                db.add(new_day)
+                existing_dates[date_str] = new_day
+        db.commit()
+
+        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
+
+        valid_days = []
         for day in range(1, num_days + 1):
             if is_summer: continue
             if month == 8 and day < 20: continue
-            valid_match_days.append(day)
-        
-        existing_dates = {d.date for d in db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()}
-        
-        if len(existing_dates) < num_days:
-            for day in range(1, num_days + 1):
-                date_str = f"{year}-{month:02d}-{day:02d}"
-                if date_str not in existing_dates:
-                    r = random.random()
-                    day_type = "training" if r < 0.3 else "rest"
-                    db.add(GameDay(date=date_str, type=day_type))
-            db.commit()
-        
-        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
-        
+            valid_days.append(day)
+
+        match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match"]
         for d in days:
-            if d.type != "match": continue
             day_num = int(d.date.split("-")[2])
-            if is_summer or (month == 8 and day_num < 20):
-                r = random.random()
-                d.type = "training" if r < 0.3 else "rest"
+            if d.type == "match" and day_num not in valid_days:
+                d.type = "rest"
+
+        match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match" and int(d.date.split("-")[2]) in valid_days]
+
+        target_matches = min(random.randint(2, 7), max(1, len(valid_days) // 2))
+        if len(match_days) < target_matches:
+            needed = target_matches - len(match_days)
+            candidates = [d for d in days if d.type != "match" and int(d.date.split("-")[2]) in valid_days]
+            random.shuffle(candidates)
+            for cand in candidates:
+                if needed <= 0: break
+                cand_day = int(cand.date.split("-")[2])
+                if all(abs(cand_day - cm) >= 2 for cm in match_days):
+                    cand.type = "match"
+                    match_days.append(cand_day)
+                    needed -= 1
+
+        for d in days:
+            day_num = int(d.date.split("-")[2])
+            if d.type == "rest" and day_num in valid_days and day_num not in match_days:
+                if random.random() < 0.3:
+                    d.type = "training"
+
         db.commit()
-        
-        if valid_match_days:
-            current_match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match"]
-            max_possible = max(1, len(valid_match_days) // 2)
-            target = min(random.randint(2, 7), max_possible)
-            
-            if len(current_match_days) < target:
-                needed = target - len(current_match_days)
-                candidates = [d for d in days if d.type != "match" and int(d.date.split("-")[2]) in valid_match_days]
-                random.shuffle(candidates)
-                
-                for cand in candidates:
-                    if needed <= 0: break
-                    cand_day = int(cand.date.split("-")[2])
-                    if all(abs(cand_day - cm) >= 2 for cm in current_match_days):
-                        cand.type = "match"
-                        current_match_days.append(cand_day)
-                        needed -= 1
-                db.commit()
-                days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
-        
+        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
+
         result = []
         for d in days:
             entry = {"date": d.date, "type": d.type}
             if d.type == "match" and club_id:
                 my_club = db.query(Club).filter(Club.id == club_id).first()
                 if my_club:
-                    rnd = random.Random(d.date)
-                    opps = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).all()
-                    if opps:
-                        opp = rnd.choice(opps)
-                        entry["opponent_name"] = opp.name
-                        entry["is_home"] = rnd.choice([True, False])
-                        entry["tournament_name"] = my_club.league
+                    rnd = random.Random(d.date + str(club_id))
+                    tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == my_club.id).all()
+                    if tours:
+                        tour = rnd.choice(tours)
+                        opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tour.id, Club.id != my_club.id).all()
+                        if opps:
+                            opp = rnd.choice(opps)
+                            entry["opponent_name"] = opp.name
+                            entry["is_home"] = rnd.choice([True, False])
+                            entry["tournament_name"] = tour.name
             result.append(entry)
         return result
     except Exception as e:
-        print(f"Schedule Error: {e}")
         db.rollback()
-        num_days = calendar.monthrange(year, month)[1]
-        fallback = []
-        for day in range(1, num_days + 1):
-            fallback.append({"date": f"{year}-{month:02d}-{day:02d}", "type": "rest"})
-        return fallback
+        print(f"Schedule Error: {e}")
+        return []
     finally:
         db.close()
 
