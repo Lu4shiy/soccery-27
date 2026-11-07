@@ -700,6 +700,42 @@
         <button class="btn" id="btn-save-tactics">💾 Сохранить состав</button>
     </div>
 
+    <div id="screen-match" class="screen hidden">
+        <button class="btn-back" id="btn-back-from-match">← Назад в календарь</button>
+        <div class="card" style="text-align: center;">
+            <p id="match-tour-name" style="color:#52a8ff; font-weight:bold; margin-bottom:10px;"></p>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin: 20px 0;">
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+                    <div id="match-home-logo"></div>
+                    <div id="match-home-name" style="font-size:14px; font-weight:bold; margin-top:8px;"></div>
+                </div>
+                <div style="font-size:32px; font-weight:bold; color:#fff; margin: 0 15px;">
+                    <span id="match-score">- : -</span>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+                    <div id="match-away-logo"></div>
+                    <div id="match-away-name" style="font-size:14px; font-weight:bold; margin-top:8px;"></div>
+                </div>
+            </div>
+            <p id="match-date" style="font-size:12px; color:#8e9eb5;"></p>
+            <p id="match-days-left" style="font-weight:bold; color:#e6c544; margin-top:10px;"></p>
+        </div>
+
+        <div id="match-events-block" class="card hidden">
+            <h3 style="margin-top:0; color:#52a8ff;">События матча</h3>
+            <div id="match-events-list" style="font-size:13px;"></div>
+        </div>
+
+        <div id="match-stats-block" class="card hidden">
+            <h3 style="margin-top:0; color:#52a8ff;">Статистика</h3>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-poss-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Владение</span>
+                <span id="stat-poss-away" style="font-weight:bold;"></span>
+            </div>
+        </div>
+    </div>
+
     <div id="bottom-nav" class="bottom-nav hidden">
         <div class="nav-item" onclick="switchTab('office')" id="nav-office"><div class="nav-icon">💼</div>Офис</div>
         <div class="nav-item" onclick="switchTab('center')" id="nav-center"><div class="nav-icon">🏟</div>Спортцентр</div>
@@ -1471,11 +1507,13 @@
                         const oppLogo = getSmallLogo(d.opponent_name || "");
                         const ha = d.is_home ? "Д" : "В";
                         const tourShort = (d.tournament_name || "").substring(0, 4);
-                        inner += `<div class="cal-match-info" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
+                        const scoreStr = d.is_played ? `<div style="font-size:10px; font-weight:bold; color:#52a8ff;">${d.is_home ? d.home_goals + '-' + d.away_goals : d.away_goals + '-' + d.home_goals}</div>` : '';
+                        inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id})" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
                                     <div class="cal-tour">${tourShort}</div>
                                     <div class="cal-opp">${oppLogo}</div>
                                     <div style="font-size:6px; color:#fff; text-align:center; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; margin-top:1px;">${d.opponent_name}</div>
                                     <div class="cal-ha">${ha}</div>
+                                    ${scoreStr}
                                   </div>`;
                     } else if (d.type === "training") {
                         cls += " training";
@@ -2594,6 +2632,56 @@
                 } catch(e) {}
             }, 5000);
         }
+
+        window.openMatchDetails = async function(fixtureId) {
+            showScreen("match");
+            if ($("match-score")) $("match-score").innerText = "- : -";
+            if ($("match-events-block")) $("match-events-block").classList.add("hidden");
+            if ($("match-stats-block")) $("match-stats-block").classList.add("hidden");
+            
+            try {
+                const res = await fetch(API_BASE + `/api/match/${fixtureId}`);
+                if (!res.ok) throw new Error("Не найден");
+                const m = await res.json();
+                
+                if ($("match-tour-name")) $("match-tour-name").innerText = m.tournament;
+                if ($("match-home-logo")) $("match-home-logo").innerHTML = getLogoHTML('clubs', m.home_club, 'logo-large');
+                if ($("match-away-logo")) $("match-away-logo").innerHTML = getLogoHTML('clubs', m.away_club, 'logo-large');
+                if ($("match-home-name")) $("match-home-name").innerText = m.home_club;
+                if ($("match-away-name")) $("match-away-name").innerText = m.away_club;
+                if ($("match-date")) $("match-date").innerText = m.date;
+                
+                if (m.is_played) {
+                    if ($("match-score")) $("match-score").innerText = m.home_goals + " : " + m.away_goals;
+                    if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
+                    
+                    if ($("match-events-block")) $("match-events-block").classList.remove("hidden");
+                    const evHtml = m.events.map(e => `<div style="margin-bottom:4px;"><span style="color:#8e9eb5;">${e.minute}'</span> <b>${e.player}</b> ${e.type === 'goal' ? '⚽' : ''} ${e.assist ? '(асс. ' + e.assist + ')' : ''}</div>`).join("");
+                    if ($("match-events-list")) $("match-events-list").innerHTML = evHtml || "Нет событий";
+                    
+                    if ($("match-stats-block")) $("match-stats-block").classList.remove("hidden");
+                    if ($("stat-poss-home")) $("stat-poss-home").innerText = m.home_poss + "%";
+                    if ($("stat-poss-away")) $("stat-poss-away").innerText = m.away_poss + "%";
+                } else {
+                    if ($("match-days-left")) {
+                        const matchDate = new Date(m.date);
+                        const today = new Date(currentGameDate);
+                        const diffTime = Math.abs(matchDate - today);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        $("match-days-left").innerText = diffDays === 0 ? "Матч сегодня!" : `До матча: ${diffDays} дн.`;
+                    }
+                }
+            } catch(e) {
+                tg.showAlert("Ошибка загрузки матча");
+                showScreen("center");
+            }
+        };
+
+        if ($("btn-back-from-match")) $("btn-back-from-match").onclick = function() {
+            showScreen("center");
+            if ($("center-schedule")) $("center-schedule").classList.remove("hidden");
+            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+        };
 
         window.addEventListener('load', initApp);
         console.log("Soccery 27 initialized OK. User:", userId);

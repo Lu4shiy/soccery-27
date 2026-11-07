@@ -74,6 +74,37 @@ class Player(Base):
     training_started_at = Column(DateTime, nullable=True)
     morale = Column(String, default="green")
     fitness = Column(String, default="green")
+    goals = Column(Integer, default=0)
+    assists = Column(Integer, default=0)
+    matches_played = Column(Integer, default=0)
+    rating_sum = Column(Float, default=0.0)
+    fatigue = Column(Integer, default=0)
+    injury_weeks = Column(Integer, default=0)
+
+class Fixture(Base):
+    __tablename__ = "fixtures"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String, index=True)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"))
+    home_club_id = Column(Integer, ForeignKey("clubs.id"))
+    away_club_id = Column(Integer, ForeignKey("clubs.id"))
+    is_played = Column(Integer, default=0)
+    home_goals = Column(Integer, nullable=True)
+    away_goals = Column(Integer, nullable=True)
+    home_poss = Column(Integer, default=50)
+    away_poss = Column(Integer, default=50)
+    home_shots = Column(Integer, default=0)
+    away_shots = Column(Integer, default=0)
+
+class MatchEvent(Base):
+    __tablename__ = "match_events"
+    id = Column(Integer, primary_key=True, index=True)
+    fixture_id = Column(Integer, ForeignKey("fixtures.id"))
+    minute = Column(Integer)
+    event_type = Column(String)
+    club_id = Column(Integer, ForeignKey("clubs.id"))
+    player_id = Column(Integer, ForeignKey("players.id"))
+    assist_id = Column(Integer, ForeignKey("players.id"), nullable=True)
 
 class Manager(Base):
     __tablename__ = "managers"
@@ -250,6 +281,12 @@ def init_db():
         db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS morale VARCHAR DEFAULT 'green';"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fitness VARCHAR DEFAULT 'green';"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS goals INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS assists INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS matches_played INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS rating_sum FLOAT DEFAULT 0.0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fatigue INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_weeks INTEGER DEFAULT 0;"))
         db.commit()
         
         # Инициализация времени
@@ -577,6 +614,52 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
+def generate_fixtures_for_club(club_id: int, db: Session):
+    db.query(Fixture).filter((Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)).delete()
+    db.commit()
+    
+    start_date = date(2026, 8, 20)
+    end_date = date(2027, 5, 31)
+    season_days = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+    
+    rnd = random.Random(club_id)
+    tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == club_id).all()
+    
+    matches_to_play = []
+    for t in tours:
+        if t.type == "League":
+            matches_to_play.extend([t] * 38)
+        elif t.type == "Cup":
+            matches_to_play.extend([t] * 6)
+        elif t.type == "Continental":
+            matches_to_play.extend([t] * (6 if t.name == "UEFA Conference League" else 8))
+            
+    rnd.shuffle(matches_to_play)
+    used_days = set()
+    
+    for t in matches_to_play:
+        for _ in range(1000):
+            d = rnd.choice(season_days)
+            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
+                opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == t.id, Club.id != club_id).all()
+                if opps:
+                    opp = rnd.choice(opps)
+                    is_home = rnd.choice([True, False])
+                    
+                    h_id = club_id if is_home else opp.id
+                    a_id = opp.id if is_home else club_id
+                    
+                    db.add(Fixture(
+                        date=d.strftime("%Y-%m-%d"),
+                        tournament_id=t.id,
+                        home_club_id=h_id,
+                        away_club_id=a_id,
+                        is_played=0
+                    ))
+                    used_days.add(d)
+                break
+    db.commit()
+
 @app.post("/api/select-club")
 def select_club(req: SelectClubRequest):
     db = Session(engine)
@@ -593,6 +676,9 @@ def select_club(req: SelectClubRequest):
         else:
             db.add(Manager(telegram_id=req.telegram_id, first_name=req.first_name or "", club_id=req.club_id, is_setup_complete=0))
         db.commit()
+        
+        generate_fixtures_for_club(req.club_id, db)
+        
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
         db.close()
@@ -804,99 +890,83 @@ def get_game_time():
     finally:
         db.close()
 
-def generate_club_schedule(club_id: int, db: Session):
-    start_date = date(2026, 8, 20)
-    end_date = date(2027, 5, 31)
-    season_days = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
-    
-    rnd = random.Random(club_id)
-    tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == club_id).all()
-    
-    matches_to_play = []
-    for t in tours:
-        if t.type == "League":
-            matches_to_play.extend([t] * 38)
-        elif t.type == "Cup":
-            matches_to_play.extend([t] * 6)
-        elif t.type == "Continental":
-            matches_to_play.extend([t] * (6 if t.name == "UEFA Conference League" else 8))
-            
-    rnd.shuffle(matches_to_play)
-    
-    match_days = {}
-    used_days = set()
-    
-    for t in matches_to_play:
-        for _ in range(1000):
-            d = rnd.choice(season_days)
-            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
-                opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == t.id, Club.id != club_id).all()
-                if opps:
-                    opp = rnd.choice(opps)
-                    is_home = rnd.choice([True, False])
-                    match_days[d] = (t.name, opp.name, is_home)
-                    used_days.add(d)
-                break
-                
-    schedule = {}
-    train_streak = 0
-    rest_streak = 0
-    
-    for d in season_days:
-        if d in match_days:
-            t_name, opp_name, is_home = match_days[d]
-            schedule[d] = {"type": "match", "tournament_name": t_name, "opponent_name": opp_name, "is_home": is_home}
-            train_streak = 0
-            rest_streak = 1
-        else:
-            is_after_match = (d - timedelta(days=1)) in match_days
-            
-            if is_after_match:
-                schedule[d] = {"type": "rest"}
-                rest_streak += 1
-                train_streak = 0
-            else:
-                if train_streak >= 2:
-                    schedule[d] = {"type": "rest"}
-                    rest_streak += 1
-                    train_streak = 0
-                elif rest_streak >= 2:
-                    schedule[d] = {"type": "training"}
-                    train_streak += 1
-                    rest_streak = 0
-                else:
-                    day_rnd = random.Random(f"{club_id}_{d}")
-                    if day_rnd.random() < 0.7:
-                        schedule[d] = {"type": "training"}
-                        train_streak += 1
-                        rest_streak = 0
-                    else:
-                        schedule[d] = {"type": "rest"}
-                        rest_streak += 1
-                        train_streak = 0
-    return schedule
-
 @app.get("/api/game/schedule")
 def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
         num_days = calendar.monthrange(year, month)[1]
+        start_str = f"{year}-{month:02d}-01"
+        end_str = f"{year}-{month:02d}-{num_days:02d}"
         
-        club_schedule = {}
+        fixtures = []
         if club_id:
-            club_schedule = generate_club_schedule(club_id, db)
+            fixtures = db.query(Fixture).filter(
+                Fixture.date >= start_str,
+                Fixture.date <= end_str,
+                (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)
+            ).all()
             
+        fixture_map = {f.date: f for f in fixtures}
+        
         result = []
+        train_streak = 0
+        rest_streak = 0
+        prev_date = date(year, month, 1) - timedelta(days=1)
+        
+        if club_id:
+            prev_match = db.query(Fixture).filter(Fixture.date == prev_date.strftime("%Y-%m-%d"), (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)).first()
+            if prev_match: rest_streak = 1
+            
         for day in range(1, num_days + 1):
             date_obj = date(year, month, day)
             date_str = date_obj.strftime("%Y-%m-%d")
             
-            if date_obj in club_schedule:
-                entry = {"date": date_str}
-                entry.update(club_schedule[date_obj])
+            if date_str in fixture_map:
+                f = fixture_map[date_str]
+                tour = db.query(Tournament).filter_by(id=f.tournament_id).first()
+                is_home = (f.home_club_id == club_id)
+                opp_id = f.away_club_id if is_home else f.home_club_id
+                opp = db.query(Club).filter_by(id=opp_id).first()
+                
+                entry = {
+                    "date": date_str, 
+                    "type": "match", 
+                    "fixture_id": f.id,
+                    "is_played": f.is_played,
+                    "tournament_name": tour.name if tour else "Товарищеский",
+                    "opponent_name": opp.name if opp else "Соперник",
+                    "is_home": is_home
+                }
+                if f.is_played:
+                    entry["home_goals"] = f.home_goals
+                    entry["away_goals"] = f.away_goals
                 result.append(entry)
+                train_streak = 0
+                rest_streak = 1
             else:
-                result.append({"date": date_str, "type": "rest"})
+                if rest_streak >= 1:
+                    entry = {"date": date_str, "type": "rest"}
+                    rest_streak += 1
+                    train_streak = 0
+                elif train_streak >= 2:
+                    entry = {"date": date_str, "type": "rest"}
+                    rest_streak += 1
+                    train_streak = 0
+                elif rest_streak >= 2:
+                    entry = {"date": date_str, "type": "training"}
+                    train_streak += 1
+                    rest_streak = 0
+                else:
+                    day_rnd = random.Random(f"{club_id}_{date_str}")
+                    if day_rnd.random() < 0.7:
+                        entry = {"date": date_str, "type": "training"}
+                        train_streak += 1
+                        rest_streak = 0
+                    else:
+                        entry = {"date": date_str, "type": "rest"}
+                        rest_streak += 1
+                        train_streak = 0
+                result.append(entry)
         return result
     except Exception as e:
         print(f"Schedule Error: {e}")
@@ -1041,14 +1111,122 @@ async def cmd_start(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(keyboard=[[types.KeyboardButton(text="🚀 Открыть Soccery 27", web_app=types.WebAppInfo(url=web_app_url))]], resize_keyboard=True)
     await message.answer("Добро пожаловать в Soccery 27!\nНажми кнопку ниже, чтобы начать карьеру.", reply_markup=keyboard)
 
+def simulate_match(fixture_id: int, db: Session):
+    fx = db.query(Fixture).filter_by(id=fixture_id).first()
+    if not fx or fx.is_played: return
+    
+    home = db.query(Club).filter_by(id=fx.home_club_id).first()
+    away = db.query(Club).filter_by(id=fx.away_club_id).first()
+    
+    def get_xi(club_id):
+        t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
+        players = []
+        if t and t.starting_xi:
+            xi_ids = json.loads(t.starting_xi)
+            players = db.query(Player).filter(Player.id.in_(xi_ids)).all()
+        if not players:
+            players = db.query(Player).filter_by(club_id=club_id).order_by(Player.overall_rating.desc()).limit(11).all()
+        return players
+
+    h_xi = get_xi(home.id)
+    a_xi = get_xi(away.id)
+    
+    h_att = sum([p.shooting or 50 for p in h_xi if "Goalkeeper" not in p.position]) / 10
+    a_def = sum([p.defending or 50 for p in a_xi if "Goalkeeper" not in p.position]) / 10
+    a_att = sum([p.shooting or 50 for p in a_xi if "Goalkeeper" not in p.position]) / 10
+    h_def = sum([p.defending or 50 for p in h_xi if "Goalkeeper" not in p.position]) / 10
+    
+    h_goals = 0
+    a_goals = 0
+    events = []
+    
+    h_chances = max(1, int((h_att - a_def) / 10) + 4)
+    a_chances = max(1, int((a_att - h_def) / 10) + 3)
+    
+    h_scorers = [p for p in h_xi if "Goalkeeper" not in p.position]
+    a_scorers = [p for p in a_xi if "Goalkeeper" not in p.position]
+    
+    for _ in range(h_chances):
+        if random.random() < 0.3:
+            h_goals += 1
+            scorer = random.choice(h_scorers)
+            assist = random.choice([p for p in h_scorers if p.id != scorer.id]) if random.random() < 0.7 else None
+            events.append(MatchEvent(fixture_id=fx.id, minute=random.randint(1, 90), event_type='goal', club_id=home.id, player_id=scorer.id, assist_id=assist.id if assist else None))
+            scorer.goals = (scorer.goals or 0) + 1
+            if assist: assist.assists = (assist.assists or 0) + 1
+            scorer.rating_sum = (scorer.rating_sum or 0) + 1.0
+            
+    for _ in range(a_chances):
+        if random.random() < 0.25:
+            a_goals += 1
+            scorer = random.choice(a_scorers)
+            assist = random.choice([p for p in a_scorers if p.id != scorer.id]) if random.random() < 0.7 else None
+            events.append(MatchEvent(fixture_id=fx.id, minute=random.randint(1, 90), event_type='goal', club_id=away.id, player_id=scorer.id, assist_id=assist.id if assist else None))
+            scorer.goals = (scorer.goals or 0) + 1
+            if assist: assist.assists = (assist.assists or 0) + 1
+            scorer.rating_sum = (scorer.rating_sum or 0) + 1.0
+
+    for p in h_xi + a_xi:
+        p.matches_played = (p.matches_played or 0) + 1
+        p.fatigue = min(100, (p.fatigue or 0) + random.randint(10, 25))
+        if p.fatigue > 80: p.fitness = "red"
+        elif p.fatigue > 60: p.fitness = "orange"
+        elif p.fatigue > 40: p.fitness = "yellow"
+        
+    fx.home_goals = h_goals
+    fx.away_goals = a_goals
+    fx.is_played = 1
+    fx.home_poss = random.randint(40, 60)
+    fx.away_poss = 100 - fx.home_poss
+    
+    for ev in events: db.add(ev)
+    db.commit()
+
 def advance_game_date(db, days_to_add):
     state = db.query(GameState).first()
     if not state: return None
     curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
     new_date = curr + timedelta(days=days_to_add)
+    
+    unplayed = db.query(Fixture).filter(Fixture.date <= new_date.strftime("%Y-%m-%d"), Fixture.is_played == 0).all()
+    for fx in unplayed:
+        simulate_match(fx.id, db)
+        
     state.current_date = new_date.strftime("%Y-%m-%d")
     db.commit()
     return state.current_date
+
+@app.get("/api/match/{fixture_id}")
+def get_match_details(fixture_id: int):
+    db = Session(engine)
+    try:
+        fx = db.query(Fixture).filter_by(id=fixture_id).first()
+        if not fx: raise HTTPException(status_code=404, detail="Матч не найден")
+        home = db.query(Club).filter_by(id=fx.home_club_id).first()
+        away = db.query(Club).filter_by(id=fx.away_club_id).first()
+        tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
+        
+        events = db.query(MatchEvent).filter_by(fixture_id=fx.id).order_by(MatchEvent.minute).all()
+        
+        events_data = []
+        for e in events:
+            p = db.query(Player).filter_by(id=e.player_id).first()
+            a = db.query(Player).filter_by(id=e.assist_id).first() if e.assist_id else None
+            events_data.append({
+                "minute": e.minute, "type": e.event_type, "club_id": e.club_id,
+                "player": p.name if p else "", "assist": a.name if a else ""
+            })
+            
+        return {
+            "id": fx.id, "date": fx.date, "is_played": bool(fx.is_played),
+            "home_club": home.name, "away_club": away.name,
+            "home_goals": fx.home_goals, "away_goals": fx.away_goals,
+            "home_poss": fx.home_poss, "away_poss": fx.away_poss,
+            "tournament": tour.name if tour else "",
+            "events": events_data
+        }
+    finally:
+        db.close()
 
 @dp.message(Command("day"))
 async def cmd_admin_day(message: types.Message):
