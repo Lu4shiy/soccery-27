@@ -262,7 +262,6 @@ def init_db():
             else: c.continent = "UEFA"
         db.commit()
 
-        # Пересоздаем турниры при каждом запуске (чтобы применить новые кубки)
         db.execute(text("DROP TABLE IF EXISTS club_tournaments CASCADE;"))
         db.execute(text("DROP TABLE IF EXISTS tournaments CASCADE;"))
         db.commit()
@@ -315,15 +314,7 @@ def init_db():
                 if c in tour_map:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
 
-            if club.continent == "UEFA":
-                if is_in_list(club.name, UCL_TEAMS):
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Champions League"]))
-                elif is_in_list(club.name, UEL_TEAMS):
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Europa League"]))
-                elif is_in_list(club.name, UECL_TEAMS):
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["UEFA Conference League"]))
-            
-            elif club.continent == "CONMEBOL":
+            if club.continent == "CONMEBOL":
                 if club.stars >= 4.0:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
                 else:
@@ -336,6 +327,36 @@ def init_db():
                 db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["AFC Champions League Elite"]))
 
         db.commit()
+
+        for comp_name, team_list in [
+            ("UEFA Champions League", UCL_TEAMS),
+            ("UEFA Europa League", UEL_TEAMS),
+            ("UEFA Conference League", UECL_TEAMS)
+        ]:
+            tour = db.query(Tournament).filter_by(name=comp_name).first()
+            if not tour: continue
+            
+            db.query(ClubTournament).filter_by(tournament_id=tour.id).delete()
+            
+            added_clubs = set()
+            for t_name in team_list:
+                c_clean = clean_name(t_name)
+                club = None
+                for c in db.query(Club).filter(Club.continent == "UEFA").all():
+                    if clean_name(c.name) == c_clean or c_clean in clean_name(c.name):
+                        club = c
+                        break
+                if club and club.id not in added_clubs:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour.id))
+                    added_clubs.add(club.id)
+            
+            if len(added_clubs) < 36:
+                other_clubs = db.query(Club).filter(Club.continent == "UEFA", ~Club.id.in_(added_clubs)).order_by(func.random()).all()
+                for c in other_clubs:
+                    if len(added_clubs) >= 36: break
+                    db.add(ClubTournament(club_id=c.id, tournament_id=tour.id))
+                    added_clubs.add(c.id)
+            db.commit()
 
         # Генерация базового расписания на сезон (Август - Июль)
         if db.query(GameDay).count() == 0:
@@ -778,78 +799,53 @@ def get_schedule(year: int, month: int, club_id: int = None):
     try:
         num_days = calendar.monthrange(year, month)[1]
         is_summer = month in [6, 7]
-
-        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()
-        existing_dates = {d.date: d for d in days}
-
-        for day in range(1, num_days + 1):
-            date_str = f"{year}-{month:02d}-{day:02d}"
-            if date_str not in existing_dates:
-                new_day = GameDay(date=date_str, type="rest")
-                db.add(new_day)
-                existing_dates[date_str] = new_day
-        db.commit()
-
-        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
-
-        valid_days = []
-        for day in range(1, num_days + 1):
-            if is_summer: continue
-            if month == 8 and day < 20: continue
-            valid_days.append(day)
-
-        match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match"]
-        for d in days:
-            day_num = int(d.date.split("-")[2])
-            if d.type == "match" and day_num not in valid_days:
-                d.type = "rest"
-
-        match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match" and int(d.date.split("-")[2]) in valid_days]
-
-        target_matches = min(random.randint(2, 7), max(1, len(valid_days) // 2))
-        if len(match_days) < target_matches:
-            needed = target_matches - len(match_days)
-            candidates = [d for d in days if d.type != "match" and int(d.date.split("-")[2]) in valid_days]
-            random.shuffle(candidates)
-            for cand in candidates:
-                if needed <= 0: break
-                cand_day = int(cand.date.split("-")[2])
-                if all(abs(cand_day - cm) >= 2 for cm in match_days):
-                    cand.type = "match"
-                    match_days.append(cand_day)
-                    needed -= 1
-
-        for d in days:
-            day_num = int(d.date.split("-")[2])
-            if d.type == "rest" and day_num in valid_days and day_num not in match_days:
-                if random.random() < 0.3:
-                    d.type = "training"
-
-        db.commit()
-        days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
-
-        result = []
-        for d in days:
-            entry = {"date": d.date, "type": d.type}
-            if d.type == "match" and club_id:
-                my_club = db.query(Club).filter(Club.id == club_id).first()
-                if my_club:
-                    rnd = random.Random(d.date + str(club_id))
-                    tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == my_club.id).all()
-                    if tours:
-                        tour = rnd.choice(tours)
-                        opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tour.id, Club.id != my_club.id).all()
-                        if opps:
-                            opp = rnd.choice(opps)
-                            entry["opponent_name"] = opp.name
-                            entry["is_home"] = rnd.choice([True, False])
-                            entry["tournament_name"] = tour.name
-            result.append(entry)
-        return result
+        valid_days = [d for d in range(1, num_days + 1) if not is_summer and not (month == 8 and d < 20)]
+        
+        days_data = []
+        rnd = random.Random(f"{year}-{month}")
+        
+        match_days = []
+        if valid_days:
+            target_matches = min(rnd.randint(2, 7), max(1, len(valid_days) // 2))
+            candidates = valid_days[:]
+            rnd.shuffle(candidates)
+            for c in candidates:
+                if len(match_days) >= target_matches: break
+                if all(abs(c - m) >= 2 for m in match_days):
+                    match_days.append(c)
+        
+        my_club = db.query(Club).filter(Club.id == club_id).first() if club_id else None
+        
+        for d in range(1, num_days + 1):
+            date_str = f"{year}-{month:02d}-{d:02d}"
+            if d in match_days:
+                day_type = "match"
+            elif d in valid_days:
+                day_type = "training" if rnd.random() < 0.3 else "rest"
+            else:
+                day_type = "rest"
+                
+            entry = {"date": date_str, "type": day_type}
+            
+            if day_type == "match" and my_club:
+                tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == my_club.id).all()
+                if tours:
+                    trnd = random.Random(date_str + str(my_club.id))
+                    tour = trnd.choice(tours)
+                    entry["tournament_name"] = tour.name
+                    
+                    opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tour.id, Club.id != my_club.id).all()
+                    if opps:
+                        opp = trnd.choice(opps)
+                        entry["opponent_name"] = opp.name
+                        entry["is_home"] = trnd.choice([True, False])
+                        
+            days_data.append(entry)
+            
+        return days_data
     except Exception as e:
-        db.rollback()
         print(f"Schedule Error: {e}")
-        return []
+        return [{"date": f"{year}-{month:02d}-{d:02d}", "type": "rest"} for d in range(1, calendar.monthrange(year, month)[1] + 1)]
     finally:
         db.close()
 

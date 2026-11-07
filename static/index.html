@@ -1336,6 +1336,11 @@
                 await loadTactics();
             } else if (tabId === 'account') {
                 if ($("account-club-name")) $("account-club-name").innerText = currentClubName;
+                try {
+                    const mRes = await fetch(API_BASE + '/api/manager/' + userId);
+                    const mData = await mRes.json();
+                    if (mData.is_admin) isAdmin = true;
+                } catch(e) {}
                 if ($("admin-block")) {
                     if (isAdmin) $("admin-block").classList.remove("hidden");
                     else $("admin-block").classList.add("hidden");
