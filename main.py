@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, date
 from typing import Optional, List
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Depends
@@ -986,14 +986,19 @@ def advance_month(req: dict):
         state = db.query(GameState).first()
         if not state: return {"status": "error"}
         
-        # Парсим текущую дату
-        y, m, d = map(int, state.current_date.split("-"))
-        if m == 12:
-            y += 1
-            m = 1
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        last_day = calendar.monthrange(curr.year, curr.month)[1]
+        days_to_end = last_day - curr.day
+        
+        if days_to_end > 0:
+            new_date = curr + timedelta(days=days_to_end)
         else:
-            m += 1
-        state.current_date = f"{y}-{m:02d}-01"
+            if curr.month == 12:
+                new_date = date(curr.year + 1, 1, 1)
+            else:
+                new_date = date(curr.year, curr.month + 1, 1)
+                
+        state.current_date = new_date.strftime("%Y-%m-%d")
         db.commit()
         return {"status": "ok", "new_date": state.current_date}
     finally:
@@ -1027,6 +1032,49 @@ async def cmd_start(message: types.Message):
     web_app_url = "https://soccery-27.onrender.com/app"
     keyboard = types.ReplyKeyboardMarkup(keyboard=[[types.KeyboardButton(text="🚀 Открыть Soccery 27", web_app=types.WebAppInfo(url=web_app_url))]], resize_keyboard=True)
     await message.answer("Добро пожаловать в Soccery 27!\nНажми кнопку ниже, чтобы начать карьеру.", reply_markup=keyboard)
+
+def advance_game_date(db, days_to_add):
+    state = db.query(GameState).first()
+    if not state: return None
+    curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+    new_date = curr + timedelta(days=days_to_add)
+    state.current_date = new_date.strftime("%Y-%m-%d")
+    db.commit()
+    return state.current_date
+
+@dp.message(Command("day"))
+async def cmd_admin_day(message: types.Message):
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    db = Session(engine)
+    new_date = advance_game_date(db, 1)
+    db.close()
+    await message.answer(f"⏩ Промотан 1 день. Дата: {new_date}")
+
+@dp.message(Command("week"))
+async def cmd_admin_week(message: types.Message):
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    db = Session(engine)
+    state = db.query(GameState).first()
+    if state:
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        days_to_sunday = 6 - curr.weekday()
+        if days_to_sunday == 0: days_to_sunday = 7
+        new_date = advance_game_date(db, days_to_sunday)
+        await message.answer(f"⏩ Промотано до конца недели. Дата: {new_date}")
+    db.close()
+
+@dp.message(Command("month"))
+async def cmd_admin_month(message: types.Message):
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    db = Session(engine)
+    state = db.query(GameState).first()
+    if state:
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        last_day = calendar.monthrange(curr.year, curr.month)[1]
+        days_to_end = last_day - curr.day
+        new_date = advance_game_date(db, days_to_end)
+        await message.answer(f"⏩ Промотан месяц. Дата: {new_date}")
+    db.close()
 
 async def start_bot():
     await dp.start_polling(bot)
