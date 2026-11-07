@@ -33,7 +33,7 @@ engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
 # --- ВАЖНО: ЗАМЕНИТЕ НА РЕАЛЬНЫЙ ID @IvanImpulse19 ---
-ADMIN_TELEGRAM_ID = "123456789" # <--- ВСТАВЬТЕ СЮДА ID АДМИНА
+ADMIN_TELEGRAM_ID = "5020258637" # <--- ВСТАВЬТЕ СЮДА ID АДМИНА
 
 # --- МОДЕЛИ ---
 class Club(Base):
