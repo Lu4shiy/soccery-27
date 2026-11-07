@@ -1479,6 +1479,16 @@
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
         };
 
+        window.getSmallLogo = function(name) {
+            if (!name) return "";
+            const slug = slugify(name);
+            const fallback = name.charAt(0);
+            return `<div style="width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border-radius: 3px; margin: 0 6px; padding: 1px; flex-shrink: 0; overflow: hidden;">
+                <img src="/static/logos/clubs/${slug}.png?v=10" style="max-width: 100%; max-height: 100%;" onerror="handleImgError(this, 'clubs', '${slug}', '${fallback}')">
+                <div class="logo-fallback" style="display:none; font-size: 10px; color: #52a8ff; font-weight: bold;">${fallback}</div>
+            </div>`;
+        };
+
         window.renderBracket = function(data) {
             const container = $("tour-tab-table");
             if (!container) return;
@@ -1492,10 +1502,12 @@
                 html += `<div style="color: #52a8ff; font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #2f3b4d;">${round.name}</div>`;
                 round.matches.forEach(m => {
                     const score = (m.score1 !== null && m.score2 !== null) ? `${m.score1} : ${m.score2}` : "—";
+                    const t1Logo = getSmallLogo(m.team1);
+                    const t2Logo = getSmallLogo(m.team2);
                     html += `<div style="background: #17212b; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-                        <span style="flex:1; text-align:right; margin-right:8px;">${m.team1}</span>
+                        <span style="flex:1; display:flex; justify-content:flex-end; align-items:center; text-align:right; margin-right:8px;">${m.team1} ${t1Logo}</span>
                         <span style="color:#52a8ff; font-weight:bold; min-width:40px; text-align:center;">${score}</span>
-                        <span style="flex:1; margin-left:8px;">${m.team2}</span>
+                        <span style="flex:1; display:flex; justify-content:flex-start; align-items:center; margin-left:8px;">${t2Logo} ${m.team2}</span>
                     </div>`;
                 });
                 html += `</div>`;
@@ -1539,10 +1551,17 @@
                         const rowsHtml = stData.standings.map(s => {
                             let currentZone = "";
                             let rowStyle = "";
-                            if (s.pos <= 4) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
-                            else if (s.pos === 5) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
-                            else if (s.pos === 6) { currentZone = "Лига Конференций"; rowStyle = "border-left: 3px solid #2ecc71;"; }
-                            else if (s.pos > total - 3) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            if (tourType === "League") {
+                                if (s.pos <= 4) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
+                                else if (s.pos === 5) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
+                                else if (s.pos === 6) { currentZone = "Лига Конференций"; rowStyle = "border-left: 3px solid #2ecc71;"; }
+                                else if (s.pos > total - 3) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            } else if (tourType === "Continental") {
+                                if (s.pos === 1) { currentZone = "Чемпион"; rowStyle = "border-left: 3px solid #e6c544;"; }
+                                else if (s.pos >= 2 && s.pos <= 8) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
+                                else if (s.pos >= 9 && s.pos <= 24) { currentZone = "Стыковые матчи"; rowStyle = "border-left: 3px solid #2ecc71;"; }
+                                else if (s.pos > 24) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            }
                             
                             let html = "";
                             if (currentZone && currentZone !== lastZone) {
@@ -1550,8 +1569,7 @@
                                 lastZone = currentZone;
                             }
                             
-                            const slug = slugify(s.club_name);
-                            const logoHtml = `<div style="width: 20px; height: 20px; background: #fff; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; padding: 2px;"><img src="/static/logos/clubs/${slug}.png" style="max-width: 100%; max-height: 100%;" onerror="this.style.display='none'"></div>`;
+                            const logoHtml = getSmallLogo(s.club_name);
                             
                             html += `<tr style="${rowStyle}">
                                 <td class="num">${s.pos}</td>

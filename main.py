@@ -144,7 +144,7 @@ Base.metadata.create_all(bind=engine)
 
 # === СПИСКИ УЧАСТНИКОВ ===
 UCL_TEAMS = ["Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchester United", "Atlético Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal", "FC Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart", "Inter", "Como", "Napoli", "Roma", "Paris SG", "RC Lens", "LOSC Lille", "PSV", "Feyenoord", "Sporting CP", "FC Porto", "Galatasaray", "Fenerbahçe", "AEK Athens", "Club Brugge", "FK Bodø/Glimt", "Viking FK", "LASK", "Sabah", "Slavia Praha", "Slovan Bratislava", "Shakhtar Donetsk"]
-UEL_TEAMS = ["Crystal Palace", "AFC Bournemouth", "Sunderland", "AC Milan", "Juventus", "Real Sociedad", "Celta", "Bayer 04 Leverkusen", "TSG Hoffenheim", "Olympique Marseille", "Stade Rennais FC", "SL Benfica", "União Torreense", "AZ", "RSC Anderlecht", "Union Saint-Gilloise", "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "SK Sturm Graz", "Olympiacos FC", "Ararat-Armenia", "Dinamo Zagreb", "PFC Ludogorets"]
+UEL_TEAMS = ["Bayer 04 Leverkusen", "SL Benfica", "Juventus", "AC Milan", "Olympique Lyonnais", "AZ", "Olympiacos FC", "Real Sociedad", "Olympique Marseille", "Ferencvárosi TC", "Viktoria Plzeň", "Union Saint-Gilloise", "Dinamo Zagreb", "RB Salzburg", "Celtic", "Sparta Praha", "Stade Rennais FC", "RSC Anderlecht", "SK Sturm Graz", "Lech Poznań", "Crystal Palace", "AFC Bournemouth", "Sunderland", "Celje", "Jagiellonia", "Omonia FC", "Celta", "TSG Hoffenheim", "Beşiktaş", "União Torreense", "Hapoel Be'er Sheva", "N.E.C. Nijmegen", "OFI", "Lillestrøm SK", "Levski Sofia", "Ararat-Armenia"]
 UECL_TEAMS = ["Atalanta", "SC Braga", "Ajax", "SC Freiburg", "AS Monaco", "F.C. København", "FC Midtjylland", "Crvena Zvezda", "KAA Gent", "Panathinaikos", "Pafos", "Brighton", "FC Lugano", "Getafe CF", "FC Twente", "KuPS", "Borac Banja Luka", "STVV", "Lincoln Red Imps", "SK Brann", "Hearts", "Kairat", "Trabzonspor", "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec", "FC Nordsjælland", "Inter Escaldes", "AGF", "FC Thun", "CSKA Sofia", "Kauno Žalgiris", "Mjällby AIF", "Iberia 1999", "Egnatia"]
 
 def clean_name(n):
@@ -832,19 +832,23 @@ def get_schedule(year: int, month: int, club_id: int = None):
             if d.type == "match" and club_id:
                 my_club = db.query(Club).filter(Club.id == club_id).first()
                 if my_club:
-                    random.seed(d.date)
+                    rnd = random.Random(d.date)
                     opps = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).all()
                     if opps:
-                        opp = random.choice(opps)
+                        opp = rnd.choice(opps)
                         entry["opponent_name"] = opp.name
-                        entry["is_home"] = random.choice([True, False])
+                        entry["is_home"] = rnd.choice([True, False])
                         entry["tournament_name"] = my_club.league
-                    random.seed()
             result.append(entry)
         return result
     except Exception as e:
         print(f"Schedule Error: {e}")
-        return []
+        db.rollback()
+        num_days = calendar.monthrange(year, month)[1]
+        fallback = []
+        for day in range(1, num_days + 1):
+            fallback.append({"date": f"{year}-{month:02d}-{day:02d}", "type": "rest"})
+        return fallback
     finally:
         db.close()
 
