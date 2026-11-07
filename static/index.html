@@ -357,6 +357,8 @@
         .cal-day.match { border: 1px solid #52a8ff; background: rgba(82,168,255,0.05); border-bottom: 3px solid #52a8ff; }
         .cal-day.training { border-bottom: 3px solid #e6c544; }
         .cal-day.rest { border-bottom: 3px solid #2ecc71; }
+        .cal-day.past { opacity: 0.4; }
+        .cal-day.today { border: 2px solid #e6c544 !important; box-shadow: 0 0 8px rgba(230, 197, 68, 0.4); background: #2f3b4d; }
         .cal-match-info { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; }
         .cal-tour { font-size: 7px; color: #52a8ff; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .cal-opp .logo-container-mini { width: 14px; height: 14px; margin-right: 0; padding: 1px; border-radius: 3px; }
@@ -760,6 +762,7 @@
         let calYear = 2026;
         let calMonth = 8;
         let currentTours = [];
+        let currentGameDate = "2026-08-01";
 
         const STAT_NAMES = {
             "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
@@ -1401,6 +1404,7 @@
                 const parts = data.current_date.split("-");
                 calYear = parseInt(parts[0]);
                 calMonth = parseInt(parts[1]);
+                currentGameDate = data.current_date;
                 if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
             } catch (e) { console.error(e); }
         }
@@ -1458,6 +1462,9 @@
                     const dayNum = parseInt(d.date.split("-")[2]);
                     let cls = "cal-day";
                     let inner = `<div class="cal-date">${dayNum}</div>`;
+                    
+                    if (d.date === currentGameDate) cls += " today";
+                    else if (d.date < currentGameDate) cls += " past";
                     
                     if (d.type === "match") {
                         cls += " match";
@@ -2570,9 +2577,15 @@
                     const parts = data.current_date.split("-");
                     const newY = parseInt(parts[0]);
                     const newM = parseInt(parts[1]);
+                    const dateChanged = data.current_date !== currentGameDate;
+                    
                     if (newY !== calYear || newM !== calMonth) {
                         calYear = newY;
                         calMonth = newM;
+                    }
+                    
+                    if (dateChanged) {
+                        currentGameDate = data.current_date;
                         if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
                         if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
                             renderCalendar();

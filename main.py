@@ -1044,15 +1044,19 @@ def advance_game_date(db, days_to_add):
 
 @dp.message(Command("day"))
 async def cmd_admin_day(message: types.Message):
-    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
+        await message.answer("⛔ У вас нет прав для этой команды.")
+        return
     db = Session(engine)
     new_date = advance_game_date(db, 1)
     db.close()
-    await message.answer(f"⏩ Промотан 1 день. Дата: {new_date}")
+    await message.answer(f"⏩ Промотан 1 день.\nТекущая дата: {new_date}")
 
 @dp.message(Command("week"))
 async def cmd_admin_week(message: types.Message):
-    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
+        await message.answer("⛔ У вас нет прав для этой команды.")
+        return
     db = Session(engine)
     state = db.query(GameState).first()
     if state:
@@ -1060,12 +1064,14 @@ async def cmd_admin_week(message: types.Message):
         days_to_sunday = 6 - curr.weekday()
         if days_to_sunday == 0: days_to_sunday = 7
         new_date = advance_game_date(db, days_to_sunday)
-        await message.answer(f"⏩ Промотано до конца недели. Дата: {new_date}")
+        await message.answer(f"⏩ Промотано до конца недели.\nТекущая дата: {new_date}")
     db.close()
 
 @dp.message(Command("month"))
 async def cmd_admin_month(message: types.Message):
-    if str(message.from_user.id) != ADMIN_TELEGRAM_ID: return
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
+        await message.answer("⛔ У вас нет прав для этой команды.")
+        return
     db = Session(engine)
     state = db.query(GameState).first()
     if state:
@@ -1073,7 +1079,7 @@ async def cmd_admin_month(message: types.Message):
         last_day = calendar.monthrange(curr.year, curr.month)[1]
         days_to_end = last_day - curr.day
         new_date = advance_game_date(db, days_to_end)
-        await message.answer(f"⏩ Промотан месяц. Дата: {new_date}")
+        await message.answer(f"⏩ Промотан месяц.\nТекущая дата: {new_date}")
     db.close()
 
 async def start_bot():
