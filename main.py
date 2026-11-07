@@ -6,6 +6,7 @@ import sys
 import asyncio
 import random
 import unicodedata
+import calendar
 from datetime import datetime, timedelta, date
 from typing import Optional, List
 
@@ -336,10 +337,9 @@ def init_db():
         db.commit()
 
         # Генерация базового расписания на сезон (Август - Май)
-        # Генерация базового расписания на сезон (Август - Май)
         if db.query(GameDay).count() == 0:
             start = date(2026, 8, 1)
-            end = date(2027, 5, 31)
+            end = date(2027, 7, 31)
             
             curr = start
             while curr <= end:
@@ -349,10 +349,16 @@ def init_db():
                     month_days.append(d)
                     d += timedelta(days=1)
                 
-                num_matches = random.randint(2, 7)
+                # Летом (июнь, июль) матчей нет
+                is_summer = curr.month in [6, 7]
+                
+                num_matches = 0 if is_summer else random.randint(2, 7)
                 match_indices = []
                 while len(match_indices) < num_matches:
                     idx = random.randint(0, len(month_days) - 1)
+                    day_date = month_days[idx]
+                    if is_summer: break
+                    if curr.month == 8 and day_date.day < 20: continue
                     if all(abs(idx - m) >= 2 for m in match_indices):
                         match_indices.append(idx)
                 
@@ -760,7 +766,6 @@ def get_game_time():
 def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
-        import calendar
         num_days = calendar.monthrange(year, month)[1]
         
         # Получаем существующие дни
@@ -768,10 +773,13 @@ def get_schedule(year: int, month: int, club_id: int = None):
         
         # Если дней меньше, чем должно быть в месяце, генерируем недостающие
         if len(days) < num_days:
-            num_matches = random.randint(2, 7)
+            is_summer = month in [6, 7]
+            num_matches = 0 if is_summer else random.randint(2, 7)
             match_indices = []
             while len(match_indices) < num_matches:
                 idx = random.randint(1, num_days)
+                if is_summer: break
+                if month == 8 and idx < 20: continue
                 if all(abs(idx - m) >= 2 for m in match_indices):
                     match_indices.append(idx)
             
@@ -796,11 +804,13 @@ def get_schedule(year: int, month: int, club_id: int = None):
                 if my_club:
                     # Делаем выбор соперника и дома/в гостях детерминированным для этой даты
                     random.seed(d.date)
-                    opp = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).order_by(func.random()).first()
-                    if opp:
+                    opps = db.query(Club).filter(Club.league == my_club.league, Club.id != my_club.id).all()
+                    if opps:
+                        opp = random.choice(opps)
                         entry["opponent_name"] = opp.name
                         entry["is_home"] = random.choice([True, False])
                         entry["tournament_name"] = my_club.league
+                    random.seed() # Сбрасываем seed
             result.append(entry)
         return result
     finally:

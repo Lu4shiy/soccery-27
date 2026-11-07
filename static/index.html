@@ -1327,15 +1327,13 @@
             _doSwitchTab(tabId);
         }
 
-        function _doSwitchTab(tabId) {
+        async function _doSwitchTab(tabId) {
             document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
             const navEl = $('nav-' + tabId);
             if (navEl) navEl.classList.add('active');
             
-            showScreen(tabId);
-            
             if (tabId === 'tactics') {
-                loadTactics();
+                await loadTactics(); // Ждем полной загрузки данных перед показом экрана
             } else if (tabId === 'account') {
                 if ($("account-club-name")) $("account-club-name").innerText = currentClubName;
                 fetch(API_BASE + '/api/manager/' + userId)
@@ -1350,6 +1348,8 @@
                 if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
                 fetchGameTime();
             }
+            
+            showScreen(tabId);
             window.scrollTo(0, 0);
         }
 
@@ -1404,7 +1404,6 @@
             container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
             
             try {
-                // Формируем URL безопасно
                 let url = `${API_BASE}/api/game/schedule?year=${calYear}&month=${calMonth}`;
                 if (currentClubId) url += `&club_id=${currentClubId}`;
                 
@@ -1412,18 +1411,14 @@
                 if (!res.ok) throw new Error("Network response was not ok");
                 const days = await res.json();
                 
-                // Сначала вычисляем отступ для первого дня месяца
                 const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
                 const offset = firstDay === 0 ? 6 : firstDay - 1;
                 
                 let html = "";
-                
-                // Добавляем пустые ячейки для отступа
                 for (let i = 0; i < offset; i++) {
                     html += `<div></div>`;
                 }
 
-                // Рендерим дни
                 days.forEach(d => {
                     const dayNum = parseInt(d.date.split("-")[2]);
                     let cls = "cal-day";
@@ -1448,9 +1443,7 @@
                     html += `<div class="${cls}">${inner}</div>`;
                 });
                 
-                // Применяем один раз (так браузер работает быстрее)
                 container.innerHTML = html;
-                
             } catch (e) {
                 console.error(e);
                 container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
