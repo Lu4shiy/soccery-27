@@ -1411,6 +1411,8 @@
                 if (!res.ok) throw new Error("Network response was not ok");
                 const days = await res.json();
                 
+                if (!Array.isArray(days)) throw new Error("Invalid response format");
+                
                 const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
                 const offset = firstDay === 0 ? 6 : firstDay - 1;
                 
@@ -1445,7 +1447,7 @@
                 
                 container.innerHTML = html;
             } catch (e) {
-                console.error(e);
+                console.error("Calendar Error:", e);
                 container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
             }
         }
@@ -1518,31 +1520,42 @@
             container.innerHTML = "<div style='color:#8e9eb5;'>Загрузка...</div>";
             
             try {
-                // Узнаем тип турнира
                 const stRes = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
                 const stData = await stRes.json();
                 const tourType = stData.type || "League";
                 
-                // Обновляем лейбл вкладки
                 const firstTab = document.querySelectorAll('.sc-tab')[0];
                 if (firstTab) firstTab.innerText = (tourType === "Cup") ? "Сетка" : "Таблица";
                 
-                // Рендерим основной контент
                 if (tourType === "Cup") {
                     const brRes = await fetch(API_BASE + `/api/tournaments/${id}/bracket`);
                     const brData = await brRes.json();
                     renderBracket(brData);
                 } else {
                     if (stData.standings && stData.standings.length > 0) {
-                        container.innerHTML = `<table class="stats-table">
-                            <tr>
-                                <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
-                                <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
-                                <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
-                            </tr>
-                            ${stData.standings.map(s => `<tr>
+                        let lastZone = "";
+                        const total = stData.standings.length;
+                        
+                        const rowsHtml = stData.standings.map(s => {
+                            let currentZone = "";
+                            let rowStyle = "";
+                            if (s.pos <= 4) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
+                            else if (s.pos === 5) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
+                            else if (s.pos === 6) { currentZone = "Лига Конференций"; rowStyle = "border-left: 3px solid #2ecc71;"; }
+                            else if (s.pos > total - 3) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            
+                            let html = "";
+                            if (currentZone && currentZone !== lastZone) {
+                                html += `<tr><td colspan="10" style="background:#17212b; color:#8e9eb5; font-size:9px; text-align:left; padding:4px 8px; border-bottom:1px solid #232e3c;">${currentZone}</td></tr>`;
+                                lastZone = currentZone;
+                            }
+                            
+                            const slug = slugify(s.club_name);
+                            const logoHtml = `<div style="width: 20px; height: 20px; background: #fff; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; padding: 2px;"><img src="/static/logos/clubs/${slug}.png" style="max-width: 100%; max-height: 100%;" onerror="this.style.display='none'"></div>`;
+                            
+                            html += `<tr style="${rowStyle}">
                                 <td class="num">${s.pos}</td>
-                                <td>${s.club_name}</td>
+                                <td><div style="display:flex; align-items:center;">${logoHtml}<span>${s.club_name}</span></div></td>
                                 <td class="num">${s.mp}</td>
                                 <td class="num">${s.w}</td>
                                 <td class="num">${s.d}</td>
@@ -1551,14 +1564,23 @@
                                 <td class="num">${s.ga}</td>
                                 <td class="num">${s.gd}</td>
                                 <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
-                            </tr>`).join("")}
+                            </tr>`;
+                            return html;
+                        }).join("");
+                        
+                        container.innerHTML = `<table class="stats-table">
+                            <tr>
+                                <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
+                                <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
+                                <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
+                            </tr>
+                            ${rowsHtml}
                         </table>`;
                     } else {
                         container.innerHTML = "<div style='color:#8e9eb5;'>Нет данных</div>";
                     }
                 }
 
-                // Статистика
                 const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
                 const stats = await statRes.json();
                 const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";

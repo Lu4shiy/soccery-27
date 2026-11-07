@@ -143,19 +143,20 @@ class GameDay(Base):
 Base.metadata.create_all(bind=engine)
 
 # === СПИСКИ УЧАСТНИКОВ ===
-UCL_TEAMS = ["Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchester United", "Atlético Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal", "Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart", "Inter", "Como", "Napoli", "Roma", "Paris Saint-Germain", "Lens", "Lille", "PSV", "Feyenoord", "Sporting CP", "FC Porto", "Galatasaray", "Fenerbahçe", "AEK Athens", "Club Brugge KV", "Bodø/Glimt", "Viking", "LASK", "Sabah", "Slavia Praha", "Slovan Bratislava", "Shakhtar Donetsk"]
-UEL_TEAMS = ["Crystal Palace", "Bournemouth", "Sunderland", "Milan", "Juventus", "Real Sociedad", "Celta de Vigo", "Bayer Leverkusen", "Hoffenheim", "Marseille", "Rennes", "Benfica", "Torreense", "AZ Alkmaar", "Anderlecht", "Union Saint-Gilloise", "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "Sturm Graz", "Olympiacos", "Ararat-Armenia", "Dinamo Zagreb", "Ludogorets"]
-UECL_TEAMS = ["Atalanta", "Braga", "Ajax", "Freiburg", "Monaco", "Copenhagen", "Midtjylland", "Crvena Zvezda", "Gent", "Panathinaikos", "Pafos", "Brighton", "Lugano", "Getafe", "Twente", "KuPS", "Borac Banja Luka", "Sint-Truiden", "Lincoln Red Imps", "Brann", "Hearts", "Kairat", "Trabzonspor", "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec", "Nordsjælland", "Inter Escaldes", "Aarhus", "Thun", "CSKA Sofia", "Kauno Žalgiris", "Mjällby", "Iberia 1999", "Egnatia"]
+UCL_TEAMS = ["Arsenal", "Aston Villa", "Liverpool", "Manchester City", "Manchester United", "Atlético Madrid", "Barcelona", "Real Betis", "Real Madrid", "Villarreal", "FC Bayern München", "Borussia Dortmund", "RB Leipzig", "VfB Stuttgart", "Inter", "Como", "Napoli", "Roma", "Paris SG", "RC Lens", "LOSC Lille", "PSV", "Feyenoord", "Sporting CP", "FC Porto", "Galatasaray", "Fenerbahçe", "AEK Athens", "Club Brugge", "FK Bodø/Glimt", "Viking FK", "LASK", "Sabah", "Slavia Praha", "Slovan Bratislava", "Shakhtar Donetsk"]
+UEL_TEAMS = ["Crystal Palace", "AFC Bournemouth", "Sunderland", "AC Milan", "Juventus", "Real Sociedad", "Celta", "Bayer 04 Leverkusen", "TSG Hoffenheim", "Olympique Marseille", "Stade Rennais FC", "SL Benfica", "União Torreense", "AZ", "RSC Anderlecht", "Union Saint-Gilloise", "Beşiktaş", "Viktoria Plzeň", "Sparta Praha", "SK Sturm Graz", "Olympiacos FC", "Ararat-Armenia", "Dinamo Zagreb", "PFC Ludogorets"]
+UECL_TEAMS = ["Atalanta", "SC Braga", "Ajax", "SC Freiburg", "AS Monaco", "F.C. København", "FC Midtjylland", "Crvena Zvezda", "KAA Gent", "Panathinaikos", "Pafos", "Brighton", "FC Lugano", "Getafe CF", "FC Twente", "KuPS", "Borac Banja Luka", "STVV", "Lincoln Red Imps", "SK Brann", "Hearts", "Kairat", "Trabzonspor", "Universitatea Craiova", "Riga", "Hajduk Split", "Jablonec", "FC Nordsjælland", "Inter Escaldes", "AGF", "FC Thun", "CSKA Sofia", "Kauno Žalgiris", "Mjällby AIF", "Iberia 1999", "Egnatia"]
 
 def clean_name(n):
+    if not n: return ""
     n = unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8')
-    return n.lower().replace(" ", "").replace("-", "").replace(".", "").replace("fc", "").replace("cf", "")
+    return n.lower().replace(" ", "").replace("-", "").replace(".", "").replace("'", "")
 
 def is_in_list(club_name, team_list):
     c_clean = clean_name(club_name)
     for t in team_list:
         t_clean = clean_name(t)
-        if t_clean in c_clean or c_clean in t_clean:
+        if c_clean == t_clean:
             return True
     return False
 
@@ -778,17 +779,14 @@ def get_schedule(year: int, month: int, club_id: int = None):
         num_days = calendar.monthrange(year, month)[1]
         is_summer = month in [6, 7]
         
-        # Определяем допустимые для матчей дни
         valid_match_days = []
         for day in range(1, num_days + 1):
             if is_summer: continue
             if month == 8 and day < 20: continue
             valid_match_days.append(day)
         
-        # Существующие дни в БД
         existing_dates = {d.date for d in db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).all()}
         
-        # Генерируем недостающие дни
         if len(existing_dates) < num_days:
             for day in range(1, num_days + 1):
                 date_str = f"{year}-{month:02d}-{day:02d}"
@@ -800,7 +798,6 @@ def get_schedule(year: int, month: int, club_id: int = None):
         
         days = db.query(GameDay).filter(GameDay.date.like(f"{year}-{month:02d}-%")).order_by(GameDay.date).all()
         
-        # Сбрасываем некорректные матчи (лето или август до 20-го)
         for d in days:
             if d.type != "match": continue
             day_num = int(d.date.split("-")[2])
@@ -809,7 +806,6 @@ def get_schedule(year: int, month: int, club_id: int = None):
                 d.type = "training" if r < 0.3 else "rest"
         db.commit()
         
-        # Добавляем матчи, если их нет (только для допустимых месяцев)
         if valid_match_days:
             current_match_days = [int(d.date.split("-")[2]) for d in days if d.type == "match"]
             max_possible = max(1, len(valid_match_days) // 2)
@@ -846,6 +842,9 @@ def get_schedule(year: int, month: int, club_id: int = None):
                     random.seed()
             result.append(entry)
         return result
+    except Exception as e:
+        print(f"Schedule Error: {e}")
+        return []
     finally:
         db.close()
 
