@@ -22,6 +22,7 @@
         }
         h1 { color: #52a8ff; margin: 0 0 4px; text-align: center;}
         h2 { margin: 8px 0; }
+        h3 { margin: 8px 0; }
         p { color: #8e9eb5; margin: 4px 0; }
         .hidden { display: none !important; }
         
@@ -333,17 +334,28 @@
         .modal-content { background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
         .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
 
-        .competitions-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-        .competitions-table th, .competitions-table td { padding: 8px; text-align: left; border-bottom: 1px solid #17212b; }
-        .competitions-table th { color: #52a8ff; font-weight: bold; }
-        .competitions-table td { color: #fff; }
-        .continent-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #2f3b4d; color: #8e9eb5; }
-        .continent-UEFA { background: #1a3c5a; color: #52a8ff; }
-        .continent-CONMEBOL { background: #2e4a1a; color: #2ecc71; }
-        .continent-AFC { background: #5a3a1a; color: #e67e22; }
-        .continent-CONCACAF { background: #5a1a3a; color: #e74c3c; }
-        .continent-World { background: #5a4a1a; color: #f1c40f; }
-        .continent-Domestic { background: #2d3748; color: #cbd5e0; }
+        /* СПОРТЦЕНТР */
+        .sc-tabs { display: flex; gap: 10px; margin-bottom: 12px; }
+        .sc-tab { flex: 1; text-align: center; padding: 10px; background: #232e3c; border-radius: 8px; font-weight: bold; cursor: pointer; color: #8e9eb5; }
+        .sc-tab.active { background: #52a8ff; color: white; }
+        
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .calendar-title { font-size: 18px; font-weight: bold; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+        .cal-day { background: #17212b; padding: 8px 4px; border-radius: 6px; font-size: 12px; position: relative; }
+        .cal-day.match { border-bottom: 3px solid #52a8ff; }
+        .cal-day.rest { border-bottom: 3px solid #2ecc71; }
+        .cal-day.training { border-bottom: 3px solid #e6c544; }
+        .cal-day.today { background: #2f3b4d; border: 1px solid #52a8ff; }
+
+        .tour-list { display: flex; flex-direction: column; gap: 8px; }
+        .tour-item { background: #232e3c; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        .stats-table th, .stats-table td { padding: 6px 4px; text-align: left; border-bottom: 1px solid #17212b; }
+        .stats-table th { color: #52a8ff; }
+        .stats-table td { color: #fff; }
+        .stats-table .num { text-align: center; }
     </style>
 </head>
 <body>
@@ -463,6 +475,12 @@
             <p>Текущий клуб: <b id="account-club-name" style="color:#52a8ff;"></b></p>
             <button class="btn" id="btn-change-club" style="background-color: #a82929; margin-top: 10px;">Сменить клуб</button>
         </div>
+        
+        <div id="admin-block" class="card hidden" style="border: 1px solid #a82929;">
+            <h3 style="color: #a82929;">👑 Админ-панель</h3>
+            <button class="btn" id="btn-admin-skip" style="background-color: #e67e22;">Промотать месяц</button>
+            <button class="btn" id="btn-admin-reset" style="background-color: #a82929; margin-top: 10px;">Сбросить карьеру</button>
+        </div>
     </div>
 
     <div id="screen-player" class="screen hidden">
@@ -516,7 +534,7 @@
                     </div>
                 </div>
                 <div id="pd-training-available">
-                    <p style="font-size:12px;">Доступные программы (5 из 15):</p>
+                    <p style="font-size:12px;">Доступные программы:</p>
                     <div id="pd-training-list" class="training-list"></div>
                 </div>
             </div>
@@ -525,15 +543,66 @@
 
     <div id="screen-center" class="screen hidden">
         <h2>🏟 Спортивный центр</h2>
-        <div class="card">
-            <h3>Турниры сезона 2026/27</h3>
-            <p style="font-size: 12px;">Ваш клуб: <b id="center-club-name" style="color:#52a8ff;"></b> (<span id="center-club-continent"></span>)</p>
-            <table class="competitions-table">
-                <thead>
-                    <tr><th>Турнир</th><th>Континент</th></tr>
-                </thead>
-                <tbody id="competitions-list"></tbody>
-            </table>
+        
+        <div id="center-main-menu">
+            <div class="card" style="text-align: center;">
+                <p style="font-size: 16px; margin-bottom: 12px;">Текущая дата: <b id="current-game-date" style="color:#52a8ff;">Загрузка...</b></p>
+                <button class="btn" id="btn-open-schedule" style="margin-bottom: 10px;">📅 Расписание</button>
+                <button class="btn" id="btn-open-tournaments">🏆 Мои турниры</button>
+            </div>
+        </div>
+
+        <div id="center-schedule" class="hidden">
+            <button class="btn-back" id="btn-back-to-sc">← Назад в спортцентр</button>
+            <div class="card">
+                <div class="calendar-header">
+                    <button class="btn-secondary" id="btn-prev-month">◀</button>
+                    <span class="calendar-title" id="cal-title">Август 2026</span>
+                    <button class="btn-secondary" id="btn-next-month">▶</button>
+                </div>
+                <div style="display: flex; gap: 10px; font-size: 10px; justify-content: center; margin-bottom: 10px;">
+                    <span style="color: #52a8ff;">■ Матч</span>
+                    <span style="color: #e6c544;">■ Тренировка</span>
+                    <span style="color: #2ecc71;">■ Отдых</span>
+                </div>
+                <div class="calendar-grid" id="calendar-days"></div>
+            </div>
+        </div>
+
+        <div id="center-tournaments-list" class="hidden">
+            <button class="btn-back" id="btn-back-to-sc2">← Назад в спортцентр</button>
+            <h3>Ваши турниры</h3>
+            <div class="tour-list" id="tour-list-container"></div>
+        </div>
+
+        <div id="center-tournament-detail" class="hidden">
+            <button class="btn-back" id="btn-back-to-tours">← Назад к турнирам</button>
+            <h3 id="detail-tour-name">Название турнира</h3>
+            
+            <div class="sc-tabs" style="margin-top: 10px;">
+                <div class="sc-tab active" onclick="switchTourTab('table')">Таблица</div>
+                <div class="sc-tab" onclick="switchTourTab('stats')">Статистика</div>
+            </div>
+
+            <div id="tour-tab-table" class="card">
+                <table class="stats-table" id="standings-table">
+                    <!-- Сюда рендерится таблица -->
+                </table>
+            </div>
+
+            <div id="tour-tab-stats" class="card hidden">
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Лучшие бомбардиры</h4>
+                <div id="stat-scorers" style="font-size: 12px; margin-bottom: 15px;"></div>
+                
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Лучшие ассистенты</h4>
+                <div id="stat-assists" style="font-size: 12px; margin-bottom: 15px;"></div>
+
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Лучшие по средней оценке</h4>
+                <div id="stat-rating" style="font-size: 12px; margin-bottom: 15px;"></div>
+
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Сухие матчи (команды)</h4>
+                <div id="stat-clean-sheets" style="font-size: 12px;"></div>
+            </div>
         </div>
     </div>
 
@@ -647,12 +716,18 @@
         let currentLeague = "";
         let currentContinent = "";
         let currentStars = 0.5;
+        let isAdmin = false;
         let leaguesScrollPos = 0;
         let selectedNationality = "Россия";
         let managerSetupComplete = false;
         let tacticsDirty = false;
         let pendingTabId = null;
         let globalTrainingPrograms = [];
+        
+        // Календарь
+        let calYear = 2026;
+        let calMonth = 8; // Август (1-12)
+        let currentTours = [];
 
         const STAT_NAMES = {
             "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
@@ -729,7 +804,7 @@
             "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
             "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw",
-            "Kenya": "ke"
+            "Kenya": "ke", "Latvia": "lv"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -823,6 +898,14 @@
                     currentContinent = data.continent;
                     currentStars = data.stars;
                     managerSetupComplete = !!data.is_setup_complete;
+                    isAdmin = !!data.is_admin;
+                    
+                    if (isAdmin) {
+                        $("admin-block").classList.remove("hidden");
+                    } else {
+                        $("admin-block").classList.add("hidden");
+                    }
+
                     if (!skipConfirm) {
                         showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
                     }
@@ -1161,6 +1244,7 @@
                         return isGK ? isGKProg : !isGKProg;
                     });
 
+                    // Берем 5 случайных
                     filtered = filtered.sort(() => 0.5 - Math.random()).slice(0, 5);
 
                     listDiv.innerHTML = filtered.map(function(prog) {
@@ -1199,6 +1283,7 @@
             } catch (e) { tg.showAlert("Сетевая ошибка"); }
         }
 
+        // === СПОРТЦЕНТР ===
         function switchTab(tabId) {
             if (currentScreenIsTactics() && tabId !== 'tactics' && tacticsDirty) {
                 pendingTabId = tabId;
@@ -1212,6 +1297,7 @@
             document.querySelectorAll('.nav-item').forEach(function(el) { el.classList.remove('active'); });
             $('nav-' + tabId).classList.add('active');
             showScreen(tabId);
+            
             if (tabId === 'tactics') {
                 loadTactics();
             } else if (tabId === 'account') {
@@ -1222,7 +1308,11 @@
                         if (data.coach_name) $("inp-account-coach-name").value = data.coach_name;
                     });
             } else if (tabId === 'center') {
-                loadCompetitions();
+                $("center-main-menu").classList.remove("hidden");
+                $("center-schedule").classList.add("hidden");
+                $("center-tournaments-list").classList.add("hidden");
+                $("center-tournament-detail").classList.add("hidden");
+                fetchGameTime();
             }
             window.scrollTo(0, 0);
         }
@@ -1231,337 +1321,396 @@
             return !$("screen-tactics").classList.contains("hidden");
         }
 
-        window.switchTab = switchTab;
-        window.openPlayerDetails = openPlayerDetails;
-        window.startTraining = startTraining;
-        window.handleImgError = handleImgError;
-        window.onSlotClick = onSlotClick;
-        window.onBenchPlayerClick = onBenchPlayerClick;
+        async function fetchGameTime() {
+            try {
+                const res = await fetch(API_BASE + '/api/game/time');
+                const data = await res.json();
+                const parts = data.current_date.split("-");
+                calYear = parseInt(parts[0]);
+                calMonth = parseInt(parts[1]);
+                $("current-game-date").innerText = data.current_date;
+            } catch (e) { console.error(e); }
+        }
 
-        // === СПОРТЦЕНТР ===
-        async function loadCompetitions() {
-            $("center-club-name").innerText = currentClubName;
+        $("btn-open-schedule").onclick = function() {
+            $("center-main-menu").classList.add("hidden");
+            $("center-schedule").classList.remove("hidden");
+            renderCalendar();
+        };
+
+        $("btn-back-to-sc").onclick = function() {
+            $("center-main-menu").classList.remove("hidden");
+            $("center-schedule").classList.add("hidden");
+        };
+
+        $("btn-prev-month").onclick = function() {
+            calMonth--;
+            if (calMonth < 1) { calMonth = 12; calYear--; }
+            renderCalendar();
+        };
+
+        $("btn-next-month").onclick = function() {
+            calMonth++;
+            if (calMonth > 12) { calMonth = 1; calYear++; }
+            renderCalendar();
+        };
+
+        async function renderCalendar() {
+            const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+            $("cal-title").innerText = months[calMonth - 1] + " " + calYear;
             
-            const tbody = $("competitions-list");
-            tbody.innerHTML = "<tr><td colspan='2'>Загрузка...</td></tr>";
+            const container = $("calendar-days");
+            container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
             
             try {
-                // Добавлен параметр ?t=Date.now() чтобы сбросить кэш браузера
-                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments?t=' + Date.now());
-                const tournaments = await res.json();
+                const res = await fetch(API_BASE + `/api/game/schedule?year=${calYear}&month=${calMonth}`);
+                const days = await res.json();
                 
-                // 🔥 ИСПРАВЛЕНИЕ: Мгновенно подтягиваем континент из ответа сервера, 
-                // чтобы не было пустых скобок при первом заходе
-                const managerRes = await fetch(API_BASE + '/api/manager/' + encodeURIComponent(userId));
-                const managerData = await managerRes.json();
-                if (managerData.continent) {
-                    currentContinent = managerData.continent;
-                }
-                $("center-club-continent").innerText = currentContinent || "UEFA";
+                container.innerHTML = "";
                 
-                if (!tournaments.length) {
-                    tbody.innerHTML = "<tr><td colspan='2'>Нет данных о турнирах.</td></tr>";
-                    return;
+                const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
+                const offset = firstDay === 0 ? 6 : firstDay - 1; // Сдвиг для Пн-Вс
+                
+                for (let i = 0; i < offset; i++) {
+                    container.innerHTML += `<div></div>`;
                 }
 
-                // Сортируем: сначала национальные лиги, потом кубки, потом континентальные, потом мировые
-                tournaments.sort((a, b) => {
-                    if (a.continent === "Domestic" && b.continent !== "Domestic") return -1;
-                    if (b.continent === "Domestic" && a.continent !== "Domestic") return 1;
-                    if (a.type === "League" && b.type !== "League") return -1;
-                    if (b.type === "League" && a.type !== "League") return 1;
-                    return 0;
+                days.forEach(d => {
+                    const dayNum = parseInt(d.date.split("-")[2]);
+                    let cls = "cal-day";
+                    if (d.type === "match") cls += " match";
+                    else if (d.type === "training") cls += " training";
+                    else cls += " rest";
+                    
+                    container.innerHTML += `<div class="${cls}">${dayNum}</div>`;
                 });
-
-                tbody.innerHTML = tournaments.map(t => `
-                    <tr>
-                        <td>${t.name}</td>
-                        <td><span class="continent-badge continent-${t.continent}">${t.continent}</span></td>
-                    </tr>
-                `).join("");
             } catch (e) {
-                tbody.innerHTML = "<tr><td colspan='2'>Ошибка загрузки турниров.</td></tr>";
+                container.innerHTML = "Ошибка загрузки";
             }
         }
 
-        // === МОДАЛ ===
-        $("modal-btn-stay").onclick = function() {
-            $("custom-modal").classList.add("hidden");
-            pendingTabId = null;
-        };
-        $("modal-btn-exit").onclick = function() {
-            $("custom-modal").classList.add("hidden");
-            tacticsDirty = false;
-            tg.disableClosingConfirmation();
-            if (pendingTabId) _doSwitchTab(pendingTabId);
-            pendingTabId = null;
-        };
-        $("modal-btn-save").onclick = async function() {
-            const btn = $("modal-btn-save");
-            btn.innerText = "Сохранение...";
-            const success = await doSaveTactics();
-            btn.innerText = "Сохранить и выйти";
-            if (success) {
-                $("custom-modal").classList.add("hidden");
-                if (pendingTabId) _doSwitchTab(pendingTabId);
-                pendingTabId = null;
+        $("btn-open-tournaments").onclick = async function() {
+            $("center-main-menu").classList.add("hidden");
+            $("center-tournaments-list").classList.remove("hidden");
+            
+            const container = $("tour-list-container");
+            container.innerHTML = "Загрузка...";
+            
+            try {
+                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments');
+                currentTours = await res.json();
+                
+                container.innerHTML = currentTours.map(t => `
+                    <div class="tour-item" onclick="openTournament(${t.id}, '${t.name}')">
+                        ${t.name}
+                    </div>
+                `).join("");
+            } catch (e) {
+                container.innerHTML = "Ошибка загрузки";
             }
         };
 
-        // ========================================
-        // ============ ВКЛАДКА «СОСТАВ» ==========
-        // ========================================
+        $("btn-back-to-sc2").onclick = function() {
+            $("center-main-menu").classList.remove("hidden");
+            $("center-tournaments-list").classList.add("hidden");
+        };
+
+        window.openTournament = async function(id, name) {
+            $("center-tournaments-list").classList.add("hidden");
+            $("center-tournament-detail").classList.remove("hidden");
+            $("detail-tour-name").innerText = name;
+            
+            document.querySelectorAll('.sc-tab').forEach((el, i) => {
+                if (i === 0) el.classList.add("active");
+                else el.classList.remove("active");
+            });
+            $("tour-tab-table").classList.remove("hidden");
+            $("tour-tab-stats").classList.add("hidden");
+
+            const table = $("standings-table");
+            table.innerHTML = "<tr><td>Загрузка...</td></tr>";
+            
+            try {
+                const res = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
+                const data = await res.json();
+                
+                if (data.standings && data.standings.length > 0) {
+                    table.innerHTML = `
+                        <tr>
+                            <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
+                            <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
+                            <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
+                        </tr>
+                    ` + data.standings.map(s => `
+                        <tr>
+                            <td class="num">${s.pos}</td>
+                            <td>${s.club_name}</td>
+                            <td class="num">${s.mp}</td>
+                            <td class="num">${s.w}</td>
+                            <td class="num">${s.d}</td>
+                            <td class="num">${s.l}</td>
+                            <td class="num">${s.gf}</td>
+                            <td class="num">${s.ga}</td>
+                            <td class="num">${s.gd}</td>
+                            <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
+                        </tr>
+                    `).join("");
+                } else {
+                    table.innerHTML = "<tr><td>Нет данных</td></tr>";
+                }
+
+                const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
+                const stats = await statRes.json();
+                
+                $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+
+            } catch (e) {
+                table.innerHTML = "<tr><td>Ошибка загрузки данных</td></tr>";
+            }
+        };
+
+        window.switchTourTab = function(tab) {
+            document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
+            if (tab === 'table') {
+                document.querySelectorAll('.sc-tab')[0].classList.add("active");
+                $("tour-tab-table").classList.remove("hidden");
+                $("tour-tab-stats").classList.add("hidden");
+            } else {
+                document.querySelectorAll('.sc-tab')[1].classList.add("active");
+                $("tour-tab-table").classList.add("hidden");
+                $("tour-tab-stats").classList.remove("hidden");
+            }
+        };
+
+        $("btn-back-to-tours").onclick = function() {
+            $("center-tournaments-list").classList.remove("hidden");
+            $("center-tournament-detail").classList.add("hidden");
+        };
+
+        $("btn-admin-skip").onclick = async function() {
+            tg.showConfirm("Промотать 1 игровой месяц для всех?", async (ok) => {
+                if (!ok) return;
+                const res = await fetch(API_BASE + '/api/admin/advance-month', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ telegram_id: userId })
+                });
+                if (res.ok) {
+                    tg.showAlert("Месяц промотан!");
+                    fetchGameTime();
+                    window.currentPlayers = null;
+                } else {
+                    tg.showAlert("Ошибка прав");
+                }
+            });
+        };
+
+        $("btn-admin-reset").onclick = function() {
+            tg.showConfirm("ВНИМАНИЕ! Это сбросит карьеру у ВСЕХ игроков. Продолжить?", function(ok1) {
+                if (!ok1) return;
+                tg.showConfirm("Точно уверен? Это действие нельзя отменить.", async function(ok2) {
+                    if (!ok2) return;
+                    const res = await fetch(API_BASE + '/api/admin/reset-game', {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ telegram_id: userId })
+                    });
+                    if (res.ok) {
+                        tg.showAlert("Карьера сброшена.");
+                        window.location.reload();
+                    }
+                });
+            });
+        };
+
+        // === ТАКТИКА ===
         const FORMATIONS = {
             "3-1-4-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
-                { role: "CDM", x: 50, y: 60 },
-                { role: "LM", x: 12, y: 46 }, { role: "CM", x: 38, y: 46 }, { role: "CM", x: 62, y: 46 }, { role: "RM", x: 88, y: 46 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "CDM", x: 50, y: 60 }, { role: "LM", x: 12, y: 46 }, { role: "CM", x: 38, y: 46 }, { role: "CM", x: 62, y: 46 }, { role: "RM", x: 88, y: 46 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "3-4-1-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
                 { role: "LM", x: 12, y: 58 }, { role: "CM", x: 38, y: 58 }, { role: "CM", x: 62, y: 58 }, { role: "RM", x: 88, y: 58 },
-                { role: "CAM", x: 50, y: 42 },
-                { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
+                { role: "CAM", x: 50, y: 42 }, { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "3-4-2-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
                 { role: "LM", x: 12, y: 58 }, { role: "CM", x: 38, y: 58 }, { role: "CM", x: 62, y: 58 }, { role: "RM", x: 88, y: 58 },
-                { role: "CAM", x: 30, y: 42 }, { role: "CAM", x: 70, y: 42 },
-                { role: "ST", x: 50, y: 22 }
+                { role: "CAM", x: 30, y: 42 }, { role: "CAM", x: 70, y: 42 }, { role: "ST", x: 50, y: 22 }
             ],
             "3-4-3 (Линия)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
                 { role: "LM", x: 12, y: 56 }, { role: "CM", x: 38, y: 56 }, { role: "CM", x: 62, y: 56 }, { role: "RM", x: 88, y: 56 },
                 { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 24 }, { role: "RW", x: 80, y: 24 }
             ],
             "3-4-3 (Ромб)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
-                { role: "CDM", x: 50, y: 64 },
-                { role: "CM", x: 25, y: 50 }, { role: "CM", x: 75, y: 50 },
-                { role: "CAM", x: 50, y: 36 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "CDM", x: 50, y: 64 }, { role: "CM", x: 25, y: 50 }, { role: "CM", x: 75, y: 50 }, { role: "CAM", x: 50, y: 36 },
                 { role: "LW", x: 20, y: 22 }, { role: "ST", x: 50, y: 22 }, { role: "RW", x: 80, y: 22 }
             ],
             "3-5-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
                 { role: "LWB", x: 10, y: 56 }, { role: "CM", x: 33, y: 56 }, { role: "CM", x: 50, y: 56 }, { role: "CM", x: 67, y: 56 }, { role: "RWB", x: 90, y: 56 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "3-5-1-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "CB", x: 28, y: 74 }, { role: "CB", x: 50, y: 76 }, { role: "CB", x: 72, y: 74 },
                 { role: "LWB", x: 10, y: 58 }, { role: "CM", x: 33, y: 58 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 67, y: 58 }, { role: "RWB", x: 90, y: 58 },
-                { role: "CAM", x: 50, y: 42 },
-                { role: "ST", x: 50, y: 22 }
+                { role: "CAM", x: 50, y: 42 }, { role: "ST", x: 50, y: 22 }
             ],
             "4-1-2-1-2 (Узкая)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 50, y: 62 },
-                { role: "CM", x: 30, y: 48 }, { role: "CM", x: 70, y: 48 },
-                { role: "CAM", x: 50, y: 34 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 50, y: 62 }, { role: "CM", x: 30, y: 48 }, { role: "CM", x: 70, y: 48 }, { role: "CAM", x: 50, y: 34 },
                 { role: "ST", x: 35, y: 20 }, { role: "ST", x: 65, y: 20 }
             ],
             "4-1-2-1-2 (Широкая)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 50, y: 62 },
-                { role: "LM", x: 15, y: 48 }, { role: "RM", x: 85, y: 48 },
-                { role: "CAM", x: 50, y: 34 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 50, y: 62 }, { role: "LM", x: 15, y: 48 }, { role: "RM", x: 85, y: 48 }, { role: "CAM", x: 50, y: 34 },
                 { role: "ST", x: 35, y: 20 }, { role: "ST", x: 65, y: 20 }
             ],
             "4-1-3-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 50, y: 60 },
-                { role: "CM", x: 25, y: 46 }, { role: "CM", x: 50, y: 46 }, { role: "CM", x: 75, y: 46 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 50, y: 60 }, { role: "CM", x: 25, y: 46 }, { role: "CM", x: 50, y: 46 }, { role: "CM", x: 75, y: 46 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-1-4-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 50, y: 60 },
-                { role: "LM", x: 15, y: 44 }, { role: "CM", x: 38, y: 44 }, { role: "CM", x: 62, y: 44 }, { role: "RM", x: 85, y: 44 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 50, y: 60 }, { role: "LM", x: 15, y: 44 }, { role: "CM", x: 38, y: 44 }, { role: "CM", x: 62, y: 44 }, { role: "RM", x: 85, y: 44 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "4-3-1-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CM", x: 30, y: 58 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 58 },
-                { role: "CAM", x: 50, y: 42 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CM", x: 30, y: 58 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 58 }, { role: "CAM", x: 50, y: 42 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-3-2-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CM", x: 30, y: 58 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 58 },
-                { role: "CF", x: 35, y: 40 }, { role: "CF", x: 65, y: 40 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CM", x: 30, y: 58 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 58 }, { role: "CF", x: 35, y: 40 }, { role: "CF", x: 65, y: 40 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "4-3-3 (Линия)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "CM", x: 30, y: 56 }, { role: "CM", x: 50, y: 56 }, { role: "CM", x: 70, y: 56 },
                 { role: "LW", x: 20, y: 26 }, { role: "ST", x: 50, y: 24 }, { role: "RW", x: 80, y: 26 }
             ],
             "4-3-3 (Удержание)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "CDM", x: 30, y: 62 }, { role: "CM", x: 50, y: 58 }, { role: "CM", x: 70, y: 62 },
                 { role: "LW", x: 20, y: 30 }, { role: "ST", x: 50, y: 24 }, { role: "RW", x: 80, y: 30 }
             ],
             "4-3-3 (Защита)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "CDM", x: 30, y: 64 }, { role: "CDM", x: 50, y: 64 }, { role: "CDM", x: 70, y: 64 },
                 { role: "LW", x: 20, y: 34 }, { role: "ST", x: 50, y: 26 }, { role: "RW", x: 80, y: 34 }
             ],
             "4-3-3 (Атака)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 74 }, { role: "CB", x: 35, y: 76 }, { role: "CB", x: 65, y: 76 }, { role: "RB", x: 90, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 74 }, { role: "CB", x: 35, y: 76 }, { role: "CB", x: 65, y: 76 }, { role: "RB", x: 90, y: 74 },
                 { role: "CM", x: 30, y: 50 }, { role: "CAM", x: 50, y: 48 }, { role: "CM", x: 70, y: 50 },
                 { role: "LW", x: 18, y: 22 }, { role: "ST", x: 50, y: 18 }, { role: "RW", x: 82, y: 22 }
             ],
             "4-3-3 (Ложная девятка)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "CM", x: 30, y: 56 }, { role: "CM", x: 50, y: 56 }, { role: "CM", x: 70, y: 56 },
                 { role: "LW", x: 20, y: 28 }, { role: "CF", x: 50, y: 32 }, { role: "RW", x: 80, y: 28 }
             ],
             "4-4-1-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "LM", x: 15, y: 54 }, { role: "CM", x: 38, y: 54 }, { role: "CM", x: 62, y: 54 }, { role: "RM", x: 85, y: 54 },
-                { role: "CAM", x: 50, y: 38 },
-                { role: "ST", x: 50, y: 22 }
+                { role: "CAM", x: 50, y: 38 }, { role: "ST", x: 50, y: 22 }
             ],
             "4-5-1 (Атака)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "LM", x: 10, y: 50 }, { role: "CM", x: 30, y: 52 }, { role: "CAM", x: 50, y: 50 }, { role: "CM", x: 70, y: 52 }, { role: "RM", x: 90, y: 50 },
                 { role: "ST", x: 50, y: 24 }
             ],
             "4-5-1 (Линия)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "LM", x: 10, y: 54 }, { role: "CM", x: 30, y: 54 }, { role: "CM", x: 50, y: 54 }, { role: "CM", x: 70, y: 54 }, { role: "RM", x: 90, y: 54 },
                 { role: "ST", x: 50, y: 24 }
             ],
             "4-2-1-3": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
-                { role: "CAM", x: 50, y: 44 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 }, { role: "CAM", x: 50, y: 44 },
                 { role: "LW", x: 20, y: 22 }, { role: "ST", x: 50, y: 20 }, { role: "RW", x: 80, y: 22 }
             ],
             "4-2-2-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
-                { role: "CAM", x: 25, y: 44 }, { role: "CAM", x: 75, y: 44 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 }, { role: "CAM", x: 25, y: 44 }, { role: "CAM", x: 75, y: 44 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-2-3-1 (Широкая)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
-                { role: "LM", x: 15, y: 44 }, { role: "CAM", x: 50, y: 44 }, { role: "RM", x: 85, y: 44 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 }, { role: "LM", x: 15, y: 44 }, { role: "CAM", x: 50, y: 44 }, { role: "RM", x: 85, y: 44 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "4-2-3-1 (Узкая)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 },
-                { role: "CAM", x: 25, y: 44 }, { role: "CAM", x: 50, y: 44 }, { role: "CAM", x: 75, y: 44 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CDM", x: 35, y: 62 }, { role: "CDM", x: 65, y: 62 }, { role: "CAM", x: 25, y: 44 }, { role: "CAM", x: 50, y: 44 }, { role: "CAM", x: 75, y: 44 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "4-2-4": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
-                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 },
-                { role: "LW", x: 15, y: 24 }, { role: "ST", x: 40, y: 22 }, { role: "ST", x: 60, y: 22 }, { role: "RW", x: 85, y: 24 }
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 }, { role: "LW", x: 15, y: 24 }, { role: "ST", x: 40, y: 22 }, { role: "ST", x: 60, y: 22 }, { role: "RW", x: 85, y: 24 }
             ],
             "4-4-2 (Линия)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 76 }, { role: "CB", x: 35, y: 78 }, { role: "CB", x: 65, y: 78 }, { role: "RB", x: 90, y: 76 },
                 { role: "LM", x: 15, y: 54 }, { role: "CM", x: 38, y: 54 }, { role: "CM", x: 62, y: 54 }, { role: "RM", x: 85, y: 54 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "4-4-2 (Удержание)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 78 }, { role: "CB", x: 35, y: 80 }, { role: "CB", x: 65, y: 80 }, { role: "RB", x: 90, y: 78 },
                 { role: "LM", x: 15, y: 58 }, { role: "CM", x: 38, y: 58 }, { role: "CM", x: 62, y: 58 }, { role: "RM", x: 85, y: 58 },
                 { role: "ST", x: 35, y: 26 }, { role: "ST", x: 65, y: 26 }
             ],
             "4-4-2 (Защита)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LB", x: 10, y: 80 }, { role: "CB", x: 35, y: 82 }, { role: "CB", x: 65, y: 82 }, { role: "RB", x: 90, y: 80 },
+                { role: "GK", x: 50, y: 94 }, { role: "LB", x: 10, y: 80 }, { role: "CB", x: 35, y: 82 }, { role: "CB", x: 65, y: 82 }, { role: "RB", x: 90, y: 80 },
                 { role: "LM", x: 15, y: 62 }, { role: "CDM", x: 38, y: 62 }, { role: "CDM", x: 62, y: 62 }, { role: "RM", x: 85, y: 62 },
                 { role: "ST", x: 35, y: 30 }, { role: "ST", x: 65, y: 30 }
             ],
             "5-1-2-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
-                { role: "CDM", x: 50, y: 60 },
-                { role: "CAM", x: 25, y: 42 }, { role: "CAM", x: 75, y: 42 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "CDM", x: 50, y: 60 }, { role: "CAM", x: 25, y: 42 }, { role: "CAM", x: 75, y: 42 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "5-2-1-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
-                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 },
-                { role: "CAM", x: 50, y: 40 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 }, { role: "CAM", x: 50, y: 40 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "5-2-2-1": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
-                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 },
-                { role: "CAM", x: 25, y: 40 }, { role: "CAM", x: 75, y: 40 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 }, { role: "CAM", x: 25, y: 40 }, { role: "CAM", x: 75, y: 40 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "5-2-3": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
-                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 },
-                { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 22 }, { role: "RW", x: 80, y: 24 }
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "CM", x: 35, y: 56 }, { role: "CM", x: 65, y: 56 }, { role: "LW", x: 20, y: 24 }, { role: "ST", x: 50, y: 22 }, { role: "RW", x: 80, y: 24 }
             ],
             "5-3-2": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
                 { role: "CM", x: 30, y: 56 }, { role: "CM", x: 50, y: 56 }, { role: "CM", x: 70, y: 56 },
                 { role: "ST", x: 35, y: 22 }, { role: "ST", x: 65, y: 22 }
             ],
             "5-4-1 (Линия)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
                 { role: "LM", x: 15, y: 50 }, { role: "CM", x: 38, y: 50 }, { role: "CM", x: 62, y: 50 }, { role: "RM", x: 85, y: 50 },
                 { role: "ST", x: 50, y: 22 }
             ],
             "5-4-1 (Ромб)": [
-                { role: "GK", x: 50, y: 94 },
-                { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
-                { role: "CDM", x: 50, y: 60 },
-                { role: "CM", x: 25, y: 44 }, { role: "CM", x: 75, y: 44 },
-                { role: "CAM", x: 50, y: 32 },
+                { role: "GK", x: 50, y: 94 }, { role: "LWB", x: 8, y: 74 }, { role: "CB", x: 28, y: 76 }, { role: "CB", x: 50, y: 78 }, { role: "CB", x: 72, y: 76 }, { role: "RWB", x: 92, y: 74 },
+                { role: "CDM", x: 50, y: 60 }, { role: "CM", x: 25, y: 44 }, { role: "CM", x: 75, y: 44 }, { role: "CAM", x: 50, y: 32 },
                 { role: "ST", x: 50, y: 20 }
             ]
         };
 
         let tacticsState = {
-            formation: "4-3-3 (Линия)",
-            starting_xi: [],
-            bench: [],
-            captain_id: null,
-            free_kick_taker_id: null,
-            corner_taker_id: null,
-            penalty_taker_id: null
+            formation: "4-3-3 (Линия)", starting_xi: [], bench: [],
+            captain_id: null, free_kick_taker_id: null, corner_taker_id: null, penalty_taker_id: null
         };
         let tacticsLoaded = false;
         let selectedSlotIndex = null;
@@ -1599,10 +1748,8 @@
         }
 
         const POSITION_GROUPS = {
-            "GK": ["GK"],
-            "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
-            "MID": ["CDM", "CM", "CAM", "LM", "RM"],
-            "ATT": ["LW", "RW", "ST", "CF"]
+            "GK": ["GK"], "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
+            "MID": ["CDM", "CM", "CAM", "LM", "RM"], "ATT": ["LW", "RW", "ST", "CF"]
         };
 
         const POSITION_PENALTY = {
@@ -1616,8 +1763,7 @@
             "LB->LWB": 2, "LB->CB": 4, "LB->RB": 5, "LB->LM": 4, "LB->CM": 11, "LB->CDM": 9, "LB->CAM": 15, "LB->ST": 20, "LB->GK": 45,
             "RB->RWB": 2, "RB->CB": 4, "RB->LB": 5, "RB->RM": 4, "RB->CM": 11, "RB->CDM": 9, "RB->CAM": 15, "RB->ST": 20, "RB->GK": 45,
             "GK->CB": 40, "GK->CM": 45, "GK->ST": 48,
-            "LWB->LB": 2, "LWB->LM": 3, "LWB->CB": 5,
-            "RWB->RB": 2, "RWB->RM": 3, "RWB->CB": 5,
+            "LWB->LB": 2, "LWB->LM": 3, "LWB->CB": 5, "RWB->RB": 2, "RWB->RM": 3, "RWB->CB": 5,
             "LM->LW": 3, "LM->CM": 5, "LM->CAM": 6, "LM->LB": 4, "LM->CDM": 9, "LM->ST": 9, "LM->CB": 14, "LM->GK": 45,
             "RM->RW": 3, "RM->CM": 5, "RM->CAM": 6, "RM->RB": 4, "RM->CDM": 9, "RM->ST": 9, "RM->CB": 14, "RM->GK": 45
         };
@@ -2136,8 +2282,7 @@
             if (newName.length < 3) return tg.showAlert("Слишком короткое имя");
             try {
                 const res = await fetch(API_BASE + '/api/update-coach-name', {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ telegram_id: userId, coach_name: newName })
                 });
                 if (res.ok) tg.showAlert("✅ Имя тренера обновлено!");
