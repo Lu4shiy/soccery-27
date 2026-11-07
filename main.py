@@ -257,12 +257,11 @@ def init_db():
             db.add(GameState(current_date="2026-08-01", season="2026/27"))
             db.commit()
 
-        # Назначаем континенты
         for c in db.query(Club).all():
             l = (c.league or "").lower()
-            if "brazil" in l or "argentin" in l: c.continent = "CONMEBOL"
-            elif "mls" in l or "mexico" in l: c.continent = "CONCACAF"
-            elif "saudi" in l or "japan" in l or "korea" in l or "australia" in l: c.continent = "AFC"
+            if any(x in l for x in ["brazil", "argentin", "chile", "colombia", "ecuador", "paraguay", "peru", "uruguay", "venezuela", "bolivia"]): c.continent = "CONMEBOL"
+            elif any(x in l for x in ["mls", "mexico", "liga mx"]): c.continent = "CONCACAF"
+            elif any(x in l for x in ["saudi", "japan", "korea", "australia", "china", "qatar", "uae", "india", "iran", "j1 league", "k league"]): c.continent = "AFC"
             else: c.continent = "UEFA"
         db.commit()
 
@@ -332,6 +331,14 @@ def init_db():
 
         db.commit()
 
+        for comp_name in ["UEFA Champions League", "UEFA Europa League", "UEFA Conference League"]:
+            tour = db.query(Tournament).filter_by(name=comp_name).first()
+            if tour:
+                db.query(ClubTournament).filter_by(tournament_id=tour.id).delete()
+        db.commit()
+
+        used_euro_clubs = set()
+        
         for comp_name, team_list in [
             ("UEFA Champions League", UCL_TEAMS),
             ("UEFA Europa League", UEL_TEAMS),
@@ -340,26 +347,26 @@ def init_db():
             tour = db.query(Tournament).filter_by(name=comp_name).first()
             if not tour: continue
             
-            db.query(ClubTournament).filter_by(tournament_id=tour.id).delete()
-            
             added_clubs = set()
             for t_name in team_list:
                 c_clean = clean_name(t_name)
                 club = None
                 for c in db.query(Club).filter(Club.continent == "UEFA").all():
-                    if clean_name(c.name) == c_clean or c_clean in clean_name(c.name):
+                    if clean_name(c.name) == c_clean:
                         club = c
                         break
-                if club and club.id not in added_clubs:
+                if club and club.id not in used_euro_clubs:
                     db.add(ClubTournament(club_id=club.id, tournament_id=tour.id))
                     added_clubs.add(club.id)
+                    used_euro_clubs.add(club.id)
             
             if len(added_clubs) < 36:
-                other_clubs = db.query(Club).filter(Club.continent == "UEFA", ~Club.id.in_(added_clubs)).order_by(func.random()).all()
+                other_clubs = db.query(Club).filter(Club.continent == "UEFA", ~Club.id.in_(used_euro_clubs)).order_by(func.random()).all()
                 for c in other_clubs:
                     if len(added_clubs) >= 36: break
                     db.add(ClubTournament(club_id=c.id, tournament_id=tour.id))
                     added_clubs.add(c.id)
+                    used_euro_clubs.add(c.id)
             db.commit()
 
         # Генерация базового расписания на сезон (Август - Июль)
@@ -988,16 +995,17 @@ def advance_month(req: dict):
         
         curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
         last_day = calendar.monthrange(curr.year, curr.month)[1]
-        days_to_end = last_day - curr.day
         
-        if days_to_end > 0:
-            new_date = curr + timedelta(days=days_to_end)
-        else:
+        if curr.day == last_day:
             if curr.month == 12:
-                new_date = date(curr.year + 1, 1, 1)
+                next_month = date(curr.year + 1, 1, 1)
             else:
-                new_date = date(curr.year, curr.month + 1, 1)
-                
+                next_month = date(curr.year, curr.month + 1, 1)
+            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+            new_date = date(next_month.year, next_month.month, next_month_last_day)
+        else:
+            new_date = date(curr.year, curr.month, last_day)
+            
         state.current_date = new_date.strftime("%Y-%m-%d")
         db.commit()
         return {"status": "ok", "new_date": state.current_date}
@@ -1062,7 +1070,8 @@ async def cmd_admin_week(message: types.Message):
     if state:
         curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
         days_to_sunday = 6 - curr.weekday()
-        if days_to_sunday == 0: days_to_sunday = 7
+        if days_to_sunday == 0: 
+            days_to_sunday = 7
         new_date = advance_game_date(db, days_to_sunday)
         await message.answer(f"⏩ Промотано до конца недели.\nТекущая дата: {new_date}")
     db.close()
@@ -1077,9 +1086,20 @@ async def cmd_admin_month(message: types.Message):
     if state:
         curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
         last_day = calendar.monthrange(curr.year, curr.month)[1]
-        days_to_end = last_day - curr.day
-        new_date = advance_game_date(db, days_to_end)
-        await message.answer(f"⏩ Промотан месяц.\nТекущая дата: {new_date}")
+        
+        if curr.day == last_day:
+            if curr.month == 12:
+                next_month = date(curr.year + 1, 1, 1)
+            else:
+                next_month = date(curr.year, curr.month + 1, 1)
+            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+            new_date = date(next_month.year, next_month.month, next_month_last_day)
+        else:
+            new_date = date(curr.year, curr.month, last_day)
+            
+        state.current_date = new_date.strftime("%Y-%m-%d")
+        db.commit()
+        await message.answer(f"⏩ Промотан месяц.\nТекущая дата: {state.current_date}")
     db.close()
 
 async def start_bot():
