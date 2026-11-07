@@ -72,6 +72,8 @@ class Player(Base):
     alt_positions = Column(String, default="[]")
     training_program_id = Column(Integer, ForeignKey("training_programs.id"), nullable=True)
     training_started_at = Column(DateTime, nullable=True)
+    morale = Column(String, default="green")
+    fitness = Column(String, default="green")
 
 class Manager(Base):
     __tablename__ = "managers"
@@ -246,6 +248,8 @@ def init_db():
     try:
         db.execute(text("ALTER TABLE clubs ADD COLUMN IF NOT EXISTS continent VARCHAR DEFAULT 'UEFA';"))
         db.execute(text("ALTER TABLE tactics ADD COLUMN IF NOT EXISTS bench VARCHAR DEFAULT '[]';"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS morale VARCHAR DEFAULT 'green';"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fitness VARCHAR DEFAULT 'green';"))
         db.commit()
         
         # Инициализация времени
@@ -655,7 +659,7 @@ def get_club_players(club_id: int):
                 "id": p.id, "name": p.name, "position": p.position, "age": p.age,
                 "overall": p.overall_rating, "nationality": p.nationality,
                 "market_value": p.market_value or 0, "wage": p.wage or 0, "contract_until": p.contract_until,
-                "alt_positions": alts,
+                "alt_positions": alts, "morale": p.morale or "green", "fitness": p.fitness or "green",
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
                 "dribbling": p.dribbling or 50, "defending": p.defending or 50, "physicality": p.physicality or 50,
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10, "gk_kicking": p.gk_kicking or 10,
@@ -811,18 +815,58 @@ def generate_club_schedule(club_id: int, db: Session):
             matches_to_play.extend([t] * (6 if t.name == "UEFA Conference League" else 8))
             
     rnd.shuffle(matches_to_play)
-    schedule = {}
+    
+    match_days = {}
+    used_days = set()
     
     for t in matches_to_play:
-        for _ in range(200):
+        for _ in range(1000):
             d = rnd.choice(season_days)
-            if d not in schedule and all(abs((d - k).days) >= 3 for k in schedule.keys()):
+            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
                 opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == t.id, Club.id != club_id).all()
                 if opps:
                     opp = rnd.choice(opps)
                     is_home = rnd.choice([True, False])
-                    schedule[d] = (t.name, opp.name, is_home)
+                    match_days[d] = (t.name, opp.name, is_home)
+                    used_days.add(d)
                 break
+                
+    schedule = {}
+    train_streak = 0
+    rest_streak = 0
+    
+    for d in season_days:
+        if d in match_days:
+            t_name, opp_name, is_home = match_days[d]
+            schedule[d] = {"type": "match", "tournament_name": t_name, "opponent_name": opp_name, "is_home": is_home}
+            train_streak = 0
+            rest_streak = 1
+        else:
+            is_after_match = (d - timedelta(days=1)) in match_days
+            
+            if is_after_match:
+                schedule[d] = {"type": "rest"}
+                rest_streak += 1
+                train_streak = 0
+            else:
+                if train_streak >= 2:
+                    schedule[d] = {"type": "rest"}
+                    rest_streak += 1
+                    train_streak = 0
+                elif rest_streak >= 2:
+                    schedule[d] = {"type": "training"}
+                    train_streak += 1
+                    rest_streak = 0
+                else:
+                    day_rnd = random.Random(f"{club_id}_{d}")
+                    if day_rnd.random() < 0.7:
+                        schedule[d] = {"type": "training"}
+                        train_streak += 1
+                        rest_streak = 0
+                    else:
+                        schedule[d] = {"type": "rest"}
+                        rest_streak += 1
+                        train_streak = 0
     return schedule
 
 @app.get("/api/game/schedule")
@@ -830,35 +874,22 @@ def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
         num_days = calendar.monthrange(year, month)[1]
-        is_summer = month in [6, 7]
         
         club_schedule = {}
         if club_id:
-            club = db.query(Club).filter(Club.id == club_id).first()
-            if club:
-                club_schedule = generate_club_schedule(club_id, db)
-                
+            club_schedule = generate_club_schedule(club_id, db)
+            
         result = []
         for day in range(1, num_days + 1):
             date_obj = date(year, month, day)
             date_str = date_obj.strftime("%Y-%m-%d")
-            entry = {"date": date_str, "type": "rest"}
             
             if date_obj in club_schedule:
-                t_name, opp_name, is_home = club_schedule[date_obj]
-                entry["type"] = "match"
-                entry["tournament_name"] = t_name
-                entry["opponent_name"] = opp_name
-                entry["is_home"] = is_home
-            elif not is_summer:
-                prev_day = date_obj - timedelta(days=1)
-                if prev_day in club_schedule:
-                    entry["type"] = "rest"
-                else:
-                    rnd = random.Random(f"day_{club_id}_{date_str}")
-                    entry["type"] = "training" if rnd.random() < 0.7 else "rest"
-                    
-            result.append(entry)
+                entry = {"date": date_str}
+                entry.update(club_schedule[date_obj])
+                result.append(entry)
+            else:
+                result.append({"date": date_str, "type": "rest"})
         return result
     except Exception as e:
         print(f"Schedule Error: {e}")

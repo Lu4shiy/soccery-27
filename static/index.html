@@ -330,6 +330,11 @@
         }
         .role-select:focus { border-color: #52a8ff; }
 
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px; }
+        .status-green { background-color: #2ecc71; }
+        .status-yellow { background-color: #e6c544; }
+        .status-orange { background-color: #e67e22; }
+        .status-red { background-color: #a82929; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
         .modal-content { background: #232e3c; border-radius: 14px; padding: 20px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
         .modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
@@ -521,6 +526,14 @@
                 <div class="detail-item">
                     <div class="detail-label">Зарплата</div>
                     <div class="detail-value" id="pd-wage">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Настрой</div>
+                    <div class="detail-value" id="pd-morale" style="display:flex; align-items:center;">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Тонус</div>
+                    <div class="detail-value" id="pd-fitness" style="display:flex; align-items:center;">--</div>
                 </div>
             </div>
 
@@ -1153,7 +1166,10 @@
                         '<div class="player-pos">' + shortPos + '</div>' +
                         '<div class="player-name-block">' +
                         '<div class="player-name">' + p.name + '</div>' +
-                        '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет</div>' +
+                        '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет' + 
+                        '<span class="status-dot status-' + (p.morale || 'green') + '" title="Настрой"></span>' +
+                        '<span class="status-dot status-' + (p.fitness || 'green') + '" title="Тонус"></span>' +
+                        '</div>' +
                         '</div></div>' +
                         '<div class="player-val">' + val + '</div>' +
                         '</div>';
@@ -1178,6 +1194,11 @@
             
             const wageK = p.wage ? (p.wage / 1000).toFixed(0) + " тыс. $" : "Неизвестно";
             if ($("pd-wage")) $("pd-wage").innerText = wageK + " / нед.";
+
+            const moraleMap = { "green": "Зеленый", "yellow": "Желтый", "orange": "Оранжевый", "red": "Красный" };
+            const fitnessMap = { "green": "Зеленый", "yellow": "Желтый", "orange": "Оранжевый", "red": "Красный" };
+            if ($("pd-morale")) $("pd-morale").innerHTML = '<span class="status-dot status-' + (p.morale || 'green') + '" style="width:12px;height:12px;margin-right:6px;"></span>' + (moraleMap[p.morale] || "Зеленый");
+            if ($("pd-fitness")) $("pd-fitness").innerHTML = '<span class="status-dot status-' + (p.fitness || 'green') + '" style="width:12px;height:12px;margin-right:6px;"></span>' + (fitnessMap[p.fitness] || "Зеленый");
 
             const altDiv = $("pd-alt");
             if (altDiv) {
