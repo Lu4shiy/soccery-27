@@ -660,43 +660,32 @@ def generate_tournament_fixtures(tournament_id: int, db: Session):
     total_rounds = 38 if tour.type == "League" else (6 if tour.type == "Cup" or tour.name == "UEFA Conference League" else 8)
     
     for round_num in range(1, total_rounds + 1):
+        round_date = None
+        for _ in range(500):
+            d = rnd.choice(season_days)
+            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
+                round_date = d
+                used_days.add(d)
+                break
+        if not round_date:
+            round_date = max(used_days) + timedelta(days=4) if used_days else start_date
+            used_days.add(round_date)
+            
         round_clubs = clubs[:]
         rnd.shuffle(round_clubs)
         
-        matches_in_round = []
         for i in range(0, len(round_clubs), 2):
             home = round_clubs[i]
             away = round_clubs[i+1]
             if home and away:
-                matches_in_round.append((home, away))
-                
-        for home, away in matches_in_round:
-            found_date = False
-            for _ in range(500):
-                d = rnd.choice(season_days)
-                if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
-                    db.add(Fixture(
-                        date=d.strftime("%Y-%m-%d"),
-                        tournament_id=tour.id,
-                        round_number=round_num,
-                        home_club_id=home.id,
-                        away_club_id=away.id,
-                        is_played=0
-                    ))
-                    used_days.add(d)
-                    found_date = True
-                    break
-            if not found_date:
-                d = max(used_days) + timedelta(days=4) if used_days else start_date
                 db.add(Fixture(
-                    date=d.strftime("%Y-%m-%d"),
+                    date=round_date.strftime("%Y-%m-%d"),
                     tournament_id=tour.id,
                     round_number=round_num,
                     home_club_id=home.id,
                     away_club_id=away.id,
                     is_played=0
                 ))
-                used_days.add(d)
     db.commit()
 
 @app.post("/api/select-club")
@@ -935,12 +924,6 @@ def get_game_time():
 def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
-        state = db.query(GameState).first()
-        if state:
-            unplayed_past = db.query(Fixture).filter(Fixture.date < state.current_date, Fixture.is_played == 0).all()
-            for f in unplayed_past:
-                simulate_match(f.id, db)
-                
         num_days = calendar.monthrange(year, month)[1]
         start_str = f"{year}-{month:02d}-01"
         end_str = f"{year}-{month:02d}-{num_days:02d}"
@@ -1081,12 +1064,59 @@ def get_match_players(fixture_id: int):
 
 @app.get("/api/tournaments/{tournament_id}/stats")
 def get_stats(tournament_id: int):
-    return {
-        "scorers": [],
-        "assists": [],
-        "rating": [],
-        "clean_sheets": []
-    }
+    db = Session(engine)
+    try:
+        tour = db.query(Tournament).filter_by(id=tournament_id).first()
+        if not tour: return {"scorers": [], "assists": [], "rating": [], "clean_sheets": []}
+        
+        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, is_played=1).all()
+        fx_ids = [f.id for f in fixtures]
+        
+        if not fx_ids:
+            return {"scorers": [], "assists": [], "rating": [], "clean_sheets": []}
+            
+        scorers_q = db.query(Player).filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
+        scorers = [{"player": p.name, "team": "Клуб", "val": p.goals} for p in scorers_q]
+        
+        assists_q = db.query(Player).filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
+        assists = [{"player": p.name, "team": "Клуб", "val": p.assists} for p in assists_q]
+        
+        ratings_q = db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(fx_ids)).all()
+        ratings_dict = {}
+        for r in ratings_q:
+            if r.player_id not in ratings_dict:
+                ratings_dict[r.player_id] = {"sum": 0, "count": 0}
+            ratings_dict[r.player_id]["sum"] += r.rating
+            ratings_dict[r.player_id]["count"] += 1
+            
+        avg_ratings = []
+        for pid, data in ratings_dict.items():
+            p = db.query(Player).filter_by(id=pid).first()
+            if p and data["count"] > 0:
+                avg_ratings.append({"player": p.name, "team": "Клуб", "val": round(data["sum"]/data["count"], 2)})
+        avg_ratings.sort(key=lambda x: x["val"], reverse=True)
+        
+        cs_dict = {}
+        for f in fixtures:
+            if f.home_goals == 0:
+                cs_dict[f.away_club_id] = cs_dict.get(f.away_club_id, 0) + 1
+            if f.away_goals == 0:
+                cs_dict[f.home_club_id] = cs_dict.get(f.home_club_id, 0) + 1
+                
+        clean_sheets = []
+        for cid, count in cs_dict.items():
+            c = db.query(Club).filter_by(id=cid).first()
+            if c: clean_sheets.append({"team": c.name, "val": count})
+        clean_sheets.sort(key=lambda x: x["val"], reverse=True)
+
+        return {
+            "scorers": scorers[:10],
+            "assists": assists[:10],
+            "rating": avg_ratings[:10],
+            "clean_sheets": clean_sheets[:10]
+        }
+    finally:
+        db.close()
 
 @app.get("/api/tournaments/{tournament_id}/bracket")
 def get_bracket(tournament_id: int):
@@ -1343,6 +1373,40 @@ def advance_game_date(db, days_to_add):
     state.current_date = new_date.strftime("%Y-%m-%d")
     db.commit()
     return state.current_date
+
+@app.post("/api/admin/advance-month")
+def advance_month(req: dict):
+    tg_id = req.get("telegram_id")
+    if tg_id != ADMIN_TELEGRAM_ID:
+        raise HTTPException(status_code=403, detail="Нет прав")
+    
+    db = Session(engine)
+    try:
+        state = db.query(GameState).first()
+        if not state: return {"status": "error"}
+        
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        last_day = calendar.monthrange(curr.year, curr.month)[1]
+        
+        if curr.day == last_day:
+            if curr.month == 12:
+                next_month = date(curr.year + 1, 1, 1)
+            else:
+                next_month = date(curr.year, curr.month + 1, 1)
+            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+            new_date = date(next_month.year, next_month.month, next_month_last_day)
+        else:
+            new_date = date(curr.year, curr.month, last_day)
+            
+        unplayed = db.query(Fixture).filter(Fixture.date <= new_date.strftime("%Y-%m-%d"), Fixture.is_played == 0).all()
+        for fx in unplayed:
+            simulate_match(fx.id, db)
+            
+        state.current_date = new_date.strftime("%Y-%m-%d")
+        db.commit()
+        return {"status": "ok", "new_date": state.current_date}
+    finally:
+        db.close()
 
 @app.get("/api/tournaments/{tournament_id}/rounds")
 def get_tournament_rounds(tournament_id: int):
