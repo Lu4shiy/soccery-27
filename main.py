@@ -86,6 +86,7 @@ class Fixture(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(String, index=True)
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
+    round_number = Column(Integer, default=1)
     home_club_id = Column(Integer, ForeignKey("clubs.id"))
     away_club_id = Column(Integer, ForeignKey("clubs.id"))
     is_played = Column(Integer, default=0)
@@ -95,6 +96,14 @@ class Fixture(Base):
     away_poss = Column(Integer, default=50)
     home_shots = Column(Integer, default=0)
     away_shots = Column(Integer, default=0)
+    home_sot = Column(Integer, default=0)
+    away_sot = Column(Integer, default=0)
+    home_fouls = Column(Integer, default=0)
+    away_fouls = Column(Integer, default=0)
+    home_corners = Column(Integer, default=0)
+    away_corners = Column(Integer, default=0)
+    home_offsides = Column(Integer, default=0)
+    away_offsides = Column(Integer, default=0)
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
@@ -287,6 +296,15 @@ def init_db():
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS rating_sum FLOAT DEFAULT 0.0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fatigue INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_weeks INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS round_number INTEGER DEFAULT 1;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_sot INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_sot INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_fouls INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_fouls INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_corners INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_corners INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_offsides INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_offsides INTEGER DEFAULT 0;"))
         db.commit()
         
         # Инициализация времени
@@ -614,57 +632,62 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
-def generate_fixtures_for_club(club_id: int, db: Session):
-    if db.query(Fixture).filter((Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)).count() > 0:
+def generate_tournament_fixtures(tournament_id: int, db: Session):
+    if db.query(Fixture).filter_by(tournament_id=tournament_id).count() > 0:
         return
         
+    tour = db.query(Tournament).filter_by(id=tournament_id).first()
+    clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).all()
+    if not clubs or len(clubs) < 2: return
+    
+    rnd = random.Random(tournament_id)
     start_date = date(2026, 8, 20)
-    end_date = date(2027, 5, 31)
-    season_days = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
-    
-    rnd = random.Random(club_id)
-    tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == club_id).all()
-    
-    matches_to_play = []
-    for t in tours:
-        if t.type == "League":
-            matches_to_play.extend([t] * 38)
-        elif t.type == "Cup":
-            matches_to_play.extend([t] * 6)
-        elif t.type == "Continental":
-            matches_to_play.extend([t] * (6 if t.name == "UEFA Conference League" else 8))
-            
-    rnd.shuffle(matches_to_play)
+    season_days = [start_date + timedelta(days=i) for i in range(280)]
     used_days = set()
     
-    for t in matches_to_play:
-        for _ in range(1000):
-            d = rnd.choice(season_days)
-            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
-                opps = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == t.id, Club.id != club_id).all()
-                if opps:
-                    opp = rnd.choice(opps)
-                    is_home = rnd.choice([True, False])
-                    
-                    h_id = club_id if is_home else opp.id
-                    a_id = opp.id if is_home else club_id
-                    
-                    exists = db.query(Fixture).filter(
-                        Fixture.date == d.strftime("%Y-%m-%d"),
-                        ((Fixture.home_club_id == h_id) & (Fixture.away_club_id == a_id)) |
-                        ((Fixture.home_club_id == a_id) & (Fixture.away_club_id == h_id))
-                    ).first()
-                    
-                    if not exists:
-                        db.add(Fixture(
-                            date=d.strftime("%Y-%m-%d"),
-                            tournament_id=t.id,
-                            home_club_id=h_id,
-                            away_club_id=a_id,
-                            is_played=0
-                        ))
+    num_clubs = len(clubs)
+    if num_clubs % 2 != 0: clubs.append(None)
+    
+    total_rounds = 38 if tour.type == "League" else (6 if tour.type == "Cup" or tour.name == "UEFA Conference League" else 8)
+    
+    for round_num in range(1, total_rounds + 1):
+        round_clubs = clubs[:]
+        rnd.shuffle(round_clubs)
+        
+        matches_in_round = []
+        for i in range(0, len(round_clubs), 2):
+            home = round_clubs[i]
+            away = round_clubs[i+1]
+            if home and away:
+                matches_in_round.append((home, away))
+                
+        for home, away in matches_in_round:
+            found_date = False
+            for _ in range(500):
+                d = rnd.choice(season_days)
+                if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
+                    db.add(Fixture(
+                        date=d.strftime("%Y-%m-%d"),
+                        tournament_id=tour.id,
+                        round_number=round_num,
+                        home_club_id=home.id,
+                        away_club_id=away.id,
+                        is_played=0
+                    ))
                     used_days.add(d)
-                break
+                    found_date = True
+                    break
+            if not found_date:
+                d = max(used_days) + timedelta(days=4) if used_days else start_date
+                db.add(Fixture(
+                    date=d.strftime("%Y-%m-%d"),
+                    tournament_id=tour.id,
+                    round_number=round_num,
+                    home_club_id=home.id,
+                    away_club_id=away.id,
+                    is_played=0
+                ))
+                used_days.add(d)
     db.commit()
 
 @app.post("/api/select-club")
@@ -684,8 +707,10 @@ def select_club(req: SelectClubRequest):
             db.add(Manager(telegram_id=req.telegram_id, first_name=req.first_name or "", club_id=req.club_id, is_setup_complete=0))
         db.commit()
         
-        generate_fixtures_for_club(req.club_id, db)
-        
+        tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == req.club_id).all()
+        for t in tours:
+            generate_tournament_fixtures(t.id, db)
+            
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
         db.close()
@@ -907,7 +932,6 @@ def get_schedule(year: int, month: int, club_id: int = None):
         
         fixtures = []
         if club_id:
-            generate_fixtures_for_club(club_id, db)
             fixtures = db.query(Fixture).filter(
                 Fixture.date >= start_str,
                 Fixture.date <= end_str,
@@ -1147,44 +1171,74 @@ def simulate_match(fixture_id: int, db: Session):
     h_xi = get_xi(home.id)
     a_xi = get_xi(away.id)
     
-    h_att = sum([p.shooting or 50 for p in h_xi if "Goalkeeper" not in p.position]) / 10
-    a_def = sum([p.defending or 50 for p in a_xi if "Goalkeeper" not in p.position]) / 10
-    a_att = sum([p.shooting or 50 for p in a_xi if "Goalkeeper" not in p.position]) / 10
-    h_def = sum([p.defending or 50 for p in h_xi if "Goalkeeper" not in p.position]) / 10
+    h_att = sum([(p.shooting or 50) + (p.pace or 50) for p in h_xi if "Goalkeeper" not in p.position]) / 20
+    a_def = sum([(p.defending or 50) + (p.physicality or 50) for p in a_xi if "Goalkeeper" not in p.position]) / 20
+    a_att = sum([(p.shooting or 50) + (p.pace or 50) for p in a_xi if "Goalkeeper" not in p.position]) / 20
+    h_def = sum([(p.defending or 50) + (p.physicality or 50) for p in h_xi if "Goalkeeper" not in p.position]) / 20
     
-    h_goals = 0
-    a_goals = 0
+    h_goals, a_goals = 0, 0
     events = []
     
-    h_chances = max(1, int((h_att - a_def) / 10) + 4)
-    a_chances = max(1, int((a_att - h_def) / 10) + 3)
+    def add_event(minute, e_type, club_id, p_id=None, a_id=None):
+        events.append(MatchEvent(fixture_id=fx.id, minute=minute, event_type=e_type, club_id=club_id, player_id=p_id, assist_id=a_id))
+        
+    add_event(0, "start", None)
+    add_event(45, "half_end", None)
+    add_event(46, "second_half", None)
+    add_event(90, "end", None)
+
+    total_shots_h = max(2, int((h_att - a_def) * 1.5) + 10)
+    total_shots_a = max(2, int((a_att - h_def) * 1.5) + 8)
+    h_sot, a_sot = 0, 0
     
-    h_scorers = [p for p in h_xi if "Goalkeeper" not in p.position]
-    a_scorers = [p for p in a_xi if "Goalkeeper" not in p.position]
+    h_players = [p for p in h_xi if "Goalkeeper" not in p.position]
+    a_players = [p for p in a_xi if "Goalkeeper" not in p.position]
     
-    for _ in range(h_chances):
-        if random.random() < 0.3:
-            h_goals += 1
-            scorer = random.choice(h_scorers)
-            assist = random.choice([p for p in h_scorers if p.id != scorer.id]) if random.random() < 0.7 else None
-            events.append(MatchEvent(fixture_id=fx.id, minute=random.randint(1, 90), event_type='goal', club_id=home.id, player_id=scorer.id, assist_id=assist.id if assist else None))
-            scorer.goals = (scorer.goals or 0) + 1
-            if assist: assist.assists = (assist.assists or 0) + 1
-            scorer.rating_sum = (scorer.rating_sum or 0) + 1.0
-            
-    for _ in range(a_chances):
-        if random.random() < 0.25:
-            a_goals += 1
-            scorer = random.choice(a_scorers)
-            assist = random.choice([p for p in a_scorers if p.id != scorer.id]) if random.random() < 0.7 else None
-            events.append(MatchEvent(fixture_id=fx.id, minute=random.randint(1, 90), event_type='goal', club_id=away.id, player_id=scorer.id, assist_id=assist.id if assist else None))
-            scorer.goals = (scorer.goals or 0) + 1
-            if assist: assist.assists = (assist.assists or 0) + 1
-            scorer.rating_sum = (scorer.rating_sum or 0) + 1.0
+    for _ in range(total_shots_h):
+        if random.random() < 0.4:
+            h_sot += 1
+            minute = random.randint(1, 90)
+            if random.random() < 0.35:
+                h_goals += 1
+                scorer = random.choice(h_players)
+                assist = random.choice([p for p in h_players if p.id != scorer.id]) if random.random() < 0.65 else None
+                add_event(minute, 'goal', home.id, scorer.id, assist.id if assist else None)
+                scorer.goals = (scorer.goals or 0) + 1
+                if assist: assist.assists = (assist.assists or 0) + 1
+                
+    for _ in range(total_shots_a):
+        if random.random() < 0.4:
+            a_sot += 1
+            minute = random.randint(1, 90)
+            if random.random() < 0.30:
+                a_goals += 1
+                scorer = random.choice(a_players)
+                assist = random.choice([p for p in a_players if p.id != scorer.id]) if random.random() < 0.65 else None
+                add_event(minute, 'goal', away.id, scorer.id, assist.id if assist else None)
+                scorer.goals = (scorer.goals or 0) + 1
+                if assist: assist.assists = (assist.assists or 0) + 1
+
+    if random.random() < 0.2:
+        side = home.id if random.random() < 0.5 else away.id
+        minute = random.randint(1, 90)
+        add_event(minute, 'penalty_goal' if random.random() < 0.7 else 'penalty_miss', side)
+        if side == home.id: h_goals += 1
+        else: a_goals += 1
+
+    for _ in range(random.randint(1, 4)):
+        side = home.id if random.random() < 0.5 else away.id
+        p = random.choice(h_players if side == home.id else a_players)
+        add_event(random.randint(10, 85), 'yellow_card', side, p.id)
+        
+    for _ in range(random.randint(3, 5)):
+        side = home.id if random.random() < 0.5 else away.id
+        out_p = random.choice(h_players if side == home.id else a_players)
+        in_p = db.query(Player).filter_by(club_id=side).first()
+        add_event(random.randint(60, 85), 'substitution', side, out_p.id, in_p.id if in_p else None)
 
     for p in h_xi + a_xi:
         p.matches_played = (p.matches_played or 0) + 1
-        p.fatigue = min(100, (p.fatigue or 0) + random.randint(10, 25))
+        p.fatigue = min(100, (p.fatigue or 0) + random.randint(15, 30))
         if p.fatigue > 80: p.fitness = "red"
         elif p.fatigue > 60: p.fitness = "orange"
         elif p.fatigue > 40: p.fitness = "yellow"
@@ -1192,8 +1246,18 @@ def simulate_match(fixture_id: int, db: Session):
     fx.home_goals = h_goals
     fx.away_goals = a_goals
     fx.is_played = 1
-    fx.home_poss = random.randint(40, 60)
+    fx.home_poss = random.randint(35, 65)
     fx.away_poss = 100 - fx.home_poss
+    fx.home_shots = total_shots_h
+    fx.away_shots = total_shots_a
+    fx.home_sot = h_sot
+    fx.away_sot = a_sot
+    fx.home_fouls = random.randint(5, 15)
+    fx.away_fouls = random.randint(5, 15)
+    fx.home_corners = random.randint(2, 10)
+    fx.away_corners = random.randint(2, 10)
+    fx.home_offsides = random.randint(0, 4)
+    fx.away_offsides = random.randint(0, 4)
     
     for ev in events: db.add(ev)
     db.commit()
@@ -1211,6 +1275,33 @@ def advance_game_date(db, days_to_add):
     state.current_date = new_date.strftime("%Y-%m-%d")
     db.commit()
     return state.current_date
+
+@app.get("/api/tournaments/{tournament_id}/rounds")
+def get_tournament_rounds(tournament_id: int):
+    db = Session(engine)
+    try:
+        rounds = db.query(Fixture.round_number).filter_by(tournament_id=tournament_id).distinct().order_by(Fixture.round_number).all()
+        return [r[0] for r in rounds]
+    finally:
+        db.close()
+
+@app.get("/api/tournaments/{tournament_id}/rounds/{round_number}")
+def get_round_matches(tournament_id: int, round_number: int):
+    db = Session(engine)
+    try:
+        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, round_number=round_number).all()
+        result = []
+        for f in fixtures:
+            h = db.query(Club).filter_by(id=f.home_club_id).first()
+            a = db.query(Club).filter_by(id=f.away_club_id).first()
+            result.append({
+                "id": f.id, "date": f.date, "is_played": bool(f.is_played),
+                "home_name": h.name if h else "", "away_name": a.name if a else "",
+                "home_goals": f.home_goals, "away_goals": f.away_goals
+            })
+        return result
+    finally:
+        db.close()
 
 @app.get("/api/match/{fixture_id}")
 def get_match_details(fixture_id: int):
@@ -1238,6 +1329,11 @@ def get_match_details(fixture_id: int):
             "home_club": home.name, "away_club": away.name,
             "home_goals": fx.home_goals, "away_goals": fx.away_goals,
             "home_poss": fx.home_poss, "away_poss": fx.away_poss,
+            "home_shots": fx.home_shots, "away_shots": fx.away_shots,
+            "home_sot": fx.home_sot, "away_sot": fx.away_sot,
+            "home_fouls": fx.home_fouls, "away_fouls": fx.away_fouls,
+            "home_corners": fx.home_corners, "away_corners": fx.away_corners,
+            "home_offsides": fx.home_offsides, "away_offsides": fx.away_offsides,
             "tournament": tour.name if tour else "",
             "events": events_data
         }

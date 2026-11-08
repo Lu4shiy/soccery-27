@@ -721,19 +721,39 @@
             <p id="match-days-left" style="font-weight:bold; color:#e6c544; margin-top:10px;"></p>
         </div>
 
-        <div id="match-events-block" class="card hidden">
-            <h3 style="margin-top:0; color:#52a8ff;">События матча</h3>
-            <div id="match-events-list" style="font-size:13px;"></div>
-        </div>
-
-        <div id="match-stats-block" class="card hidden">
-            <h3 style="margin-top:0; color:#52a8ff;">Статистика</h3>
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span id="stat-poss-home" style="font-weight:bold;"></span>
-                <span style="color:#8e9eb5;">Владение</span>
-                <span id="stat-poss-away" style="font-weight:bold;"></span>
+            <div id="match-events-block" class="card hidden">
+                <h3 style="margin-top:0; color:#52a8ff;">События матча</h3>
+                <div id="match-events-list" style="font-size:13px; display:flex; flex-direction:column; gap:6px;"></div>
             </div>
-        </div>
+
+            <div id="match-stats-block" class="card hidden">
+                <h3 style="margin-top:0; color:#52a8ff;">Статистика</h3>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span id="stat-poss-home" style="font-weight:bold;"></span>
+                    <span style="color:#8e9eb5;">Владение</span>
+                    <span id="stat-poss-away" style="font-weight:bold;"></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span id="stat-shots-home" style="font-weight:bold;"></span>
+                    <span style="color:#8e9eb5;">Удары (в створ)</span>
+                    <span id="stat-shots-away" style="font-weight:bold;"></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span id="stat-fouls-home" style="font-weight:bold;"></span>
+                    <span style="color:#8e9eb5;">Фолы</span>
+                    <span id="stat-fouls-away" style="font-weight:bold;"></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span id="stat-corners-home" style="font-weight:bold;"></span>
+                    <span style="color:#8e9eb5;">Угловые</span>
+                    <span id="stat-corners-away" style="font-weight:bold;"></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span id="stat-offsides-home" style="font-weight:bold;"></span>
+                    <span style="color:#8e9eb5;">Офсайды</span>
+                    <span id="stat-offsides-away" style="font-weight:bold;"></span>
+                </div>
+            </div>
     </div>
 
     <div id="bottom-nav" class="bottom-nav hidden">
@@ -875,7 +895,8 @@
             "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
             "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw",
-            "Kenya": "ke", "Latvia": "lv"
+            "Kenya": "ke", "Latvia": "lv", "Indonesia": "id", "Malaysia": "my", "Thailand": "th",
+            "Vietnam": "vn", "Philippines": "ph", "Singapore": "sg", "India": "in"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -1617,6 +1638,77 @@
                 
                 const firstTab = document.querySelectorAll('.sc-tab')[0];
                 if (firstTab) firstTab.innerText = (tourType === "Cup") ? "Сетка" : "Таблица";
+                
+                const roundsRes = await fetch(API_BASE + `/api/tournaments/${id}/rounds`);
+                const rounds = await roundsRes.json();
+                
+                let roundsHtml = `<div style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:5px;">`;
+                rounds.forEach(r => {
+                    roundsHtml += `<button class="btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="loadTourRound(${id}, ${r})">Тур ${r}</button>`;
+                });
+                roundsHtml += `</div><div id="tour-round-details"></div>`;
+                
+                container.innerHTML = roundsHtml;
+                
+                if (rounds.length > 0) {
+                    loadTourRound(id, rounds[0]);
+                }
+            } catch(e) {
+                console.error(e);
+                container.innerHTML = "<div style='color:#ff6b6b;'>Ошибка загрузки турнира</div>";
+            }
+        };
+
+        window.loadTourRound = async function(tourId, roundNum) {
+            const container = $("tour-round-details");
+            if (!container) return;
+            container.innerHTML = "Загрузка...";
+            try {
+                const res = await fetch(API_BASE + `/api/tournaments/${tourId}/rounds/${roundNum}`);
+                const matches = await res.json();
+                
+                let html = `<h4 style="color:#52a8ff; margin-bottom:10px;">Тур ${roundNum}</h4>`;
+                matches.forEach(m => {
+                    const score = m.is_played ? `<span style="color:#e6c544; font-weight:bold;">${m.home_goals} : ${m.away_goals}</span>` : `<span style="color:#8e9eb5;">- : -</span>`;
+                    html += `<div style="background:#17212b; border-radius:6px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="openMatchDetails(${m.id})">
+                        <div style="flex:1; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <span>${m.home_name}</span> ${getSmallLogo(m.home_name)}
+                        </div>
+                        <div style="min-width:60px; text-align:center; font-size:14px;">${score}</div>
+                        <div style="flex:1; text-align:left; display:flex; align-items:center; gap:8px;">
+                            ${getSmallLogo(m.away_name)} <span>${m.away_name}</span>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = "Ошибка загрузки тура";
+            }
+        };
+
+        window.openTournament = async function(id, name) {
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
+            if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
+            if ($("detail-tour-name")) $("detail-tour-name").innerText = name;
+            
+            document.querySelectorAll('.sc-tab').forEach((el, i) => {
+                if (i === 0) el.classList.add("active");
+                else el.classList.remove("active");
+            });
+            if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
+            if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
+
+            const container = $("tour-tab-table");
+            if (!container) return;
+            container.innerHTML = "<div style='color:#8e9eb5;'>Загрузка...</div>";
+            
+            try {
+                const stRes = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
+                const stData = await stRes.json();
+                const tourType = stData.type || "League";
+                
+                const firstTab = document.querySelectorAll('.sc-tab')[0];
+                if (firstTab) firstTab.innerText = "Матчи";
                 
                 if (tourType === "Cup") {
                     const brRes = await fetch(API_BASE + `/api/tournaments/${id}/bracket`);
@@ -2657,12 +2749,42 @@
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
                     
                     if ($("match-events-block")) $("match-events-block").classList.remove("hidden");
-                    const evHtml = m.events.map(e => `<div style="margin-bottom:4px;"><span style="color:#8e9eb5;">${e.minute}'</span> <b>${e.player}</b> ${e.type === 'goal' ? '⚽' : ''} ${e.assist ? '(асс. ' + e.assist + ')' : ''}</div>`).join("");
+                    
+                    const evHtml = m.events.map(e => {
+                        let icon = "";
+                        let text = "";
+                        if (e.type === 'start') { icon = "▶️"; text = "Начало 1-го тайма"; }
+                        else if (e.type === 'half_end') { icon = "⏸"; text = "Конец 1-го тайма"; }
+                        else if (e.type === 'second_half') { icon = "▶️"; text = "Начало 2-го тайма"; }
+                        else if (e.type === 'end') { icon = "🏁"; text = "Конец матча"; }
+                        else if (e.type === 'goal') { icon = "⚽"; text = `<b>${e.player}</b> ${e.assist ? '(асс. ' + e.assist + ')' : ''}`; }
+                        else if (e.type === 'penalty_goal') { icon = "⚽ (П)"; text = `<b>${e.player}</b>`; }
+                        else if (e.type === 'penalty_miss') { icon = "❌ (П)"; text = `<b>${e.player}</b> не забил пенальти`; }
+                        else if (e.type === 'yellow_card') { icon = "🟨"; text = `<b>${e.player}</b>`; }
+                        else if (e.type === 'red_card') { icon = "🟥"; text = `<b>${e.player}</b>`; }
+                        else if (e.type === 'substitution') { icon = "🔄"; text = `Замена: <b>${e.player}</b> ➡️ <b>${e.assist}</b>`; }
+                        else { text = e.type; }
+                        
+                        return `<div style="display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid #2f3b4d;">
+                            <span style="color:#8e9eb5; min-width:25px;">${e.minute}'</span>
+                            <span>${icon}</span>
+                            <span>${text}</span>
+                        </div>`;
+                    }).join("");
+                    
                     if ($("match-events-list")) $("match-events-list").innerHTML = evHtml || "Нет событий";
                     
                     if ($("match-stats-block")) $("match-stats-block").classList.remove("hidden");
                     if ($("stat-poss-home")) $("stat-poss-home").innerText = m.home_poss + "%";
                     if ($("stat-poss-away")) $("stat-poss-away").innerText = m.away_poss + "%";
+                    if ($("stat-shots-home")) $("stat-shots-home").innerText = m.home_shots + " (" + m.home_sot + ")";
+                    if ($("stat-shots-away")) $("stat-shots-away").innerText = m.away_shots + " (" + m.away_sot + ")";
+                    if ($("stat-fouls-home")) $("stat-fouls-home").innerText = m.home_fouls;
+                    if ($("stat-fouls-away")) $("stat-fouls-away").innerText = m.away_fouls;
+                    if ($("stat-corners-home")) $("stat-corners-home").innerText = m.home_corners;
+                    if ($("stat-corners-away")) $("stat-corners-away").innerText = m.away_corners;
+                    if ($("stat-offsides-home")) $("stat-offsides-home").innerText = m.home_offsides;
+                    if ($("stat-offsides-away")) $("stat-offsides-away").innerText = m.away_offsides;
                 } else {
                     if ($("match-days-left")) {
                         const matchDate = new Date(m.date);
