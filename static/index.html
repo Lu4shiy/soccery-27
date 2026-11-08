@@ -352,6 +352,7 @@
             background: #17212b; padding: 4px 2px; border-radius: 6px; font-size: 12px; position: relative;
             display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
             min-height: 58px; border-bottom: 3px solid transparent;
+            min-width: 0; width: 100%; overflow: hidden;
         }
         .cal-date { font-size: 10px; color: #8e9eb5; width: 100%; text-align: center; margin-bottom: 2px; }
         .cal-day.match { border: 1px solid #52a8ff; background: rgba(82,168,255,0.05); border-bottom: 3px solid #52a8ff; }
@@ -359,8 +360,9 @@
         .cal-day.rest { border-bottom: 3px solid #2ecc71; }
         .cal-day.past { opacity: 0.4; }
         .cal-day.today { border: 2px solid #e6c544 !important; box-shadow: 0 0 8px rgba(230, 197, 68, 0.4); background: #2f3b4d; }
-        .cal-match-info { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; }
+        .cal-match-info { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 100%; min-width: 0; }
         .cal-tour { font-size: 7px; color: #52a8ff; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-opp { width: 100%; display: flex; justify-content: center; }
         .cal-opp .logo-container-mini { width: 14px; height: 14px; margin-right: 0; padding: 1px; border-radius: 3px; }
         .cal-opp .logo-container-mini .logo-img { padding: 0; }
         .cal-opp .logo-container-mini .logo-fallback { font-size: 8px; }
@@ -607,14 +609,20 @@
             <h3 id="detail-tour-name">Название турнира</h3>
             
             <div class="sc-tabs" style="margin-top: 10px;">
-                <div class="sc-tab active" onclick="switchTourTab('table')">Таблица</div>
-                <div class="sc-tab" onclick="switchTourTab('stats')">Статистика</div>
+                <div class="sc-tab active" onclick="switchTourTab('table')" id="tab-btn-table">Таблица</div>
+                <div class="sc-tab" onclick="switchTourTab('matches')" id="tab-btn-matches">Матчи</div>
+                <div class="sc-tab" onclick="switchTourTab('stats')" id="tab-btn-stats">Статистика</div>
             </div>
 
             <div id="tour-tab-table" class="card">
                 <table class="stats-table" id="standings-table">
                     <!-- Сюда рендерится таблица -->
                 </table>
+            </div>
+
+            <div id="tour-tab-matches" class="card hidden">
+                <div id="tour-rounds-list" style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:5px;"></div>
+                <div id="tour-round-details"></div>
             </div>
 
             <div id="tour-tab-stats" class="card hidden">
@@ -1627,11 +1635,10 @@
             if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
             if ($("detail-tour-name")) $("detail-tour-name").innerText = name;
             
-            document.querySelectorAll('.sc-tab').forEach((el, i) => {
-                if (i === 0) el.classList.add("active");
-                else el.classList.remove("active");
-            });
+            document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
+            if ($("tab-btn-table")) $("tab-btn-table").classList.add("active");
             if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
+            if ($("tour-tab-matches")) $("tour-tab-matches").classList.add("hidden");
             if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
 
             const container = $("tour-tab-table");
@@ -1649,20 +1656,95 @@
                 const roundsRes = await fetch(API_BASE + `/api/tournaments/${id}/rounds`);
                 const rounds = await roundsRes.json();
                 
-                let roundsHtml = `<div style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:5px;">`;
+                let roundsHtml = "";
                 rounds.forEach(r => {
                     roundsHtml += `<button class="btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="loadTourRound(${id}, ${r})">Тур ${r}</button>`;
                 });
-                roundsHtml += `</div><div id="tour-round-details"></div>`;
-                
-                container.innerHTML = roundsHtml;
+                if ($("tour-rounds-list")) $("tour-rounds-list").innerHTML = roundsHtml;
                 
                 if (rounds.length > 0) {
                     loadTourRound(id, rounds[0]);
                 }
-            } catch(e) {
+
+                if (tourType === "Cup") {
+                    const brRes = await fetch(API_BASE + `/api/tournaments/${id}/bracket`);
+                    const brData = await brRes.json();
+                    renderBracket(brData);
+                } else {
+                    if (stData.standings && stData.standings.length > 0) {
+                        let lastZone = "";
+                        const total = stData.standings.length;
+                        
+                        const rowsHtml = stData.standings.map(s => {
+                            let currentZone = "";
+                            let rowStyle = "";
+                            if (tourType === "League") {
+                                if (s.pos <= 4) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
+                                else if (s.pos === 5) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
+                                else if (s.pos === 6) { currentZone = "Лига Конференций"; rowStyle = "border-left: 3px solid #2ecc71;"; }
+                                else if (s.pos > total - 3) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            } else if (tourType === "Continental") {
+                                if (s.pos === 1) { currentZone = "Чемпион"; rowStyle = "border-left: 3px solid #e6c544;"; }
+                                else if (s.pos >= 2 && s.pos <= 8) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
+                                else if (s.pos >= 9 && s.pos <= 24) { currentZone = "Стыковые матчи"; rowStyle = "border-left: 3px solid #2ecc71;"; }
+                                else if (s.pos > 24) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
+                            }
+                            
+                            let html = "";
+                            if (currentZone && currentZone !== lastZone) {
+                                html += `<tr><td colspan="10" style="background:#17212b; color:#8e9eb5; font-size:9px; text-align:left; padding:4px 8px; border-bottom:1px solid #232e3c;">${currentZone}</td></tr>`;
+                                lastZone = currentZone;
+                            }
+                            
+                            const logoHtml = getSmallLogo(s.club_name);
+                            
+                            html += `<tr style="${rowStyle}">
+                                <td class="num">${s.pos}</td>
+                                <td><div style="display:flex; align-items:center;">${logoHtml}<span>${s.club_name}</span></div></td>
+                                <td class="num">${s.mp}</td>
+                                <td class="num">${s.w}</td>
+                                <td class="num">${s.d}</td>
+                                <td class="num">${s.l}</td>
+                                <td class="num">${s.gf}</td>
+                                <td class="num">${s.ga}</td>
+                                <td class="num">${s.gd}</td>
+                                <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
+                            </tr>`;
+                            return html;
+                        }).join("");
+                        
+                        container.innerHTML = `<table class="stats-table">
+                            <tr>
+                                <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
+                                <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
+                                <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
+                            </tr>
+                            ${rowsHtml}
+                        </table>`;
+                    } else {
+                        container.innerHTML = "<div style='color:#8e9eb5;'>Нет данных</div>";
+                    }
+                }
+
+                const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
+                const stats = await statRes.json();
+                const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
+
+                if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
+                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+
+                if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
+                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+
+                if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
+                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+
+                if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
+                else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+
+            } catch (e) {
                 console.error(e);
-                container.innerHTML = "<div style='color:#ff6b6b;'>Ошибка загрузки турнира</div>";
+                container.innerHTML = "<div style='color:#ff6b6b;'>Ошибка загрузки данных</div>";
             }
         };
 
@@ -1695,13 +1777,63 @@
 
         window.switchTourTab = function(tab) {
             document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
+            if ($("tour-tab-table")) $("tour-tab-table").classList.add("hidden");
+            if ($("tour-tab-matches")) $("tour-tab-matches").classList.add("hidden");
+            if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
+            
             if (tab === 'table') {
-                if (document.querySelectorAll('.sc-tab')[0]) document.querySelectorAll('.sc-tab')[0].classList.add("active");
+                if ($("tab-btn-table")) $("tab-btn-table").classList.add("active");
                 if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
-                if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
+            } else if (tab === 'matches') {
+                if ($("tab-btn-matches")) $("tab-btn-matches").classList.add("active");
+                if ($("tour-tab-matches")) $("tour-tab-matches").classList.remove("hidden");
             } else {
-                if (document.querySelectorAll('.sc-tab')[1]) document.querySelectorAll('.sc-tab')[1].classList.add("active");
-                if ($("tour-tab-table")) $("tour-tab-table").classList.add("hidden");
+                if ($("tab-btn-stats")) $("tab-btn-stats").classList.add("active");
+                if ($("tour-tab-stats")) $("tour-tab-stats").classList.remove("hidden");
+            }
+        };
+
+        window.loadTourRound = async function(tourId, roundNum) {
+            const container = $("tour-round-details");
+            if (!container) return;
+            container.innerHTML = "Загрузка...";
+            try {
+                const res = await fetch(API_BASE + `/api/tournaments/${tourId}/rounds/${roundNum}`);
+                const matches = await res.json();
+                
+                let html = `<h4 style="color:#52a8ff; margin-bottom:10px;">Тур ${roundNum}</h4>`;
+                matches.forEach(m => {
+                    const score = m.is_played ? `<span style="color:#e6c544; font-weight:bold;">${m.home_goals} : ${m.away_goals}</span>` : `<span style="color:#8e9eb5;">- : -</span>`;
+                    html += `<div style="background:#17212b; border-radius:6px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="openMatchDetails(${m.id})">
+                        <div style="flex:1; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <span>${m.home_name}</span> ${getSmallLogo(m.home_name)}
+                        </div>
+                        <div style="min-width:60px; text-align:center; font-size:14px;">${score}</div>
+                        <div style="flex:1; text-align:left; display:flex; align-items:center; gap:8px;">
+                            ${getSmallLogo(m.away_name)} <span>${m.away_name}</span>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = "Ошибка загрузки тура";
+            }
+        };
+
+        window.switchTourTab = function(tab) {
+            document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
+            if ($("tour-tab-table")) $("tour-tab-table").classList.add("hidden");
+            if ($("tour-tab-matches")) $("tour-tab-matches").classList.add("hidden");
+            if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
+            
+            if (tab === 'table') {
+                if ($("tab-btn-table")) $("tab-btn-table").classList.add("active");
+                if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
+            } else if (tab === 'matches') {
+                if ($("tab-btn-matches")) $("tab-btn-matches").classList.add("active");
+                if ($("tour-tab-matches")) $("tour-tab-matches").classList.remove("hidden");
+            } else {
+                if ($("tab-btn-stats")) $("tab-btn-stats").classList.add("active");
                 if ($("tour-tab-stats")) $("tour-tab-stats").classList.remove("hidden");
             }
         };

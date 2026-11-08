@@ -630,6 +630,14 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
+def parse_schedule_dates(dates_list, season_start_year):
+    res = []
+    for d_str in dates_list:
+        m, d = map(int, d_str.split("."))
+        year = season_start_year if m >= 7 else season_start_year + 1
+        res.append(date(year, m, d))
+    return res
+
 def generate_tournament_fixtures(tournament_id: int, db: Session):
     if db.query(Fixture).filter_by(tournament_id=tournament_id).count() > 0:
         return
@@ -638,27 +646,50 @@ def generate_tournament_fixtures(tournament_id: int, db: Session):
     clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).all()
     if not clubs or len(clubs) < 2: return
     
-    rnd = random.Random(tournament_id)
-    start_date = date(2026, 8, 20)
-    season_days = [start_date + timedelta(days=i) for i in range(280)]
-    used_days = set()
-    
     num_clubs = len(clubs)
     if num_clubs % 2 != 0: clubs.append(None)
     
-    total_rounds = 38 if tour.type == "League" else (6 if tour.type == "Cup" or tour.name == "UEFA Conference League" else 8)
+    rnd = random.Random(tournament_id)
+    SEASON_START = 2026
+    schedule_dates = []
     
-    for round_num in range(1, total_rounds + 1):
-        round_date = None
-        for _ in range(500):
-            d = rnd.choice(season_days)
-            if d not in used_days and all(abs((d - k).days) >= 3 for k in used_days):
-                round_date = d
-                used_days.add(d)
-                break
-        if not round_date:
-            round_date = max(used_days) + timedelta(days=4) if used_days else start_date
-            used_days.add(round_date)
+    if tour.name in ["UEFA Champions League", "UEFA Europa League"]:
+        raw_dates = ["08.09", "13.10", "20.10", "03.11", "24.11", "08.12", "19.01", "27.01", "16.02", "23.02", "09.03", "16.03", "06.04", "13.04", "27.04", "04.05", "05.06" if tour.name == "UEFA Champions League" else "30.05"]
+        schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+    elif tour.name == "UEFA Conference League":
+        raw_dates = ["13.10", "20.10", "03.11", "24.11", "08.12", "19.01", "16.02", "23.02", "09.03", "16.03", "06.04", "13.04", "27.04", "04.05", "02.06"]
+        schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+    elif tour.type == "League":
+        if num_clubs == 20:
+            raw_dates = ["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 18:
+            raw_dates = ["28.08", "05.09", "13.09", "18.09", "10.10", "17.10", "25.10", "31.10", "07.11", "20.11", "28.11", "04.12", "13.12", "18.12", "09.01", "13.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "03.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "24.04", "08.05", "15.05", "22.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 16:
+            raw_dates = ["24.07", "01.08", "08.08", "18.08", "22.08", "28.08", "05.09", "12.09", "17.09", "09.10", "16.10", "25.10", "30.10", "07.11", "11.11", "21.11", "28.11", "05.12", "28.02", "05.03", "13.03", "21.03", "03.04", "18.04", "24.04", "01.05", "09.05", "16.05", "23.05", "26.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 12:
+            raw_dates = ["31.07", "09.08", "30.08", "02.09", "05.09", "12.09", "20.09", "10.10", "17.10", "24.10", "28.10", "07.11", "21.11", "28.11", "02.12", "05.12", "20.12", "26.12", "30.12", "03.01", "13.01", "19.01"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 10:
+            raw_dates = ["01.02", "04.02", "07.02", "10.02", "13.02", "20.02", "27.02", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "22.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 24:
+            raw_dates = ["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        elif num_clubs == 22:
+            raw_dates = ["17.08", "21.08", "29.08", "05.09", "12.09", "19.09", "25.09", "04.10", "10.10", "17.10", "24.10", "31.10", "08.11", "14.11", "21.11", "29.11", "05.12", "13.12", "20.12", "03.01", "10.01", "16.01", "24.01", "31.01", "07.02", "13.02", "20.02", "28.02", "06.03", "12.03", "21.03", "28.03", "03.04", "10.04", "18.04", "24.04", "01.05", "09.05", "16.05", "19.05", "23.05", "26.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+        else:
+            raw_dates = ["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"]
+            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+    else:
+        schedule_dates = [date(SEASON_START, 9, 15) + timedelta(days=i*30) for i in range(8)]
+        
+    for round_num in range(1, len(schedule_dates) + 1):
+        if round_num > len(schedule_dates): break
+        round_date = schedule_dates[round_num - 1]
             
         round_clubs = clubs[:]
         rnd.shuffle(round_clubs)
@@ -1064,27 +1095,35 @@ def get_stats(tournament_id: int):
         if not fx_ids:
             return {"scorers": [], "assists": [], "rating": [], "clean_sheets": []}
             
-        scorers_q = db.query(Player).filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
-        scorers = [{"player": p.name, "team": "Клуб", "val": p.goals} for p in scorers_q]
+        scorers_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type.in_(['goal', 'penalty_goal'])
+        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
         
-        assists_q = db.query(Player).filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
-        assists = [{"player": p.name, "team": "Клуб", "val": p.assists} for p in assists_q]
-        
-        ratings_q = db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(fx_ids)).all()
-        ratings_dict = {}
-        for r in ratings_q:
-            if r.player_id not in ratings_dict:
-                ratings_dict[r.player_id] = {"sum": 0, "count": 0}
-            ratings_dict[r.player_id]["sum"] += r.rating
-            ratings_dict[r.player_id]["count"] += 1
-            
-        avg_ratings = []
-        for pid, data in ratings_dict.items():
+        scorers = []
+        for pid, count in scorers_q:
             p = db.query(Player).filter_by(id=pid).first()
-            if p and data["count"] > 0:
-                avg_ratings.append({"player": p.name, "team": "Клуб", "val": round(data["sum"]/data["count"], 2)})
-        avg_ratings.sort(key=lambda x: x["val"], reverse=True)
+            if p: scorers.append({"player": p.name, "team": "Клуб", "val": count})
+            
+        assists_q = db.query(MatchEvent.assist_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.assist_id.isnot(None)
+        ).group_by(MatchEvent.assist_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
         
+        assists = []
+        for pid, count in assists_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p: assists.append({"player": p.name, "team": "Клуб", "val": count})
+            
+        ratings_q = db.query(MatchPlayerStats.player_id, func.avg(MatchPlayerStats.rating)).filter(
+            MatchPlayerStats.fixture_id.in_(fx_ids)
+        ).group_by(MatchPlayerStats.player_id).order_by(func.avg(MatchPlayerStats.rating).desc()).limit(10).all()
+        
+        avg_ratings = []
+        for pid, avg_r in ratings_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p: avg_ratings.append({"player": p.name, "team": "Клуб", "val": round(avg_r, 2)})
+            
         cs_dict = {}
         for f in fixtures:
             if f.home_goals == 0:
@@ -1099,9 +1138,9 @@ def get_stats(tournament_id: int):
         clean_sheets.sort(key=lambda x: x["val"], reverse=True)
 
         return {
-            "scorers": scorers[:10],
-            "assists": assists[:10],
-            "rating": avg_ratings[:10],
+            "scorers": scorers,
+            "assists": assists,
+            "rating": avg_ratings,
             "clean_sheets": clean_sheets[:10]
         }
     finally:
@@ -1196,6 +1235,9 @@ def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()
     if not fx or fx.is_played: return
     
+    if not fx.tournament_id:
+        fx.tournament_id = db.query(Tournament).first().id
+        
     home = db.query(Club).filter_by(id=fx.home_club_id).first()
     away = db.query(Club).filter_by(id=fx.away_club_id).first()
     
@@ -1284,10 +1326,11 @@ def simulate_match(fixture_id: int, db: Session):
 
     for p in h_xi + a_xi:
         p.matches_played = (p.matches_played or 0) + 1
-        p.fatigue = min(100, (p.fatigue or 0) + random.randint(15, 30))
+        p.fatigue = min(100, (p.fatigue or 0) + random.randint(20, 40))
         if p.fatigue > 80: p.fitness = "red"
         elif p.fatigue > 60: p.fitness = "orange"
         elif p.fatigue > 40: p.fitness = "yellow"
+        else: p.fitness = "green"
         
         base_rating = 6.0 + random.uniform(-0.5, 0.5)
         mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=90, rating=base_rating)
@@ -1323,13 +1366,25 @@ def advance_game_date(db, days_to_add):
     state = db.query(GameState).first()
     if not state: return None
     curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-    new_date = curr + timedelta(days=days_to_add)
     
-    unplayed = db.query(Fixture).filter(Fixture.date <= new_date.strftime("%Y-%m-%d"), Fixture.is_played == 0).all()
-    for fx in unplayed:
-        simulate_match(fx.id, db)
+    for _ in range(days_to_add):
+        curr += timedelta(days=1)
+        date_str = curr.strftime("%Y-%m-%d")
         
-    state.current_date = new_date.strftime("%Y-%m-%d")
+        fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
+        for fx in fixtures:
+            simulate_match(fx.id, db)
+            
+        db.query(Player).update({Player.fatigue: func.greatest(0, Player.fatigue - 10)})
+        
+        players = db.query(Player).all()
+        for p in players:
+            if p.fatigue > 80: p.fitness = "red"
+            elif p.fatigue > 60: p.fitness = "orange"
+            elif p.fatigue > 40: p.fitness = "yellow"
+            else: p.fitness = "green"
+            
+    state.current_date = curr.strftime("%Y-%m-%d")
     db.commit()
     return state.current_date
 
