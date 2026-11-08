@@ -754,6 +754,11 @@
                     <span id="stat-offsides-away" style="font-weight:bold;"></span>
                 </div>
             </div>
+
+            <div id="match-players-block" class="card hidden">
+                <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="loadMatchPlayers()">👥 Игроки матча</button>
+                <div id="match-players-list" style="font-size:12px;"></div>
+            </div>
     </div>
 
     <div id="bottom-nav" class="bottom-nav hidden">
@@ -898,6 +903,7 @@
             "Kenya": "ke", "Latvia": "lv", "Indonesia": "id", "Malaysia": "my", "Thailand": "th",
             "Vietnam": "vn", "Philippines": "ph", "Singapore": "sg", "India": "in",
             "Panama": "pa", "Haiti": "ht", "Congo": "cg", "DR Congo": "cd",
+            "Tunisia": "tn", "Cape Verde": "cv"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -2695,7 +2701,7 @@
             const hasClub = await checkManager(true);
             if (hasClub && managerSetupComplete) {
                 if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
-                loadSquad();
+                await loadSquad();
             } else if (hasClub && !managerSetupComplete) {
                 goToCoachSetup();
             } else {
@@ -2746,12 +2752,19 @@
                 if ($("match-date")) $("match-date").innerText = m.date;
                 
                 if (m.is_played) {
-                    if ($("match-score")) $("match-score").innerText = m.home_goals + " : " + m.away_goals;
+                    if ($("match-score")) {
+                    $("match-score").innerText = m.home_goals + " : " + m.away_goals;
+                    $("match-score").setAttribute("data-fixture-id", m.id);
+                }
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
                     
                     if ($("match-events-block")) $("match-events-block").classList.remove("hidden");
+                    if ($("match-players-block")) $("match-players-block").classList.remove("hidden");
+                    if ($("match-players-list")) $("match-players-list").innerHTML = "";
                     
-                    const evHtml = m.events.map(e => {
+                    const sortedEvents = m.events.slice().sort((a, b) => b.minute - a.minute);
+                    
+                    const evHtml = sortedEvents.map(e => {
                         let icon = "";
                         let text = "";
                         if (e.type === 'start') { icon = "▶️"; text = "Начало 1-го тайма"; }
@@ -2798,6 +2811,33 @@
             } catch(e) {
                 tg.showAlert("Ошибка загрузки матча");
                 showScreen("center");
+            }
+        };
+
+        window.loadMatchPlayers = async function() {
+            const container = $("match-players-list");
+            if (!container) return;
+            container.innerHTML = "Загрузка...";
+            try {
+                const fxId = $("match-score").getAttribute("data-fixture-id");
+                const res = await fetch(API_BASE + `/api/match/${fxId}/players`);
+                const players = await res.json();
+                
+                let html = "";
+                players.sort((a, b) => b.rating - a.rating).forEach(p => {
+                    const isHome = p.club_id === currentClubId;
+                    const color = p.rating >= 8 ? "#2ecc71" : p.rating >= 7 ? "#e6c544" : p.rating >= 6 ? "#fff" : "#a82929";
+                    html += `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #2f3b4d;">
+                        <span>${p.name} ${isHome ? '(Д)' : '(Г)'}</span>
+                        <div>
+                            <span style="color:#8e9eb5; margin-right:10px;">${p.minutes}'</span>
+                            <span style="color:${color}; font-weight:bold;">${p.rating}</span>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = "Ошибка загрузки";
             }
         };
 

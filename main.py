@@ -115,6 +115,15 @@ class MatchEvent(Base):
     player_id = Column(Integer, ForeignKey("players.id"))
     assist_id = Column(Integer, ForeignKey("players.id"), nullable=True)
 
+class MatchPlayerStats(Base):
+    __tablename__ = "match_player_stats"
+    id = Column(Integer, primary_key=True, index=True)
+    fixture_id = Column(Integer, ForeignKey("fixtures.id"))
+    player_id = Column(Integer, ForeignKey("players.id"))
+    club_id = Column(Integer, ForeignKey("clubs.id"))
+    minutes_played = Column(Integer, default=0)
+    rating = Column(Float, default=6.0)
+
 class Manager(Base):
     __tablename__ = "managers"
     id = Column(Integer, primary_key=True, index=True)
@@ -926,6 +935,12 @@ def get_game_time():
 def get_schedule(year: int, month: int, club_id: int = None):
     db = Session(engine)
     try:
+        state = db.query(GameState).first()
+        if state:
+            unplayed_past = db.query(Fixture).filter(Fixture.date < state.current_date, Fixture.is_played == 0).all()
+            for f in unplayed_past:
+                simulate_match(f.id, db)
+                
         num_days = calendar.monthrange(year, month)[1]
         start_str = f"{year}-{month:02d}-01"
         end_str = f"{year}-{month:02d}-{num_days:02d}"
@@ -1014,16 +1029,53 @@ def get_standings(tournament_id: int):
         if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
         
         clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).all()
-        standings = []
-        for i, c in enumerate(clubs):
-            standings.append({
-                "pos": i + 1, "club_name": c.name, "mp": 0, "w": 0, "d": 0, "l": 0,
-                "gf": 0, "ga": 0, "gd": 0, "pts": 0
-            })
-        standings.sort(key=lambda x: x["club_name"])
+        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, is_played=1).all()
+        
+        stats = {c.id: {"pos": 0, "club_name": c.name, "mp": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "gd": 0, "pts": 0} for c in clubs}
+        
+        for f in fixtures:
+            if f.home_club_id in stats and f.away_club_id in stats:
+                h, a = stats[f.home_club_id], stats[f.away_club_id]
+                h["mp"] += 1; a["mp"] += 1
+                h["gf"] += f.home_goals; a["gf"] += f.away_goals
+                h["ga"] += f.away_goals; a["ga"] += f.home_goals
+                
+                if f.home_goals > f.away_goals:
+                    h["w"] += 1; h["pts"] += 3
+                    a["l"] += 1
+                elif f.home_goals < f.away_goals:
+                    a["w"] += 1; a["pts"] += 3
+                    h["l"] += 1
+                else:
+                    h["d"] += 1; a["d"] += 1
+                    h["pts"] += 1; a["pts"] += 1
+
+        standings = list(stats.values())
+        for s in standings:
+            s["gd"] = s["gf"] - s["ga"]
+            
+        standings.sort(key=lambda x: (-x["pts"], -x["gd"], -x["gf"], x["club_name"]))
         for i, s in enumerate(standings):
             s["pos"] = i + 1
+            
         return {"type": tour.type, "standings": standings}
+    finally:
+        db.close()
+
+@app.get("/api/match/{fixture_id}/players")
+def get_match_players(fixture_id: int):
+    db = Session(engine)
+    try:
+        stats = db.query(MatchPlayerStats).filter_by(fixture_id=fixture_id).all()
+        res = []
+        for s in stats:
+            p = db.query(Player).filter_by(id=s.player_id).first()
+            if p:
+                res.append({
+                    "name": p.name, "club_id": s.club_id,
+                    "minutes": s.minutes_played, "rating": round(s.rating, 1)
+                })
+        return res
     finally:
         db.close()
 
@@ -1230,6 +1282,11 @@ def simulate_match(fixture_id: int, db: Session):
         p = random.choice(h_players if side == home.id else a_players)
         add_event(random.randint(10, 85), 'yellow_card', side, p.id)
         
+    if random.random() < 0.05:
+        side = home.id if random.random() < 0.5 else away.id
+        p = random.choice(h_players if side == home.id else a_players)
+        add_event(random.randint(20, 80), 'red_card', side, p.id)
+        
     for _ in range(random.randint(3, 5)):
         side = home.id if random.random() < 0.5 else away.id
         out_p = random.choice(h_players if side == home.id else a_players)
@@ -1242,6 +1299,17 @@ def simulate_match(fixture_id: int, db: Session):
         if p.fatigue > 80: p.fitness = "red"
         elif p.fatigue > 60: p.fitness = "orange"
         elif p.fatigue > 40: p.fitness = "yellow"
+        
+        base_rating = 6.0 + random.uniform(-0.5, 0.5)
+        mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=90, rating=base_rating)
+        db.add(mp_stat)
+        
+    if h_goals > a_goals:
+        for p in h_xi: p.morale = "green"
+        for p in a_xi: p.morale = "red" if p.morale == "orange" else "orange"
+    elif a_goals > h_goals:
+        for p in a_xi: p.morale = "green"
+        for p in h_xi: p.morale = "red" if p.morale == "orange" else "orange"
         
     fx.home_goals = h_goals
     fx.away_goals = a_goals
