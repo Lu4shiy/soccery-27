@@ -329,12 +329,6 @@ def init_db():
             else: c.continent = "UEFA"
         db.commit()
 
-        db.execute(text("DROP TABLE IF EXISTS club_tournaments CASCADE;"))
-        db.execute(text("DROP TABLE IF EXISTS tournaments CASCADE;"))
-        db.commit()
-        Base.metadata.tables['tournaments'].create(bind=engine)
-        Base.metadata.tables['club_tournaments'].create(bind=engine)
-
         tour_names = set()
         for c, t_list in [
             ("UEFA", ["UEFA Champions League", "UEFA Europa League", "UEFA Conference League"]),
@@ -372,65 +366,60 @@ def init_db():
 
         tour_map = {t.name: t.id for t in db.query(Tournament).all()}
 
-        for club in db.query(Club).all():
-            if not club.league: continue
-            if club.league in tour_map:
-                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[club.league]))
-            cups = cup_map.get(club.league, [f"{club.league} Cup"])
-            for c in cups:
-                if c in tour_map:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
+        if db.query(ClubTournament).count() == 0:
+            for club in db.query(Club).all():
+                if not club.league: continue
+                if club.league in tour_map:
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[club.league]))
+                cups = cup_map.get(club.league, [f"{club.league} Cup"])
+                for c in cups:
+                    if c in tour_map:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map[c]))
 
-            if club.continent == "CONMEBOL":
-                if club.stars >= 4.0:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
-                else:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Sudamericana"]))
-            
-            elif club.continent == "CONCACAF":
-                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONCACAF Champions Cup"]))
-            
-            elif club.continent == "AFC":
-                db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["AFC Champions League Elite"]))
+                if club.continent == "CONMEBOL":
+                    if club.stars >= 4.0:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Libertadores"]))
+                    else:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONMEBOL Sudamericana"]))
+                
+                elif club.continent == "CONCACAF":
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["CONCACAF Champions Cup"]))
+                
+                elif club.continent == "AFC":
+                    db.add(ClubTournament(club_id=club.id, tournament_id=tour_map["AFC Champions League Elite"]))
 
-        db.commit()
+            db.commit()
 
-        for comp_name in ["UEFA Champions League", "UEFA Europa League", "UEFA Conference League"]:
-            tour = db.query(Tournament).filter_by(name=comp_name).first()
-            if tour:
-                db.query(ClubTournament).filter_by(tournament_id=tour.id).delete()
-        db.commit()
-
-        used_euro_clubs = set()
-        
-        for comp_name, team_list in [
-            ("UEFA Champions League", UCL_TEAMS),
-            ("UEFA Europa League", UEL_TEAMS),
-            ("UEFA Conference League", UECL_TEAMS)
-        ]:
-            tour = db.query(Tournament).filter_by(name=comp_name).first()
-            if not tour: continue
+            used_euro_clubs = set()
             
-            added_clubs = set()
-            for t_name in team_list:
-                c_clean = clean_name(t_name)
-                club = None
-                for c in db.query(Club).filter(Club.continent == "UEFA").all():
-                    if clean_name(c.name) == c_clean:
-                        club = c
-                        break
-                if club and club.id not in used_euro_clubs:
-                    db.add(ClubTournament(club_id=club.id, tournament_id=tour.id))
-                    added_clubs.add(club.id)
-                    used_euro_clubs.add(club.id)
-            
-            if len(added_clubs) < 36:
-                other_clubs = db.query(Club).filter(Club.continent == "UEFA", ~Club.id.in_(used_euro_clubs)).order_by(func.random()).all()
-                for c in other_clubs:
-                    if len(added_clubs) >= 36: break
-                    db.add(ClubTournament(club_id=c.id, tournament_id=tour.id))
-                    added_clubs.add(c.id)
-                    used_euro_clubs.add(c.id)
+            for comp_name, team_list in [
+                ("UEFA Champions League", UCL_TEAMS),
+                ("UEFA Europa League", UEL_TEAMS),
+                ("UEFA Conference League", UECL_TEAMS)
+            ]:
+                tour = db.query(Tournament).filter_by(name=comp_name).first()
+                if not tour: continue
+                
+                added_clubs = set()
+                for t_name in team_list:
+                    c_clean = clean_name(t_name)
+                    club = None
+                    for c in db.query(Club).filter(Club.continent == "UEFA").all():
+                        if clean_name(c.name) == c_clean:
+                            club = c
+                            break
+                    if club and club.id not in used_euro_clubs:
+                        db.add(ClubTournament(club_id=club.id, tournament_id=tour.id))
+                        added_clubs.add(club.id)
+                        used_euro_clubs.add(club.id)
+                
+                if len(added_clubs) < 36:
+                    other_clubs = db.query(Club).filter(Club.continent == "UEFA", ~Club.id.in_(used_euro_clubs)).order_by(func.random()).all()
+                    for c in other_clubs:
+                        if len(added_clubs) >= 36: break
+                        db.add(ClubTournament(club_id=c.id, tournament_id=tour.id))
+                        added_clubs.add(c.id)
+                        used_euro_clubs.add(c.id)
             db.commit()
 
         # Генерация базового расписания на сезон (Август - Июль)
@@ -1166,36 +1155,6 @@ def get_bracket(tournament_id: int):
         db.close()
 
 # === АДМИН ЭНДПОИНТЫ ===
-@app.post("/api/admin/advance-month")
-def advance_month(req: dict):
-    tg_id = req.get("telegram_id")
-    if tg_id != ADMIN_TELEGRAM_ID:
-        raise HTTPException(status_code=403, detail="Нет прав")
-    
-    db = Session(engine)
-    try:
-        state = db.query(GameState).first()
-        if not state: return {"status": "error"}
-        
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        last_day = calendar.monthrange(curr.year, curr.month)[1]
-        
-        if curr.day == last_day:
-            if curr.month == 12:
-                next_month = date(curr.year + 1, 1, 1)
-            else:
-                next_month = date(curr.year, curr.month + 1, 1)
-            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
-            new_date = date(next_month.year, next_month.month, next_month_last_day)
-        else:
-            new_date = date(curr.year, curr.month, last_day)
-            
-        state.current_date = new_date.strftime("%Y-%m-%d")
-        db.commit()
-        return {"status": "ok", "new_date": state.current_date}
-    finally:
-        db.close()
-
 @app.post("/api/admin/reset-game")
 def reset_game(req: dict):
     tg_id = req.get("telegram_id")

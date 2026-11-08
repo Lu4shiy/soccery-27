@@ -759,11 +759,6 @@
                     <span id="stat-offsides-away" style="font-weight:bold;"></span>
                 </div>
             </div>
-
-            <div id="match-players-block" class="card hidden">
-                <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="loadMatchPlayers()">👥 Игроки матча</button>
-                <div id="match-players-list" style="font-size:12px;"></div>
-            </div>
     </div>
 
     <div id="bottom-nav" class="bottom-nav hidden">
@@ -1563,61 +1558,6 @@
                 container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
             }
         }
-            
-            try {
-                let url = `${API_BASE}/api/game/schedule?year=${calYear}&month=${calMonth}`;
-                if (currentClubId) url += `&club_id=${currentClubId}`;
-                
-                const res = await fetch(url);
-                if (!res.ok) throw new Error("Network response was not ok");
-                const days = await res.json();
-                
-                if (!Array.isArray(days)) throw new Error("Invalid response format");
-                
-                const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
-                const offset = firstDay === 0 ? 6 : firstDay - 1;
-                
-                let html = "";
-                for (let i = 0; i < offset; i++) {
-                    html += `<div></div>`;
-                }
-
-                days.forEach(d => {
-                    const dayNum = parseInt(d.date.split("-")[2]);
-                    let cls = "cal-day";
-                    let inner = `<div class="cal-date">${dayNum}</div>`;
-                    
-                    if (d.date === currentGameDate) cls += " today";
-                    else if (d.date < currentGameDate) cls += " past";
-                    
-                    if (d.type === "match") {
-                        cls += " match";
-                        const oppLogo = getSmallLogo(d.opponent_name || "");
-                        const ha = d.is_home ? "Д" : "В";
-                        const tourShort = (d.tournament_name || "").substring(0, 4);
-                        const scoreStr = d.is_played ? `<div style="font-size:10px; font-weight:bold; color:#52a8ff;">${d.is_home ? d.home_goals + '-' + d.away_goals : d.away_goals + '-' + d.home_goals}</div>` : '';
-                        inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id})" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
-                                    <div class="cal-tour">${tourShort}</div>
-                                    <div class="cal-opp">${oppLogo}</div>
-                                    <div style="font-size:6px; color:#fff; text-align:center; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; margin-top:1px;">${d.opponent_name}</div>
-                                    <div class="cal-ha">${ha}</div>
-                                    ${scoreStr}
-                                  </div>`;
-                    } else if (d.type === "training") {
-                        cls += " training";
-                    } else {
-                        cls += " rest";
-                    }
-                    
-                    html += `<div class="${cls}">${inner}</div>`;
-                });
-                
-                container.innerHTML = html;
-            } catch (e) {
-                console.error("Calendar Error:", e);
-                container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
-            }
-        }
 
         if ($("btn-open-tournaments")) $("btn-open-tournaments").onclick = async function() {
             if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
@@ -1750,112 +1690,6 @@
                 container.innerHTML = html;
             } catch(e) {
                 container.innerHTML = "Ошибка загрузки тура";
-            }
-        };
-
-        window.openTournament = async function(id, name) {
-            if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
-            if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
-            if ($("detail-tour-name")) $("detail-tour-name").innerText = name;
-            
-            document.querySelectorAll('.sc-tab').forEach((el, i) => {
-                if (i === 0) el.classList.add("active");
-                else el.classList.remove("active");
-            });
-            if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
-            if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
-
-            const container = $("tour-tab-table");
-            if (!container) return;
-            container.innerHTML = "<div style='color:#8e9eb5;'>Загрузка...</div>";
-            
-            try {
-                const stRes = await fetch(API_BASE + `/api/tournaments/${id}/standings`);
-                const stData = await stRes.json();
-                const tourType = stData.type || "League";
-                
-                const firstTab = document.querySelectorAll('.sc-tab')[0];
-                if (firstTab) firstTab.innerText = "Матчи";
-                
-                if (tourType === "Cup") {
-                    const brRes = await fetch(API_BASE + `/api/tournaments/${id}/bracket`);
-                    const brData = await brRes.json();
-                    renderBracket(brData);
-                } else {
-                    if (stData.standings && stData.standings.length > 0) {
-                        let lastZone = "";
-                        const total = stData.standings.length;
-                        
-                        const rowsHtml = stData.standings.map(s => {
-                            let currentZone = "";
-                            let rowStyle = "";
-                            if (tourType === "League") {
-                                if (s.pos <= 4) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
-                                else if (s.pos === 5) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
-                                else if (s.pos === 6) { currentZone = "Лига Конференций"; rowStyle = "border-left: 3px solid #2ecc71;"; }
-                                else if (s.pos > total - 3) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
-                            } else if (tourType === "Continental") {
-                                if (s.pos === 1) { currentZone = "Чемпион"; rowStyle = "border-left: 3px solid #e6c544;"; }
-                                else if (s.pos >= 2 && s.pos <= 8) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
-                                else if (s.pos >= 9 && s.pos <= 24) { currentZone = "Стыковые матчи"; rowStyle = "border-left: 3px solid #2ecc71;"; }
-                                else if (s.pos > 24) { currentZone = "Зона вылета"; rowStyle = "border-left: 3px solid #a82929;"; }
-                            }
-                            
-                            let html = "";
-                            if (currentZone && currentZone !== lastZone) {
-                                html += `<tr><td colspan="10" style="background:#17212b; color:#8e9eb5; font-size:9px; text-align:left; padding:4px 8px; border-bottom:1px solid #232e3c;">${currentZone}</td></tr>`;
-                                lastZone = currentZone;
-                            }
-                            
-                            const logoHtml = getSmallLogo(s.club_name);
-                            
-                            html += `<tr style="${rowStyle}">
-                                <td class="num">${s.pos}</td>
-                                <td><div style="display:flex; align-items:center;">${logoHtml}<span>${s.club_name}</span></div></td>
-                                <td class="num">${s.mp}</td>
-                                <td class="num">${s.w}</td>
-                                <td class="num">${s.d}</td>
-                                <td class="num">${s.l}</td>
-                                <td class="num">${s.gf}</td>
-                                <td class="num">${s.ga}</td>
-                                <td class="num">${s.gd}</td>
-                                <td class="num" style="font-weight:bold; color:#52a8ff;">${s.pts}</td>
-                            </tr>`;
-                            return html;
-                        }).join("");
-                        
-                        container.innerHTML = `<table class="stats-table">
-                            <tr>
-                                <th>#</th><th>Клуб</th><th class="num">И</th><th class="num">В</th>
-                                <th class="num">Н</th><th class="num">П</th><th class="num">ГЗ</th>
-                                <th class="num">ГП</th><th class="num">РГ</th><th class="num">О</th>
-                            </tr>
-                            ${rowsHtml}
-                        </table>`;
-                    } else {
-                        container.innerHTML = "<div style='color:#8e9eb5;'>Нет данных</div>";
-                    }
-                }
-
-                const statRes = await fetch(API_BASE + `/api/tournaments/${id}/stats`);
-                const stats = await statRes.json();
-                const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
-
-                if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
-                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-
-                if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
-                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-
-                if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
-                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
-
-                if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
-                else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
-
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = "<div style='color:#ff6b6b;'>Ошибка загрузки данных</div>";
             }
         };
 
