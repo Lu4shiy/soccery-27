@@ -185,9 +185,13 @@ def clean_name(n):
 def parse_eng_dates(dates_list):
     res = []
     for d_str in dates_list:
-        m, d = map(int, d_str.split("."))
-        year = 2026 if m >= 7 else 2027
-        res.append(date(year, m, d))
+        try:
+            d, m = map(int, d_str.split("."))
+            year = 2026 if m >= 7 else 2027
+            res.append(date(year, m, d))
+        except Exception as e:
+            print(f"parse_eng_dates FAILED on '{d_str}': {e}")
+            raise
     return res
 
 def get_double_round_robin(clubs):
@@ -362,9 +366,13 @@ def init_db():
                         fixtures_data.append({"date": dates[4].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 5, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                         
                     if cup.name == "Carabao Cup":
+                        # 1/2 финала, 1-й матч — раунд 6
                         for i in range(2):
                             fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
-                            fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        # 1/2 финала, 2-й матч — раунд 7
+                        for i in range(2):
+                            fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        # Финал — раунд 8
                         fixtures_data.append({"date": dates[7].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 8, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                     else:
                         for i in range(2):
@@ -1004,41 +1012,77 @@ async def cmd_start(message: types.Message):
 
 def advance_cup_bracket(fx, db):
     tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
-    if not tour or tour.type not in ["Cup", "SuperCup"]: return
-    
-    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 1:
+    if not tour or tour.type not in ["Cup", "SuperCup"]:
         return
-        
-    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 2:
-        leg1 = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=6, match_index=fx.match_index, leg=1).first()
+
+    # Carabao: 1/2 финала, 1-й матч (раунд 6) — копируем пары во 2-й матч (раунд 7, зеркально)
+    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 1:
+        leg2 = db.query(Fixture).filter_by(
+            tournament_id=fx.tournament_id,
+            round_number=7,
+            match_index=fx.match_index,
+            leg=2
+        ).first()
+        if leg2:
+            leg2.home_club_id = fx.away_club_id
+            leg2.away_club_id = fx.home_club_id
+            db.commit()
+        return
+
+    # Carabao: 1/2 финала, 2-й матч (раунд 7) — считаем сумму и ведём в финал (раунд 8)
+    if fx.round_number == 7 and tour.name == "Carabao Cup" and fx.leg == 2:
+        leg1 = db.query(Fixture).filter_by(
+            tournament_id=fx.tournament_id,
+            round_number=6,
+            match_index=fx.match_index,
+            leg=1
+        ).first()
         if leg1 and leg1.is_played:
-            agg_home = leg1.home_goals + fx.away_goals
-            agg_away = leg1.away_goals + fx.home_goals
-            winner_id = fx.home_club_id if agg_home > agg_away else fx.away_club_id
-            if agg_home == agg_away:
+            agg_home = (leg1.home_goals or 0) + (fx.away_goals or 0)
+            agg_away = (leg1.away_goals or 0) + (fx.home_goals or 0)
+            if agg_home > agg_away:
+                winner_id = fx.home_club_id
+            elif agg_away > agg_home:
+                winner_id = fx.away_club_id
+            else:
                 winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
-                
-            next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=8).first()
-            if next_fx:
-                if fx.match_index == 0: next_fx.home_club_id = winner_id
-                else: next_fx.away_club_id = winner_id
+
+            final_fx = db.query(Fixture).filter_by(
+                tournament_id=fx.tournament_id,
+                round_number=8
+            ).first()
+            if final_fx:
+                if fx.match_index == 0:
+                    final_fx.home_club_id = winner_id
+                else:
+                    final_fx.away_club_id = winner_id
                 db.commit()
         return
-        
-    winner_id = fx.home_club_id if fx.home_goals > fx.away_goals else fx.away_club_id
-    if fx.home_goals == fx.away_goals:
+
+    # Обычный путь (FA Cup, финалы Carabao, любые одноматчевые раунды)
+    winner_id = fx.home_club_id if (fx.home_goals or 0) > (fx.away_goals or 0) else fx.away_club_id
+    if (fx.home_goals or 0) == (fx.away_goals or 0):
         winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
-        
+
     if fx.round_number == 1:
-        next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=2, match_index=fx.match_index).first()
-        if next_fx: next_fx.away_club_id = winner_id
+        next_fx = db.query(Fixture).filter_by(
+            tournament_id=fx.tournament_id, round_number=2, match_index=fx.match_index
+        ).first()
+        if next_fx:
+            next_fx.away_club_id = winner_id
     else:
         next_round = fx.round_number + 1
         next_match_index = fx.match_index // 2
-        next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=next_round, match_index=next_match_index).first()
+        next_fx = db.query(Fixture).filter_by(
+            tournament_id=fx.tournament_id,
+            round_number=next_round,
+            match_index=next_match_index
+        ).first()
         if next_fx:
-            if fx.match_index % 2 == 0: next_fx.home_club_id = winner_id
-            else: next_fx.away_club_id = winner_id
+            if fx.match_index % 2 == 0:
+                next_fx.home_club_id = winner_id
+            else:
+                next_fx.away_club_id = winner_id
     db.commit()
 
 def simulate_match(fixture_id: int, db: Session):
