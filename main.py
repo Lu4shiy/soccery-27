@@ -79,6 +79,8 @@ class Fixture(Base):
     date = Column(String, index=True)
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
     round_number = Column(Integer, default=1)
+    match_index = Column(Integer, default=0)
+    leg = Column(Integer, default=1)
     home_club_id = Column(Integer, ForeignKey("clubs.id"))
     away_club_id = Column(Integer, ForeignKey("clubs.id"))
     is_played = Column(Integer, default=0)
@@ -180,6 +182,34 @@ def clean_name(n):
     n = unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8')
     return n.lower().replace(" ", "").replace("-", "").replace(".", "").replace("'", "")
 
+def parse_eng_dates(dates_list):
+    res = []
+    for d_str in dates_list:
+        m, d = map(int, d_str.split("."))
+        year = 2026 if m >= 7 else 2027
+        res.append(date(year, m, d))
+    return res
+
+def get_double_round_robin(clubs):
+    if len(clubs) % 2 != 0: clubs.append(None)
+    n = len(clubs)
+    matches = []
+    for r in range(n - 1):
+        round_matches = []
+        for i in range(n // 2):
+            if clubs[i] and clubs[n - 1 - i]:
+                if r % 2 == 0: round_matches.append((clubs[i], clubs[n - 1 - i]))
+                else: round_matches.append((clubs[n - 1 - i], clubs[i]))
+        matches.append(round_matches)
+        clubs.insert(1, clubs.pop())
+    first_half = list(matches)
+    for r_matches in first_half:
+        rev = []
+        for h, a in r_matches:
+            rev.append((a, h))
+        matches.append(rev)
+    return matches
+
 def init_db():
     db = Session(engine)
     try:
@@ -192,6 +222,8 @@ def init_db():
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fatigue INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_weeks INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS round_number INTEGER DEFAULT 1;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS match_index INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS leg INTEGER DEFAULT 1;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_sot INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_sot INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_fouls INTEGER DEFAULT 0;"))
@@ -206,7 +238,12 @@ def init_db():
             db.add(GameState(current_date="2026-08-01", season="2026/27"))
             db.commit()
 
+        if not db.query(Club).filter_by(id=9999).first():
+            db.add(Club(id=9999, name="TBD", league="None", stars=0))
+            db.commit()
+
         for c in db.query(Club).all():
+            if c.id == 9999: continue
             l = (c.league or "").lower()
             if any(x in l for x in ["brazil", "argentin", "chile", "colombia", "ecuador", "paraguay", "peru", "uruguay", "venezuela", "bolivia"]): c.continent = "CONMEBOL"
             elif any(x in l for x in ["mls", "mexico", "liga mx"]): c.continent = "CONCACAF"
@@ -232,6 +269,7 @@ def init_db():
 
         if db.query(ClubTournament).count() == 0:
             for club in db.query(Club).all():
+                if club.id == 9999: continue
                 if club.league in ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]:
                     t1 = db.query(Tournament).filter_by(name=club.league).first()
                     if t1: db.add(ClubTournament(club_id=club.id, tournament_id=t1.id))
@@ -244,6 +282,90 @@ def init_db():
                     if t4: db.add(ClubTournament(club_id=club.id, tournament_id=t4.id))
             db.commit()
 
+        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
+        if db.query(Fixture).filter(Fixture.tournament_id.in_([t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues))])).count() == 0:
+            eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
+            if eng_clubs:
+                pl_clubs = [c for c in eng_clubs if c.league == "Premier League"]
+                champ_clubs = [c for c in eng_clubs if c.league == "EFL Championship"]
+                l1_clubs = [c for c in eng_clubs if c.league == "EFL League One"]
+                l2_clubs = [c for c in eng_clubs if c.league == "EFL League Two"]
+                
+                pl_dates = parse_eng_dates(["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"])
+                efl_dates = parse_eng_dates(["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"])
+                
+                fixtures_data = []
+                for l_name, l_clubs, l_dates in [("Premier League", pl_clubs, pl_dates), ("EFL Championship", champ_clubs, efl_dates), ("EFL League One", l1_clubs, efl_dates), ("EFL League Two", l2_clubs, efl_dates)]:
+                    tour = db.query(Tournament).filter_by(name=l_name).first()
+                    if not tour: continue
+                    matches = get_double_round_robin(l_clubs[:])
+                    for r_idx, round_m in enumerate(matches):
+                        if r_idx >= len(l_dates): break
+                        for i, (h, a) in enumerate(round_m):
+                            fixtures_data.append({
+                                "date": l_dates[r_idx].strftime("%Y-%m-%d"), "tournament_id": tour.id,
+                                "round_number": r_idx+1, "match_index": i, "home_club_id": h.id, "away_club_id": a.id, "is_played": 0
+                            })
+                            
+                sorted_eng = sorted(eng_clubs, key=lambda c: (-(c.stars or 0), c.name))
+                fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
+                carabao = db.query(Tournament).filter_by(name="Carabao Cup").first()
+                
+                fa_dates = parse_eng_dates(["25.08", "24.09", "14.12", "09.01", "23.03", "29.03", "28.05"])
+                car_dates = parse_eng_dates(["20.08", "30.08", "15.09", "28.09", "01.10", "04.10", "07.10", "23.12"])
+                
+                for cup, dates in [(fa_cup, fa_dates), (carabao, car_dates)]:
+                    if not cup: continue
+                    rnd = random.Random(cup.id)
+                    weak_teams = sorted_eng[36:]
+                    strong_teams = sorted_eng[:36]
+                    rnd.shuffle(weak_teams)
+                    
+                    for i in range(0, 56, 2):
+                        fixtures_data.append({
+                            "date": dates[0].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 1, "match_index": i//2,
+                            "home_club_id": weak_teams[i].id, "away_club_id": weak_teams[i+1].id, "is_played": 0
+                        })
+                        
+                    match_idx = 0
+                    for i in range(28):
+                        fixtures_data.append({
+                            "date": dates[1].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 2, "match_index": match_idx,
+                            "home_club_id": strong_teams[i].id, "away_club_id": 9999, "is_played": 0
+                        })
+                        match_idx += 1
+                    for i in range(28, 36, 2):
+                        fixtures_data.append({
+                            "date": dates[1].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 2, "match_index": match_idx,
+                            "home_club_id": strong_teams[i].id, "away_club_id": strong_teams[i+1].id, "is_played": 0
+                        })
+                        match_idx += 1
+                        
+                    for i in range(16):
+                        fixtures_data.append({"date": dates[2].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 3, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                    for i in range(8):
+                        fixtures_data.append({"date": dates[3].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 4, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                    for i in range(4):
+                        fixtures_data.append({"date": dates[4].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 5, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        
+                    if cup.name == "Carabao Cup":
+                        for i in range(2):
+                            fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                            fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        fixtures_data.append({"date": dates[7].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                    else:
+                        for i in range(2):
+                            fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        
+                shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
+                if shield and len(pl_clubs) >= 2:
+                    fixtures_data.append({"date": "2027-06-09", "tournament_id": shield.id, "round_number": 1, "home_club_id": pl_clubs[0].id, "away_club_id": pl_clubs[1].id, "is_played": 0})
+                    
+                if fixtures_data:
+                    db.bulk_insert_mappings(Fixture, fixtures_data)
+                    db.commit()
+
     except Exception as e:
         print("DB Init Error:", e)
         db.rollback()
@@ -251,87 +373,6 @@ def init_db():
         db.close()
 
 init_db()
-
-def generate_england_fixtures(db: Session):
-    pl_tour = db.query(Tournament).filter_by(name="Premier League").first()
-    if not pl_tour: return
-    
-    if db.query(Fixture).filter_by(tournament_id=pl_tour.id, date="2026-08-23").count() > 0:
-        return
-        
-    t_ids = [t.id for t in db.query(Tournament).filter(Tournament.name.in_(["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "FA Community Shield"])).all()]
-    db.query(Fixture).filter(Fixture.tournament_id.in_(t_ids)).delete(synchronize_session=False)
-    db.commit()
-
-    eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
-    eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
-    if not eng_clubs: return
-    
-    pl_clubs = [c for c in eng_clubs if c.league == "Premier League"]
-    champ_clubs = [c for c in eng_clubs if c.league == "EFL Championship"]
-    l1_clubs = [c for c in eng_clubs if c.league == "EFL League One"]
-    l2_clubs = [c for c in eng_clubs if c.league == "EFL League Two"]
-    
-    pl_dates = parse_eng_dates(["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"])
-    efl_dates = parse_eng_dates(["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"])
-    
-    for l_name, l_clubs, l_dates in [("Premier League", pl_clubs, pl_dates), ("EFL Championship", champ_clubs, efl_dates), ("EFL League One", l1_clubs, efl_dates), ("EFL League Two", l2_clubs, efl_dates)]:
-        tour = db.query(Tournament).filter_by(name=l_name).first()
-        if not tour: continue
-        matches = get_double_round_robin(l_clubs[:])
-        for r_idx, round_m in enumerate(matches):
-            if r_idx >= len(l_dates): break
-            for h, a in round_m:
-                db.add(Fixture(date=l_dates[r_idx].strftime("%Y-%m-%d"), tournament_id=tour.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                
-    sorted_eng = sorted(eng_clubs, key=lambda c: (-(c.stars or 0), c.name))
-    
-    fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
-    carabao = db.query(Tournament).filter_by(name="Carabao Cup").first()
-    
-    fa_dates = parse_eng_dates(["25.08", "24.09", "14.12", "09.01", "23.03", "29.03", "28.05"])
-    car_dates = parse_eng_dates(["20.08", "30.08", "15.09", "28.09", "01.10", "04.10", "23.12"])
-    
-    for cup, dates in [(fa_cup, fa_dates), (carabao, car_dates)]:
-        if not cup: continue
-        rnd = random.Random(cup.id)
-        
-        weak_teams = sorted_eng[36:]
-        strong_teams = sorted_eng[:36]
-        
-        rnd.shuffle(weak_teams)
-        round2_teams = strong_teams + weak_teams[:28]
-        
-        if len(weak_teams) >= 56:
-            weak_teams = weak_teams[:56]
-            for i in range(0, len(weak_teams), 2):
-                db.add(Fixture(date=dates[0].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=1, home_club_id=weak_teams[i].id, away_club_id=weak_teams[i+1].id, is_played=0))
-            
-        rnd.shuffle(round2_teams)
-        for i in range(0, len(round2_teams), 2):
-            if i+1 < len(round2_teams):
-                db.add(Fixture(date=dates[1].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=2, home_club_id=round2_teams[i].id, away_club_id=round2_teams[i+1].id, is_played=0))
-                
-        curr_teams = round2_teams[:32]
-        for r_idx in range(2, len(dates)):
-            rnd.shuffle(curr_teams)
-            next_r = []
-            for i in range(0, len(curr_teams), 2):
-                if i+1 < len(curr_teams):
-                    h, a = curr_teams[i], curr_teams[i+1]
-                    if r_idx == 5 and cup.name == "Carabao Cup":
-                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                        db.add(Fixture(date=(dates[r_idx] + timedelta(days=3)).strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=a.id, away_club_id=h.id, is_played=0))
-                    else:
-                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                    next_r.append(h)
-            curr_teams = next_r
-            
-    shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
-    if shield and len(pl_clubs) >= 2:
-        db.add(Fixture(date="2027-06-09", tournament_id=shield.id, round_number=1, home_club_id=pl_clubs[0].id, away_club_id=pl_clubs[1].id, is_played=0))
-        
-    db.commit()
 
 def seed_training_programs():
     db = Session(engine)
@@ -432,7 +473,7 @@ def get_clubs():
     db = Session(engine)
     try:
         rows = db.query(Club.id, Club.name, Club.league, Club.stars, Club.continent, func.count(Player.id).label("players"), func.avg(Player.overall_rating).label("avg_ovr")).outerjoin(Player, Player.club_id == Club.id).group_by(Club.id).order_by(Club.league, Club.name).all()
-        return [{"id": r.id, "name": r.name, "league": r.league, "stars": r.stars or 3.0, "continent": r.continent, "players": int(r.players or 0), "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0} for r in rows]
+        return [{"id": r.id, "name": r.name, "league": r.league, "stars": r.stars or 3.0, "continent": r.continent, "players": int(r.players or 0), "avg_ovr": round(float(r.avg_ovr), 1) if r.avg_ovr else 0} for r in rows if r.id != 9999]
     finally:
         db.close()
 
@@ -455,110 +496,6 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
-def parse_eng_dates(dates_list):
-    res = []
-    for d_str in dates_list:
-        m, d = map(int, d_str.split("."))
-        year = 2026 if m >= 7 else 2027
-        res.append(date(year, m, d))
-    return res
-
-def get_double_round_robin(clubs):
-    if len(clubs) % 2 != 0: clubs.append(None)
-    n = len(clubs)
-    matches = []
-    for r in range(n - 1):
-        round_matches = []
-        for i in range(n // 2):
-            if clubs[i] and clubs[n - 1 - i]:
-                if r % 2 == 0: round_matches.append((clubs[i], clubs[n - 1 - i]))
-                else: round_matches.append((clubs[n - 1 - i], clubs[i]))
-        matches.append(round_matches)
-        clubs.insert(1, clubs.pop())
-    # Second half (reverse fixtures)
-    first_half = list(matches)
-    for r_matches in first_half:
-        rev = []
-        for h, a in r_matches:
-            rev.append((a, h))
-        matches.append(rev)
-    return matches
-
-def generate_england_fixtures(db: Session):
-    pl_tour = db.query(Tournament).filter_by(name="Premier League").first()
-    if not pl_tour: return
-    if db.query(Fixture).filter_by(tournament_id=pl_tour.id).count() > 0: return
-        
-    eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
-    eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
-    if not eng_clubs: return
-    
-    pl_clubs = [c for c in eng_clubs if c.league == "Premier League"]
-    champ_clubs = [c for c in eng_clubs if c.league == "EFL Championship"]
-    l1_clubs = [c for c in eng_clubs if c.league == "EFL League One"]
-    l2_clubs = [c for c in eng_clubs if c.league == "EFL League Two"]
-    
-    pl_dates = parse_eng_dates(["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"])
-    efl_dates = parse_eng_dates(["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"])
-    
-    for l_name, l_clubs, l_dates in [("Premier League", pl_clubs, pl_dates), ("EFL Championship", champ_clubs, efl_dates), ("EFL League One", l1_clubs, efl_dates), ("EFL League Two", l2_clubs, efl_dates)]:
-        tour = db.query(Tournament).filter_by(name=l_name).first()
-        if not tour: continue
-        matches = get_double_round_robin(l_clubs[:])
-        for r_idx, round_m in enumerate(matches):
-            if r_idx >= len(l_dates): break
-            for h, a in round_m:
-                db.add(Fixture(date=l_dates[r_idx].strftime("%Y-%m-%d"), tournament_id=tour.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                
-    sorted_eng = sorted(eng_clubs, key=lambda c: (-(c.stars or 0), c.name))
-    
-    fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
-    carabao = db.query(Tournament).filter_by(name="Carabao Cup").first()
-    
-    fa_dates = parse_eng_dates(["25.08", "24.09", "14.12", "09.01", "23.03", "29.03", "28.05"])
-    car_dates = parse_eng_dates(["20.08", "30.08", "15.09", "28.09", "01.10", "04.10", "23.12"])
-    
-    for cup, dates in [(fa_cup, fa_dates), (carabao, car_dates)]:
-        if not cup: continue
-        rnd = random.Random(cup.id)
-        
-        weak_teams = sorted_eng[36:]
-        strong_teams = sorted_eng[:36]
-        
-        rnd.shuffle(weak_teams)
-        round2_teams = strong_teams + weak_teams[:28]
-        
-        if len(weak_teams) >= 56:
-            weak_teams = weak_teams[:56]
-            for i in range(0, len(weak_teams), 2):
-                db.add(Fixture(date=dates[0].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=1, home_club_id=weak_teams[i].id, away_club_id=weak_teams[i+1].id, is_played=0))
-            
-        rnd.shuffle(round2_teams)
-        for i in range(0, len(round2_teams), 2):
-            if i+1 < len(round2_teams):
-                db.add(Fixture(date=dates[1].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=2, home_club_id=round2_teams[i].id, away_club_id=round2_teams[i+1].id, is_played=0))
-                
-        curr_teams = round2_teams[:32]
-        for r_idx in range(2, len(dates)):
-            rnd.shuffle(curr_teams)
-            next_r = []
-            for i in range(0, len(curr_teams), 2):
-                if i+1 < len(curr_teams):
-                    h, a = curr_teams[i], curr_teams[i+1]
-                    if r_idx == 5 and cup.name == "Carabao Cup":
-                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                        db.add(Fixture(date=(dates[r_idx] + timedelta(days=3)).strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=a.id, away_club_id=h.id, is_played=0))
-                    else:
-                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
-                    next_r.append(h)
-            curr_teams = next_r
-            
-    shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
-    if shield and len(pl_clubs) >= 2:
-        db.add(Fixture(date="2027-06-09", tournament_id=shield.id, round_number=1, home_club_id=pl_clubs[0].id, away_club_id=pl_clubs[1].id, is_played=0))
-        
-    db.commit()
-
 @app.post("/api/select-club")
 def select_club(req: SelectClubRequest):
     db = Session(engine)
@@ -575,8 +512,6 @@ def select_club(req: SelectClubRequest):
         else:
             db.add(Manager(telegram_id=req.telegram_id, first_name=req.first_name or "", club_id=req.club_id, is_setup_complete=0))
         db.commit()
-        
-        generate_england_fixtures(db)
             
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
@@ -1039,12 +974,52 @@ async def cmd_start(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(keyboard=[[types.KeyboardButton(text="🚀 Открыть Soccery 27", web_app=types.WebAppInfo(url=web_app_url))]], resize_keyboard=True)
     await message.answer("Добро пожаловать в Soccery 27!\nНажми кнопку ниже, чтобы начать карьеру.", reply_markup=keyboard)
 
+def advance_cup_bracket(fx, db):
+    tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
+    if not tour or tour.type not in ["Cup", "SuperCup"]: return
+    
+    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 1:
+        return
+        
+    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 2:
+        leg1 = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=6, match_index=fx.match_index, leg=1).first()
+        if leg1 and leg1.is_played:
+            agg_home = leg1.home_goals + fx.away_goals
+            agg_away = leg1.away_goals + fx.home_goals
+            winner_id = fx.home_club_id if agg_home > agg_away else fx.away_club_id
+            if agg_home == agg_away:
+                winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
+                
+            next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=7).first()
+            if next_fx:
+                if fx.match_index == 0: next_fx.home_club_id = winner_id
+                else: next_fx.away_club_id = winner_id
+                db.commit()
+        return
+        
+    winner_id = fx.home_club_id if fx.home_goals > fx.away_goals else fx.away_club_id
+    if fx.home_goals == fx.away_goals:
+        winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
+        
+    if fx.round_number == 1:
+        next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=2, match_index=fx.match_index).first()
+        if next_fx: next_fx.away_club_id = winner_id
+    else:
+        next_round = fx.round_number + 1
+        next_match_index = fx.match_index // 2
+        next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=next_round, match_index=next_match_index).first()
+        if next_fx:
+            if fx.match_index % 2 == 0: next_fx.home_club_id = winner_id
+            else: next_fx.away_club_id = winner_id
+    db.commit()
+
 def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()
     if not fx or fx.is_played: return
     
     home = db.query(Club).filter_by(id=fx.home_club_id).first()
     away = db.query(Club).filter_by(id=fx.away_club_id).first()
+    if not home or not away: return
     
     def get_xi(club_id):
         t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
@@ -1162,6 +1137,8 @@ def simulate_match(fixture_id: int, db: Session):
     
     for ev in events: db.add(ev)
     db.commit()
+    
+    advance_cup_bracket(fx, db)
 
 def advance_game_date(db, days_to_add):
     state = db.query(GameState).first()
@@ -1264,7 +1241,7 @@ def get_match_details(fixture_id: int):
             
         return {
             "id": fx.id, "date": fx.date, "is_played": bool(fx.is_played),
-            "home_club": home.name, "away_club": away.name,
+            "home_club": home.name if home else "TBD", "away_club": away.name if away else "TBD",
             "home_goals": fx.home_goals, "away_goals": fx.away_goals,
             "home_poss": fx.home_poss, "away_poss": fx.away_poss,
             "home_shots": fx.home_shots, "away_shots": fx.away_shots,
@@ -1400,10 +1377,3 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/app")
 def read_index():
     return FileResponse("static/index.html")
-
-try:
-    db_init = Session(engine)
-    generate_england_fixtures(db_init)
-    db_init.close()
-except Exception as e:
-    print("Error generating fixtures on startup:", e)
