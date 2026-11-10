@@ -282,8 +282,15 @@ def init_db():
                     if t4: db.add(ClubTournament(club_id=club.id, tournament_id=t4.id))
             db.commit()
 
-        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
-        if db.query(Fixture).filter(Fixture.tournament_id.in_([t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues))])).count() == 0:
+        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "FA Community Shield"]
+        t_ids = [t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues)).all()]
+        
+        # ПРИНУДИТЕЛЬНО УДАЛЯЕМ СТАРЫЕ МАТЧИ, ЧТОБЫ ОБНОВИТЬ РАСПИСАНИЕ
+        db.query(Fixture).filter(Fixture.tournament_id.in_(t_ids)).delete(synchronize_session=False)
+        db.commit()
+
+        if True:
+            eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
             eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
             if eng_clubs:
                 pl_clubs = [c for c in eng_clubs if c.league == "Premier League"]
@@ -903,38 +910,46 @@ def get_bracket(tournament_id: int):
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
         
-        clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).order_by(Club.name).all()
-        if not clubs: return {"type": tour.type, "rounds": []}
-        
-        n = len(clubs)
-        size = 2
-        while size < n and size < 128: size *= 2
-        if size < 4: size = 4
-        
-        teams = [c.name for c in clubs[:size]]
-        while len(teams) < size: teams.append("TBD")
-        
-        rounds = []
-        round_names = {2: "Финал", 4: "1/2 финала", 8: "1/4 финала", 16: "1/8 финала", 32: "1/16 финала", 64: "1/32 финала", 128: "1/64 финала"}
-        
-        num_in_round = size
-        is_first = True
-        while num_in_round >= 2:
-            round_name = round_names.get(num_in_round, f"1/{num_in_round-1} финала")
-            num_matches = num_in_round // 2
-            matches = []
-            for i in range(num_matches):
-                if is_first:
-                    t1 = teams[i*2] if i*2 < len(teams) else "TBD"
-                    t2 = teams[i*2 + 1] if i*2 + 1 < len(teams) else "TBD"
-                else:
-                    t1, t2 = "TBD", "TBD"
-                matches.append({"team1": t1, "team2": t2, "score1": None, "score2": None})
-            rounds.append({"name": round_name, "matches": matches})
-            num_in_round //= 2
-            is_first = False
-        
-        return {"type": tour.type, "rounds": rounds}
+        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id).order_by(Fixture.round_number, Fixture.match_index, Fixture.leg).all()
+        if not fixtures:
+            return {"type": tour.type, "rounds": []}
+            
+        rounds_dict = {}
+        for f in fixtures:
+            if f.round_number not in rounds_dict:
+                rounds_dict[f.round_number] = []
+                
+            h = db.query(Club).filter_by(id=f.home_club_id).first()
+            a = db.query(Club).filter_by(id=f.away_club_id).first()
+            
+            rounds_dict[f.round_number].append({
+                "id": f.id,
+                "team1": h.name if h else "TBD",
+                "team2": a.name if a else "TBD",
+                "score1": f.home_goals,
+                "score2": f.away_goals,
+                "is_played": bool(f.is_played),
+                "leg": f.leg
+            })
+
+        sorted_rounds = []
+        for r_num in sorted(rounds_dict.keys()):
+            r_name = f"Тур {r_num}"
+            if tour.name in ["FA Cup", "Carabao Cup"]:
+                if r_num == 1: r_name = "Предварительный этап"
+                elif r_num == 2: r_name = "1/64 финала"
+                elif r_num == 3: r_name = "1/32 финала"
+                elif r_num == 4: r_name = "1/16 финала"
+                elif r_num == 5: r_name = "1/4 финала"
+                elif r_num == 6:
+                    r_name = "1/2 финала" if tour.name == "FA Cup" else "1/2 финала (1-й матч)"
+                elif r_num == 7:
+                    r_name = "Финал" if tour.name == "FA Cup" else "1/2 финала (2-й матч)"
+                elif r_num == 8: r_name = "Финал"
+
+            sorted_rounds.append({"name": r_name, "matches": rounds_dict[r_num]})
+
+        return {"type": tour.type, "rounds": sorted_rounds}
     finally:
         db.close()
 
