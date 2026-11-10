@@ -799,18 +799,14 @@ def get_schedule(year: int, month: int, club_id: int = None):
             
         fixture_map = {f.date: f for f in fixtures}
         
-        prev_month_start = date(year, month, 1) - timedelta(days=10)
-        past_fixtures = []
+        prev_day = date(year, month, 1) - timedelta(days=1)
+        prev_match = False
         if club_id:
-            past_fixtures = db.query(Fixture).filter(
-                Fixture.date >= prev_month_start.strftime("%Y-%m-%d"),
-                Fixture.date < start_str,
+            prev_match = db.query(Fixture).filter(
+                Fixture.date == prev_day.strftime("%Y-%m-%d"),
                 (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)
-            ).all()
+            ).first() is not None
             
-        all_match_dates = [datetime.strptime(f.date, "%Y-%m-%d").date() for f in fixtures + past_fixtures]
-        day_after_match_dates = [d + timedelta(days=1) for d in all_match_dates]
-        
         result = []
         
         for day in range(1, num_days + 1):
@@ -833,15 +829,18 @@ def get_schedule(year: int, month: int, club_id: int = None):
                     entry["home_goals"] = f.home_goals
                     entry["away_goals"] = f.away_goals
                 result.append(entry)
-            elif date_obj in day_after_match_dates:
+                prev_match = True
+            elif prev_match:
                 result.append({"date": date_str, "type": "rest"})
+                prev_match = False
             else:
-                if date_obj.toordinal() % 2 == 0:
+                if date_obj.day % 2 == 0:
                     result.append({"date": date_str, "type": "training"})
                 else:
                     result.append({"date": date_str, "type": "rest"})
         return result
     except Exception as e:
+        print("Schedule Error:", e)
         return [{"date": f"{year}-{month:02d}-{d:02d}", "type": "rest"} for d in range(1, calendar.monthrange(year, month)[1] + 1)]
     finally:
         db.close()
@@ -1402,6 +1401,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def read_index():
     return FileResponse("static/index.html")
 
-db_init = Session(engine)
-generate_england_fixtures(db_init)
-db_init.close()
+try:
+    db_init = Session(engine)
+    generate_england_fixtures(db_init)
+    db_init.close()
+except Exception as e:
+    print("Error generating fixtures on startup:", e)
