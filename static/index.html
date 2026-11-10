@@ -402,7 +402,8 @@
         
         <div id="center-main-menu">
             <div class="card" style="text-align: center;">
-                <p style="font-size: 16px; margin-bottom: 12px;">Текущая дата: <b id="current-game-date" style="color:#52a8ff;">Загрузка...</b></p>
+                <p style="font-size: 16px; margin-bottom: 8px;">Текущая дата: <b id="current-game-date" style="color:#52a8ff;">Загрузка...</b></p>
+                <p style="font-size: 14px; margin-bottom: 12px;">До проматывания: <b id="next-month-timer" style="color:#e6c544;">--:--:--</b></p>
                 <button class="btn" id="btn-open-schedule" style="margin-bottom: 10px;">📅 Расписание</button>
                 <button class="btn" id="btn-open-tournaments">🏆 Мои турниры</button>
             </div>
@@ -652,6 +653,7 @@
         let calYear = 2026;
         let calMonth = 8;
         let currentGameDate = "2026-08-01";
+        let nextAdvanceAt = null;
 
         const STAT_NAMES = {
             "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
@@ -1307,7 +1309,20 @@
                 calMonth = parseInt(parts[1]);
                 currentGameDate = data.current_date;
                 if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
+                if (data.next_advance_at) nextAdvanceAt = new Date(data.next_advance_at).getTime();
             } catch (e) { console.error(e); }
+        }
+
+        function updateCountdown() {
+            const el = $("next-month-timer");
+            if (!el) return;
+            if (!nextAdvanceAt) { el.innerText = "--:--:--"; return; }
+            let diff = Math.floor((nextAdvanceAt - Date.now()) / 1000);
+            if (diff < 0) diff = 0;
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+            el.innerText = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
         }
 
         if ($("btn-open-schedule")) $("btn-open-schedule").onclick = function() {
@@ -1321,17 +1336,19 @@
             if ($("center-schedule")) $("center-schedule").classList.add("hidden");
         };
 
-        if ($("btn-prev-month")) $("btn-prev-month").onclick = function() {
+        if ($("btn-prev-month")) $("btn-prev-month").addEventListener("click", function(e) {
+            e.preventDefault();
             calMonth--;
             if (calMonth < 1) { calMonth = 12; calYear--; }
             renderCalendar();
-        };
+        });
 
-        if ($("btn-next-month")) $("btn-next-month").onclick = function() {
+        if ($("btn-next-month")) $("btn-next-month").addEventListener("click", function(e) {
+            e.preventDefault();
             calMonth++;
             if (calMonth > 12) { calMonth = 1; calYear++; }
             renderCalendar();
-        };
+        });
 
         async function renderCalendar() {
             const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -2513,6 +2530,9 @@
                 const m = await res.json();
                 window.currentMatchId = m.id;
                 
+                const matchCard = document.querySelector('#screen-match > .card');
+                if (matchCard) matchCard.style.background = "#232e3c";
+                
                 if ($("match-tour-name")) $("match-tour-name").innerText = m.tournament;
                 if ($("match-home-logo")) $("match-home-logo").innerHTML = getLogoHTML('clubs', m.home_club, 'logo-large');
                 if ($("match-away-logo")) $("match-away-logo").innerHTML = getLogoHTML('clubs', m.away_club, 'logo-large');
@@ -2521,9 +2541,22 @@
                 if ($("match-date")) $("match-date").innerText = m.date;
                 
                 if (m.is_played) {
+                    const isHome = (m.home_club === currentClubName);
+                    const yourGoals = isHome ? m.home_goals : m.away_goals;
+                    const oppGoals = isHome ? m.away_goals : m.home_goals;
+                    
                     if ($("match-score")) {
-                        $("match-score").innerText = m.home_goals + " : " + m.away_goals;
+                        $("match-score").innerText = yourGoals + " : " + oppGoals;
                         $("match-score").setAttribute("data-fixture-id", m.id);
+                    }
+                    if (matchCard) {
+                        if (yourGoals > oppGoals) {
+                            matchCard.style.background = "linear-gradient(135deg, rgba(46, 204, 113, 0.28) 0%, #232e3c 100%)";
+                        } else if (yourGoals === oppGoals) {
+                            matchCard.style.background = "linear-gradient(135deg, rgba(230, 197, 68, 0.28) 0%, #232e3c 100%)";
+                        } else {
+                            matchCard.style.background = "linear-gradient(135deg, rgba(168, 41, 41, 0.35) 0%, #232e3c 100%)";
+                        }
                     }
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
                     
@@ -2627,10 +2660,13 @@
                 showScreen("welcome");
             }
             
+            setInterval(updateCountdown, 1000);
+
             setInterval(async () => {
                 try {
                     const res = await fetch(API_BASE + '/api/game/time');
                     const data = await res.json();
+                    if (data.next_advance_at) nextAdvanceAt = new Date(data.next_advance_at).getTime();
                     if (data.current_date !== currentGameDate) {
                         const oldDate = currentGameDate;
                         currentGameDate = data.current_date;

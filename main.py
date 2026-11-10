@@ -174,6 +174,7 @@ class GameState(Base):
     id = Column(Integer, primary_key=True, default=1)
     current_date = Column(String, default="2026-08-01")
     season = Column(String, default="2026/27")
+    last_month_advance_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
@@ -236,6 +237,7 @@ def init_db():
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_corners INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_offsides INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_offsides INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE game_state ADD COLUMN IF NOT EXISTS last_month_advance_at TIMESTAMP DEFAULT NOW();"))
         db.commit()
         
         if not db.query(GameState).first():
@@ -262,7 +264,7 @@ def init_db():
                 Tournament(name="EFL League One", continent="Domestic", type="League"),
                 Tournament(name="EFL League Two", continent="Domestic", type="League"),
                 Tournament(name="FA Cup", continent="Domestic", type="Cup"),
-                Tournament(name="Carabao Cup", continent="Domestic", type="Cup"),
+                Tournament(name="EFL Cup", continent="Domestic", type="Cup"),
                 Tournament(name="FA Community Shield", continent="Domestic", type="SuperCup"),
                 Tournament(name="UEFA Champions League", continent="UEFA", type="Continental"),
                 Tournament(name="UEFA Europa League", continent="UEFA", type="Continental"),
@@ -279,7 +281,7 @@ def init_db():
                     if t1: db.add(ClubTournament(club_id=club.id, tournament_id=t1.id))
                     t2 = db.query(Tournament).filter_by(name="FA Cup").first()
                     if t2: db.add(ClubTournament(club_id=club.id, tournament_id=t2.id))
-                    t3 = db.query(Tournament).filter_by(name="Carabao Cup").first()
+                    t3 = db.query(Tournament).filter(Tournament.name.in_(["Carabao Cup", "EFL Cup"])).first()
                     if t3: db.add(ClubTournament(club_id=club.id, tournament_id=t3.id))
                 elif club.continent == "UEFA":
                     t4 = db.query(Tournament).filter_by(name="UEFA Champions League").first()
@@ -326,17 +328,17 @@ def init_db():
                             
                 sorted_eng = sorted(eng_clubs, key=lambda c: (-(c.stars or 0), c.name))
                 fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
-                carabao = db.query(Tournament).filter_by(name="Carabao Cup").first()
+                carabao = db.query(Tournament).filter(Tournament.name.in_(["Carabao Cup", "EFL Cup"])).first()
                 
                 fa_dates = parse_eng_dates(["25.08", "24.09", "14.12", "09.01", "23.03", "29.03", "28.05"])
                 car_dates = parse_eng_dates(["20.08", "30.08", "15.09", "28.09", "01.10", "04.10", "07.10", "23.12"])
                 
                 for cup, dates in [(fa_cup, fa_dates), (carabao, car_dates)]:
                     if not cup: continue
-                    rnd = random.Random(cup.id)
                     weak_teams = sorted_eng[36:]
                     strong_teams = sorted_eng[:36]
-                    rnd.shuffle(weak_teams)
+                    random.shuffle(weak_teams)
+                    random.shuffle(strong_teams)
                     
                     for i in range(0, 56, 2):
                         fixtures_data.append({
@@ -365,7 +367,7 @@ def init_db():
                     for i in range(4):
                         fixtures_data.append({"date": dates[4].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 5, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                         
-                    if cup.name == "Carabao Cup":
+                    if cup.name in ["Carabao Cup", "EFL Cup"]:
                         # 1/2 финала, 1-й матч — раунд 6
                         for i in range(2):
                             fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
@@ -735,12 +737,46 @@ def get_club_tournaments(club_id: int):
     finally:
         db.close()
 
+def maybe_auto_advance_month(db):
+    state = db.query(GameState).first()
+    if not state: return
+    now = datetime.utcnow()
+    if state.last_month_advance_at is None:
+        state.last_month_advance_at = now
+        db.commit()
+        return
+    elapsed = (now - state.last_month_advance_at).total_seconds()
+    months = int(elapsed // (8 * 3600))
+    if months <= 0: return
+    for _ in range(months):
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        last_day = calendar.monthrange(curr.year, curr.month)[1]
+        if curr.day == last_day:
+            if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
+            else: next_month = date(curr.year, curr.month + 1, 1)
+            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+            new_date = date(next_month.year, next_month.month, next_month_last_day)
+        else:
+            new_date = date(curr.year, curr.month, last_day)
+        advance_game_date(db, (new_date - curr).days)
+    state.last_month_advance_at = now
+    db.commit()
+
 @app.get("/api/game/time")
 def get_game_time():
     db = Session(engine)
     try:
+        maybe_auto_advance_month(db)
         state = db.query(GameState).first()
-        return {"current_date": state.current_date if state else "2026-08-01", "season": state.season if state else "2026/27"}
+        if not state:
+            return {"current_date": "2026-08-01", "season": "2026/27"}
+        last = state.last_month_advance_at or datetime.utcnow()
+        next_adv = last + timedelta(hours=8)
+        return {
+            "current_date": state.current_date,
+            "season": state.season,
+            "next_advance_at": next_adv.isoformat() + "Z"
+        }
     finally:
         db.close()
 
@@ -956,7 +992,7 @@ def get_bracket(tournament_id: int):
         sorted_rounds = []
         for r_num in sorted(rounds_dict.keys()):
             r_name = f"Тур {r_num}"
-            if tour.name in ["FA Cup", "Carabao Cup"]:
+            if tour.name in ["FA Cup", "Carabao Cup", "EFL Cup"]:
                 if r_num == 1: r_name = "Предварительный этап"
                 elif r_num == 2: r_name = "1/64 финала"
                 elif r_num == 3: r_name = "1/32 финала"
@@ -994,7 +1030,9 @@ def reset_game(req: dict):
         }, synchronize_session=False)
         
         state = db.query(GameState).first()
-        if state: state.current_date = "2026-08-01"
+        if state:
+            state.current_date = "2026-08-01"
+            state.last_month_advance_at = datetime.utcnow()
         db.commit()
         return {"status": "ok"}
     finally:
@@ -1016,7 +1054,7 @@ def advance_cup_bracket(fx, db):
         return
 
     # Carabao: 1/2 финала, 1-й матч (раунд 6) — копируем пары во 2-й матч (раунд 7, зеркально)
-    if fx.round_number == 6 and tour.name == "Carabao Cup" and fx.leg == 1:
+    if fx.round_number == 6 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 1:
         leg2 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
             round_number=7,
@@ -1030,7 +1068,7 @@ def advance_cup_bracket(fx, db):
         return
 
     # Carabao: 1/2 финала, 2-й матч (раунд 7) — считаем сумму и ведём в финал (раунд 8)
-    if fx.round_number == 7 and tour.name == "Carabao Cup" and fx.leg == 2:
+    if fx.round_number == 7 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 2:
         leg1 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
             round_number=6,
@@ -1234,6 +1272,7 @@ def advance_game_date(db, days_to_add):
             else: p.fitness = "green"
             
     state.current_date = curr.strftime("%Y-%m-%d")
+    state.last_month_advance_at = datetime.utcnow()
     db.commit()
     return state.current_date
 
@@ -1425,9 +1464,10 @@ async def cmd_admin_reset(message: types.Message):
         }, synchronize_session=False)
         
         state = db.query(GameState).first()
-        if state: 
+        if state:
             state.current_date = "2026-08-01"
             state.season = "2026/27"
+            state.last_month_advance_at = datetime.utcnow()
             
         db.commit()
         await message.answer("💥 Карьера полностью сброшена! Время вернулось на 01.08.2026.")
