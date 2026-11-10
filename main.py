@@ -333,10 +333,6 @@ def generate_england_fixtures(db: Session):
         
     db.commit()
 
-db_init = Session(engine)
-generate_england_fixtures(db_init)
-db_init.close()
-
 def seed_training_programs():
     db = Session(engine)
     try:
@@ -1405,3 +1401,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/app")
 def read_index():
     return FileResponse("static/index.html")
+
+db_init = Session(engine)
+generate_england_fixtures(db_init)
+db_init.close()
