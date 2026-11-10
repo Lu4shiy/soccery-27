@@ -2631,19 +2631,16 @@
                 try {
                     const res = await fetch(API_BASE + '/api/game/time');
                     const data = await res.json();
-                    const parts = data.current_date.split("-");
-                    const newY = parseInt(parts[0]);
-                    const newM = parseInt(parts[1]);
                     const dateChanged = data.current_date !== currentGameDate;
-                    
-                    if (newY !== calYear || newM !== calMonth) {
-                        calYear = newY;
-                        calMonth = newM;
-                    }
                     
                     if (dateChanged) {
                         currentGameDate = data.current_date;
                         if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
+                        
+                        const parts = currentGameDate.split("-");
+                        calYear = parseInt(parts[0]);
+                        calMonth = parseInt(parts[1]);
+                        
                         if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
                             renderCalendar();
                         }
