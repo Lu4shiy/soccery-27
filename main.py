@@ -284,9 +284,15 @@ def init_db():
 
         eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "FA Community Shield"]
         t_ids = [t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues)).all()]
-        
-        # ПРИНУДИТЕЛЬНО УДАЛЯЕМ СТАРЫЕ МАТЧИ, ЧТОБЫ ОБНОВИТЬ РАСПИСАНИЕ
-        db.query(Fixture).filter(Fixture.tournament_id.in_(t_ids)).delete(synchronize_session=False)
+
+        # Сначала удаляем зависимые записи, иначе PostgreSQL не даст удалить Fixture
+        old_fixture_ids = [
+            row[0] for row in db.query(Fixture.id).filter(Fixture.tournament_id.in_(t_ids)).all()
+        ]
+        if old_fixture_ids:
+            db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
+            db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
+            db.query(Fixture).filter(Fixture.id.in_(old_fixture_ids)).delete(synchronize_session=False)
         db.commit()
 
         if True:
@@ -359,7 +365,7 @@ def init_db():
                         for i in range(2):
                             fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                             fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
-                        fixtures_data.append({"date": dates[7].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+                        fixtures_data.append({"date": dates[7].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 8, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                     else:
                         for i in range(2):
                             fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
@@ -384,6 +390,13 @@ init_db()
 def seed_training_programs():
     db = Session(engine)
     try:
+        db.query(Player).filter(Player.training_program_id.isnot(None)).update(
+            {
+                Player.training_program_id: None,
+                Player.training_started_at: None
+            },
+            synchronize_session=False
+        )
         db.query(TrainingProgram).delete()
         programs = [
             TrainingProgram(name="Скоростная работа", description="+1 к Скорости.", duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
@@ -1005,7 +1018,7 @@ def advance_cup_bracket(fx, db):
             if agg_home == agg_away:
                 winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
                 
-            next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=7).first()
+            next_fx = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=8).first()
             if next_fx:
                 if fx.match_index == 0: next_fx.home_club_id = winner_id
                 else: next_fx.away_club_id = winner_id
