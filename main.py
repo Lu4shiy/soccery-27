@@ -213,82 +213,10 @@ def is_in_list(club_name, team_list):
 
 # === КУБКИ ===
 COUNTRY_CUPS = {
-    "premier league": ["FA Cup", "EFL Cup"],
-    "championship": ["FA Cup", "EFL Cup"],
-    "efl league one": ["FA Cup", "EFL Cup"],
-    "efl league two": ["FA Cup", "EFL Cup"],
-    "laliga": ["Copa del Rey"],
-    "la liga": ["Copa del Rey"],
-    "laliga 2": ["Copa del Rey"],
-    "bundesliga": ["DFB-Pokal"],
-    "2. bundesliga": ["DFB-Pokal"],
-    "3. liga": ["DFB-Pokal"],
-    "serie a": ["Coppa Italia"],
-    "serie b": ["Coppa Italia"],
-    "ligue 1": ["Coupe de France"],
-    "ligue 2": ["Coupe de France"],
-    "eredivisie": ["KNVB Beker"],
-    "eerste divisie": ["KNVB Beker"],
-    "liga portugal": ["Taça de Portugal"],
-    "liga portugal 2": ["Taça de Portugal"],
-    "süper lig": ["Türkiye Kupası"],
-    "tff first league": ["Türkiye Kupası"],
-    "allsvenskan": ["Svenska Cupen"],
-    "superettan": ["Svenska Cupen"],
-    "eliteserien": ["NM-Cup"],
-    "obos-ligaen": ["NM-Cup"],
-    "superliga": ["Landspokalturneringen"],
-    "1. division": ["Landspokalturneringen"],
-    "scottish premiership": ["Scottish FA Cup", "Scottish League Cup"],
-    "scottish championship": ["Scottish FA Cup", "Scottish League Cup"],
-    "pro league": ["Beker van België"],
-    "challenger pro league": ["Beker van België"],
-    "austrian bundesliga": ["ÖFB-Cup"],
-    "2. liga": ["ÖFB-Cup"],
-    "super league": ["Schweizer Cup"],
-    "challenge league": ["Schweizer Cup"],
-    "super league 1": ["Kipelo Ellados"],
-    "super league 2": ["Kipelo Ellados"],
-    "chance liga": ["Pohár FAČR"],
-    "fotbalová národní liga": ["Pohár FAČR"],
-    "supersport hnl": ["Hrvatski nogometni kup"],
-    "first nhl": ["Hrvatski nogometni kup"],
-    "mozzart bet super liga": ["Kup Srbije"],
-    "prva liga": ["Kup Srbije"],
-    "superliga": ["Cupa României"],
-    "liga 2": ["Cupa României"],
-    "pko bp ekstraklasa": ["Puchar Polski"],
-    "fortuna 1 liga": ["Puchar Polski"],
-    "ukrainian premier league": ["Kubok Ukrajiny"],
-    "persha liha": ["Kubok Ukrajiny"],
-    "russian premier league": ["Kubok Rossii"],
-    "russian football national league": ["Kubok Rossii"],
-    "league of ireland premier division": ["FAI Cup"],
-    "league of ireland first division": ["FAI Cup"],
-    "nifl premiership": ["Irish Cup"],
-    "nifl championship": ["Irish Cup"],
-    "cymru premier": ["Welsh Cup"],
-    "cymru north": ["Welsh Cup"],
-    "cymru south": ["Welsh Cup"],
-    "veikkausliiga": ["Finnish Cup"],
-    "ykkosliiga": ["Finnish Cup"],
-    "besta deild karla": ["Icelandic Cup"],
-    "1. deild karla": ["Icelandic Cup"],
-    "slovak super liga": ["Slovenský pohár"],
-    "prvaliga": ["Pokal Slovenije"],
-    "nb i": ["Magyar Kupa"],
-    "efbet liga": ["Kupa na Balgariya"],
-    "ligat ha'al": ["Gvia HaMedina"],
-    "cyta championship": ["Kypriako Kypello"],
-    "kazakhstan premier league": ["Kazakhstan Cup"],
-    "misli premier league": ["Azerbaijan Cup"],
-    "armenian premier league": ["Armenian Cup"],
-    "erovnuli liga": ["Georgian Cup"],
-    "super liga": ["Cupa Moldovei"],
-    "vysheyshaya liga": ["Kubak Belarusi"],
-    "virslīga": ["Latvijas Kauss"],
-    "a lyga": ["Lietuvos Taurė"],
-    "meistriliiga": ["Eesti Karikas"],
+    "premier league": ["FA Cup", "Carabao Cup"],
+    "championship": ["FA Cup", "Carabao Cup"],
+    "efl league one": ["FA Cup", "Carabao Cup"],
+    "efl league two": ["FA Cup", "Carabao Cup"],
 }
 
 # === ИНИЦИАЛИЗАЦИЯ ===
@@ -630,83 +558,105 @@ class SelectClubRequest(BaseModel):
     first_name: Optional[str] = None
     club_id: int
 
-def parse_schedule_dates(dates_list, season_start_year):
+def parse_eng_dates(dates_list):
     res = []
     for d_str in dates_list:
         m, d = map(int, d_str.split("."))
-        year = season_start_year if m >= 7 else season_start_year + 1
+        year = 2026 if m >= 7 else 2027
         res.append(date(year, m, d))
     return res
 
-def generate_tournament_fixtures(tournament_id: int, db: Session):
-    if db.query(Fixture).filter_by(tournament_id=tournament_id).count() > 0:
+def get_round_robin(clubs):
+    if len(clubs) % 2 != 0:
+        clubs.append(None)
+    n = len(clubs)
+    matches = []
+    for _ in range(n - 1):
+        round_matches = []
+        for i in range(n // 2):
+            if clubs[i] and clubs[n - 1 - i]:
+                round_matches.append((clubs[i], clubs[n - 1 - i]))
+        matches.append(round_matches)
+        clubs.insert(1, clubs.pop())
+    return matches
+
+def generate_england_fixtures(db: Session):
+    if db.query(Fixture).count() > 0:
         return
         
-    tour = db.query(Tournament).filter_by(id=tournament_id).first()
-    clubs = db.query(Club).join(ClubTournament).filter(ClubTournament.tournament_id == tournament_id).all()
-    if not clubs or len(clubs) < 2: return
+    eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
+    eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
+    if not eng_clubs: return
     
-    num_clubs = len(clubs)
-    if num_clubs % 2 != 0: clubs.append(None)
+    pl_clubs = [c for c in eng_clubs if c.league == "Premier League"]
+    champ_clubs = [c for c in eng_clubs if c.league == "EFL Championship"]
+    l1_clubs = [c for c in eng_clubs if c.league == "EFL League One"]
+    l2_clubs = [c for c in eng_clubs if c.league == "EFL League Two"]
     
-    rnd = random.Random(tournament_id)
-    SEASON_START = 2026
-    schedule_dates = []
+    pl_dates = parse_eng_dates(["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"])
+    efl_dates = parse_eng_dates(["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"])
     
-    if tour.name in ["UEFA Champions League", "UEFA Europa League"]:
-        raw_dates = ["08.09", "13.10", "20.10", "03.11", "24.11", "08.12", "19.01", "27.01", "16.02", "23.02", "09.03", "16.03", "06.04", "13.04", "27.04", "04.05", "05.06" if tour.name == "UEFA Champions League" else "30.05"]
-        schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-    elif tour.name == "UEFA Conference League":
-        raw_dates = ["13.10", "20.10", "03.11", "24.11", "08.12", "19.01", "16.02", "23.02", "09.03", "16.03", "06.04", "13.04", "27.04", "04.05", "02.06"]
-        schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-    elif tour.type == "League":
-        if num_clubs == 20:
-            raw_dates = ["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 18:
-            raw_dates = ["28.08", "05.09", "13.09", "18.09", "10.10", "17.10", "25.10", "31.10", "07.11", "20.11", "28.11", "04.12", "13.12", "18.12", "09.01", "13.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "03.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "24.04", "08.05", "15.05", "22.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 16:
-            raw_dates = ["24.07", "01.08", "08.08", "18.08", "22.08", "28.08", "05.09", "12.09", "17.09", "09.10", "16.10", "25.10", "30.10", "07.11", "11.11", "21.11", "28.11", "05.12", "28.02", "05.03", "13.03", "21.03", "03.04", "18.04", "24.04", "01.05", "09.05", "16.05", "23.05", "26.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 12:
-            raw_dates = ["31.07", "09.08", "30.08", "02.09", "05.09", "12.09", "20.09", "10.10", "17.10", "24.10", "28.10", "07.11", "21.11", "28.11", "02.12", "05.12", "20.12", "26.12", "30.12", "03.01", "13.01", "19.01"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 10:
-            raw_dates = ["01.02", "04.02", "07.02", "10.02", "13.02", "20.02", "27.02", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "22.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 24:
-            raw_dates = ["07.08", "10.08", "17.08", "22.08", "28.08", "02.09", "05.09", "11.09", "19.09", "10.10", "17.10", "24.10", "30.10", "07.11", "21.11", "28.11", "05.12", "11.12", "19.12", "26.12", "29.12", "01.01", "16.01", "23.01", "30.01", "06.02", "13.02", "20.02", "27.02", "02.03", "06.03", "13.03", "20.03", "03.04", "10.04", "17.04", "20.04", "23.04", "01.05", "07.05", "10.05", "13.05", "16.05", "19.05", "22.05", "25.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-        elif num_clubs == 22:
-            raw_dates = ["17.08", "21.08", "29.08", "05.09", "12.09", "19.09", "25.09", "04.10", "10.10", "17.10", "24.10", "31.10", "08.11", "14.11", "21.11", "29.11", "05.12", "13.12", "20.12", "03.01", "10.01", "16.01", "24.01", "31.01", "07.02", "13.02", "20.02", "28.02", "06.03", "12.03", "21.03", "28.03", "03.04", "10.04", "18.04", "24.04", "01.05", "09.05", "16.05", "19.05", "23.05", "26.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
+    for l_name, l_clubs, l_dates in [("Premier League", pl_clubs, pl_dates), ("EFL Championship", champ_clubs, efl_dates), ("EFL League One", l1_clubs, efl_dates), ("EFL League Two", l2_clubs, efl_dates)]:
+        tour = db.query(Tournament).filter_by(name=l_name).first()
+        if not tour: continue
+        matches = get_round_robin(l_clubs[:])
+        for r_idx, round_m in enumerate(matches):
+            if r_idx >= len(l_dates): break
+            for h, a in round_m:
+                db.add(Fixture(date=l_dates[r_idx].strftime("%Y-%m-%d"), tournament_id=tour.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
+                
+    sorted_eng = sorted(eng_clubs, key=lambda c: (-c.stars, c.name))
+    
+    fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
+    carabao = db.query(Tournament).filter_by(name="Carabao Cup").first()
+    
+    fa_dates = parse_eng_dates(["25.08", "24.09", "14.12", "09.01", "23.03", "29.03", "28.05"])
+    car_dates = parse_eng_dates(["20.08", "30.08", "15.09", "28.09", "01.10", "04.10", "23.12"])
+    
+    for cup, dates in [(fa_cup, fa_dates), (carabao, car_dates)]:
+        if not cup: continue
+        rnd = random.Random(cup.id)
+        
+        weak_teams = sorted_eng[36:]
+        strong_teams = sorted_eng[:36]
+        
+        rnd.shuffle(weak_teams)
+        if len(weak_teams) >= 56:
+            weak_teams = weak_teams[:56]
+            for i in range(0, len(weak_teams), 2):
+                db.add(Fixture(date=dates[0].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=1, home_club_id=weak_teams[i].id, away_club_id=weak_teams[i+1].id, is_played=0))
+            round2_teams = strong_teams + weak_teams[:28]
         else:
-            raw_dates = ["23.08", "28.08", "05.09", "13.09", "20.09", "10.10", "17.10", "24.10", "31.10", "07.11", "21.11", "29.11", "02.12", "05.12", "12.12", "19.12", "26.12", "29.12", "03.01", "06.01", "16.01", "23.01", "30.01", "06.02", "10.02", "20.02", "27.02", "03.03", "13.03", "20.03", "10.04", "17.04", "24.04", "01.05", "08.05", "15.05", "23.05", "26.05"]
-            schedule_dates = parse_schedule_dates(raw_dates, SEASON_START)
-    else:
-        schedule_dates = [date(SEASON_START, 9, 15) + timedelta(days=i*30) for i in range(8)]
-        
-    for round_num in range(1, len(schedule_dates) + 1):
-        if round_num > len(schedule_dates): break
-        round_date = schedule_dates[round_num - 1]
+            round2_teams = strong_teams + weak_teams
             
-        round_clubs = clubs[:]
-        rnd.shuffle(round_clubs)
+        rnd.shuffle(round2_teams)
+        for i in range(0, len(round2_teams), 2):
+            if i+1 < len(round2_teams):
+                db.add(Fixture(date=dates[1].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=2, home_club_id=round2_teams[i].id, away_club_id=round2_teams[i+1].id, is_played=0))
+                
+        curr_teams = round2_teams[:32]
+        for r_idx in range(2, len(dates)):
+            rnd.shuffle(curr_teams)
+            next_r = []
+            for i in range(0, len(curr_teams), 2):
+                if i+1 < len(curr_teams):
+                    h, a = curr_teams[i], curr_teams[i+1]
+                    if r_idx == 5 and cup.name == "Carabao Cup":
+                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
+                        db.add(Fixture(date=(dates[r_idx] + timedelta(days=3)).strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=a.id, away_club_id=h.id, is_played=0))
+                    else:
+                        db.add(Fixture(date=dates[r_idx].strftime("%Y-%m-%d"), tournament_id=cup.id, round_number=r_idx+1, home_club_id=h.id, away_club_id=a.id, is_played=0))
+                    next_r.append(h)
+            curr_teams = next_r
+            
+    shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
+    if shield and len(pl_clubs) >= 2:
+        db.add(Fixture(date="2027-06-09", tournament_id=shield.id, round_number=1, home_club_id=pl_clubs[0].id, away_club_id=pl_clubs[1].id, is_played=0))
         
-        for i in range(0, len(round_clubs), 2):
-            home = round_clubs[i]
-            away = round_clubs[i+1]
-            if home and away:
-                db.add(Fixture(
-                    date=round_date.strftime("%Y-%m-%d"),
-                    tournament_id=tour.id,
-                    round_number=round_num,
-                    home_club_id=home.id,
-                    away_club_id=away.id,
-                    is_played=0
-                ))
     db.commit()
+
+def generate_tournament_fixtures(tournament_id: int, db: Session):
+    pass
 
 @app.post("/api/select-club")
 def select_club(req: SelectClubRequest):
@@ -725,9 +675,7 @@ def select_club(req: SelectClubRequest):
             db.add(Manager(telegram_id=req.telegram_id, first_name=req.first_name or "", club_id=req.club_id, is_setup_complete=0))
         db.commit()
         
-        tours = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == req.club_id).all()
-        for t in tours:
-            generate_tournament_fixtures(t.id, db)
+        generate_england_fixtures(db)
             
         return {"status": "ok", "club_name": club.name, "league": club.league}
     finally:
