@@ -1522,6 +1522,39 @@ async def cmd_admin_date(message: types.Message, command: CommandObject):
         await message.answer(f"⏩ Установлена дата: {state.current_date}")
     db.close()
 
+@dp.message(Command("reset"))
+async def cmd_admin_reset(message: types.Message):
+    if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
+        await message.answer("⛔ У вас нет прав для этой команды.")
+        return
+    
+    db = Session(engine)
+    try:
+        db.query(MatchEvent).delete()
+        db.query(MatchPlayerStats).delete()
+        db.query(Fixture).delete()
+        db.query(Tactic).delete()
+        db.query(Manager).delete()
+        
+        db.query(Player).update({
+            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+            Player.fitness: "green", Player.morale: "green"
+        }, synchronize_session=False)
+        
+        state = db.query(GameState).first()
+        if state: 
+            state.current_date = "2026-08-01"
+            state.season = "2026/27"
+            
+        db.commit()
+        await message.answer("💥 Карьера полностью сброшена! Все менеджеры удалены, время вернулось на 01.08.2026.")
+    except Exception as e:
+        db.rollback()
+        await message.answer(f"❌ Ошибка при сбросе: {e}")
+    finally:
+        db.close()
+
 async def start_bot():
     await dp.start_polling(bot)
 
