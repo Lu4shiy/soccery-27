@@ -8,7 +8,7 @@ import threading
 from datetime import datetime, timedelta, date
 from typing import Optional, List
 
-db_lock = threading.Lock()
+db_lock = threading.RLock()
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandObject
@@ -352,7 +352,6 @@ def init_db():
                     if t4: db.add(ClubTournament(club_id=club.id, tournament_id=t4.id))
             db.commit()
 
-        # Слить Carabao Cup → EFL Cup, если существуют оба
         carabao_old = db.query(Tournament).filter_by(name="Carabao Cup").first()
         carabao_new = db.query(Tournament).filter_by(name="EFL Cup").first()
         if carabao_old and carabao_new:
@@ -442,13 +441,10 @@ def init_db():
                         fixtures_data.append({"date": dates[4].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 5, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                         
                     if cup.name in ["Carabao Cup", "EFL Cup"]:
-                        # 1/2 финала, 1-й матч — раунд 6
                         for i in range(2):
                             fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
-                        # 1/2 финала, 2-й матч — раунд 7
                         for i in range(2):
                             fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
-                        # Финал — раунд 8
                         fixtures_data.append({"date": dates[7].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 8, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
                     else:
                         for i in range(2):
@@ -476,26 +472,34 @@ init_db()
 def seed_training_programs():
     db = Session(engine)
     try:
-        db.query(Player).filter(Player.training_program_id.isnot(None)).update(
-            {
+        if db.query(TrainingProgram).count() == 0:
+            programs = [
+                TrainingProgram(name="Скоростная работа", description="+1 к Скорости.", duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
+                TrainingProgram(name="Ударная техника", description="+1 к Удару.", duration_weeks=3, stat_boosts=json.dumps({"shooting": 1})),
+                TrainingProgram(name="Пас в движении", description="+1 к Пасу.", duration_weeks=3, stat_boosts=json.dumps({"passing": 1})),
+                TrainingProgram(name="Дриблинг 1-в-1", description="+1 к Дриблингу.", duration_weeks=4, stat_boosts=json.dumps({"dribbling": 1})),
+                TrainingProgram(name="Оборонительная стойка", description="+1 к Защите.", duration_weeks=4, stat_boosts=json.dumps({"defending": 1})),
+                TrainingProgram(name="Физическая мощь", description="+1 к Физике.", duration_weeks=4, stat_boosts=json.dumps({"physicality": 1})),
+                TrainingProgram(name="Вратарская реакция", description="+1 к Реакции, +1 к Прыжку.", duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
+                TrainingProgram(name="Игра на выходах", description="+1 к Позиции, +1 к Хватке.", duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
+                TrainingProgram(name="Комплексная работа", description="+1 ко всем статам. Шанс +1 OVR.", duration_weeks=12, ovr_boost=1, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
+            ]
+            for p in programs: db.add(p)
+            db.commit()
+        valid_ids = [r[0] for r in db.query(TrainingProgram.id).all()]
+        if valid_ids:
+            db.query(Player).filter(
+                Player.training_program_id.isnot(None),
+                ~Player.training_program_id.in_(valid_ids)
+            ).update({
                 Player.training_program_id: None,
                 Player.training_started_at: None
-            },
-            synchronize_session=False
-        )
-        db.query(TrainingProgram).delete()
-        programs = [
-            TrainingProgram(name="Скоростная работа", description="+1 к Скорости.", duration_weeks=2, stat_boosts=json.dumps({"pace": 1})),
-            TrainingProgram(name="Ударная техника", description="+1 к Удару.", duration_weeks=3, stat_boosts=json.dumps({"shooting": 1})),
-            TrainingProgram(name="Пас в движении", description="+1 к Пасу.", duration_weeks=3, stat_boosts=json.dumps({"passing": 1})),
-            TrainingProgram(name="Дриблинг 1-в-1", description="+1 к Дриблингу.", duration_weeks=4, stat_boosts=json.dumps({"dribbling": 1})),
-            TrainingProgram(name="Оборонительная стойка", description="+1 к Защите.", duration_weeks=4, stat_boosts=json.dumps({"defending": 1})),
-            TrainingProgram(name="Физическая мощь", description="+1 к Физике.", duration_weeks=4, stat_boosts=json.dumps({"physicality": 1})),
-            TrainingProgram(name="Вратарская реакция", description="+1 к Реакции, +1 к Прыжку.", duration_weeks=3, position_focus="GK", stat_boosts=json.dumps({"gk_reflexes": 1, "gk_diving": 1})),
-            TrainingProgram(name="Игра на выходах", description="+1 к Позиции, +1 к Хватке.", duration_weeks=4, position_focus="GK", stat_boosts=json.dumps({"gk_positioning": 1, "gk_handling": 1})),
-            TrainingProgram(name="Комплексная работа", description="+1 ко всем статам. Шанс +1 OVR.", duration_weeks=12, ovr_boost=1, stat_boosts=json.dumps({"pace": 1, "shooting": 1, "passing": 1, "dribbling": 1, "defending": 1, "physicality": 1})),
-        ]
-        for p in programs: db.add(p)
+            }, synchronize_session=False)
+        else:
+            db.query(Player).filter(Player.training_program_id.isnot(None)).update({
+                Player.training_program_id: None,
+                Player.training_started_at: None
+            }, synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -816,40 +820,47 @@ def get_club_tournaments(club_id: int):
         db.close()
 
 def maybe_auto_advance_month(db):
-    try:
-        state = db.query(GameState).first()
-        if not state: return
-        now = datetime.utcnow()
-        if state.last_month_advance_at is None:
+    with db_lock:
+        try:
+            state = db.query(GameState).first()
+            if not state: return
+            now = datetime.utcnow()
+            if state.last_month_advance_at is None:
+                state.last_month_advance_at = now
+                db.commit()
+                return
+            try:
+                elapsed = (now - state.last_month_advance_at).total_seconds()
+            except Exception:
+                state.last_month_advance_at = now
+                db.commit()
+                return
+            periods = int(elapsed // (8 * 3600))
+            if periods <= 0: return
+            periods = min(periods, 2)
             state.last_month_advance_at = now
             db.commit()
-            return
-        try:
-            elapsed = (now - state.last_month_advance_at).total_seconds()
-        except Exception:
-            state.last_month_advance_at = now
-            db.commit()
-            return
-        months = int(elapsed // (8 * 3600))
-        if months <= 0: return
-        # Сбрасываем таймер СРАЗУ, чтобы не зацикливаться при ошибке
-        state.last_month_advance_at = now
-        db.commit()
-        try:
-            curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-            last_day = calendar.monthrange(curr.year, curr.month)[1]
-            if curr.day == last_day:
-                if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
-                else: next_month = date(curr.year, curr.month + 1, 1)
-                next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
-                new_date = date(next_month.year, next_month.month, next_month_last_day)
-            else:
-                new_date = date(curr.year, curr.month, last_day)
-            advance_game_date(db, (new_date - curr).days)
+            for _ in range(periods):
+                try:
+                    st = db.query(GameState).first()
+                    if not st: break
+                    curr = datetime.strptime(st.current_date, "%Y-%m-%d").date()
+                    last_day = calendar.monthrange(curr.year, curr.month)[1]
+                    if curr.day == last_day:
+                        if curr.month == 12:
+                            next_month = date(curr.year + 1, 1, 1)
+                        else:
+                            next_month = date(curr.year, curr.month + 1, 1)
+                        next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+                        new_date = date(next_month.year, next_month.month, next_month_last_day)
+                    else:
+                        new_date = date(curr.year, curr.month, last_day)
+                    advance_game_date(db, (new_date - curr).days)
+                except Exception as e:
+                    print("Auto-advance iteration failed:", e)
+                    break
         except Exception as e:
-            print("Auto-advance failed:", e)
-    except Exception as e:
-        print("maybe_auto_advance_month error:", e)
+            print("maybe_auto_advance_month error:", e)
 
 @app.get("/api/game/time")
 def get_game_time():
@@ -894,7 +905,9 @@ def get_schedule(year: int, month: int, club_id: int = None):
         _clubs_map = {c.id: c for c in db.query(Club).filter(Club.id.in_(_club_ids)).all()} if _club_ids else {}
         _tours_map = {t.id: t for t in db.query(Tournament).filter(Tournament.id.in_(_tour_ids)).all()} if _tour_ids else {}
             
-        fixture_map = {f.date: f for f in fixtures}
+        fixture_map = {}
+        for f in fixtures:
+            fixture_map.setdefault(f.date, []).append(f)
         
         prev_day = date(year, month, 1) - timedelta(days=1)
         prev_match = False
@@ -911,7 +924,8 @@ def get_schedule(year: int, month: int, club_id: int = None):
             date_str = date_obj.strftime("%Y-%m-%d")
             
             if date_str in fixture_map:
-                f = fixture_map[date_str]
+                today_matches = fixture_map[date_str]
+                f = next((m for m in today_matches if not m.is_played), today_matches[0])
                 tour = _tours_map.get(f.tournament_id)
                 is_home = (f.home_club_id == club_id)
                 opp_id = f.away_club_id if is_home else f.home_club_id
@@ -999,13 +1013,14 @@ def get_match_players(fixture_id: int):
         p_events = {}
         for e in events:
             if e.player_id:
-                if e.player_id not in p_events: p_events[e.player_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0}
+                if e.player_id not in p_events: p_events[e.player_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0, "penalty_miss": 0}
                 if e.event_type == 'goal': p_events[e.player_id]["goals"] += 1
                 if e.event_type == 'own_goal': p_events[e.player_id]["own_goals"] += 1
                 if e.event_type == 'yellow_card': p_events[e.player_id]["yellow"] += 1
                 if e.event_type == 'red_card': p_events[e.player_id]["red"] += 1
+                if e.event_type == 'penalty_miss': p_events[e.player_id]["penalty_miss"] += 1
             if e.event_type in ('goal', 'penalty_goal') and e.assist_id:
-                if e.assist_id not in p_events: p_events[e.assist_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0}
+                if e.assist_id not in p_events: p_events[e.assist_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0, "penalty_miss": 0}
                 p_events[e.assist_id]["assists"] += 1
 
         stats = db.query(MatchPlayerStats).filter_by(fixture_id=fixture_id).all()
@@ -1014,7 +1029,7 @@ def get_match_players(fixture_id: int):
         for s in stats:
             p = db.query(Player).filter_by(id=s.player_id).first()
             if not p: continue
-            ev = p_events.get(p.id, {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0})
+            ev = p_events.get(p.id, {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0, "penalty_miss": 0})
             entry = {
                 "name": p.name,
                 "position": p.position,
@@ -1025,7 +1040,8 @@ def get_match_players(fixture_id: int):
                 "assists": ev["assists"],
                 "own_goals": ev["own_goals"],
                 "yellow": ev["yellow"],
-                "red": ev["red"]
+                "red": ev["red"],
+                "penalty_miss": ev["penalty_miss"]
             }
             if s.club_id == fx.home_club_id:
                 home_players.append(entry)
@@ -1141,30 +1157,6 @@ def get_stats(tournament_id: int):
             c = db.query(Club).filter_by(id=cid).first()
             if c: clean_sheets.append({"team": c.name, "val": count})
         clean_sheets.sort(key=lambda x: x["val"], reverse=True)
-
-        yellows_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
-            MatchEvent.fixture_id.in_(fx_ids),
-            MatchEvent.event_type == 'yellow_card'
-        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
-
-        yellows = []
-        for pid, count in yellows_q:
-            p = db.query(Player).filter_by(id=pid).first()
-            if p:
-                club = db.query(Club).filter_by(id=p.club_id).first()
-                yellows.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
-
-        reds_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
-            MatchEvent.fixture_id.in_(fx_ids),
-            MatchEvent.event_type == 'red_card'
-        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
-
-        reds = []
-        for pid, count in reds_q:
-            p = db.query(Player).filter_by(id=pid).first()
-            if p:
-                club = db.query(Club).filter_by(id=p.club_id).first()
-                reds.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
 
         return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "mvps": mvps, "yellows": yellows, "reds": reds, "clean_sheets": clean_sheets[:10]}
     finally:
@@ -1373,7 +1365,6 @@ def advance_cup_bracket(fx, db):
     if not tour or tour.type not in ["Cup", "SuperCup"]:
         return
 
-    # Carabao: 1/2 финала, 1-й матч (раунд 6) — копируем пары во 2-й матч (раунд 7, зеркально)
     if fx.round_number == 6 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 1:
         leg2 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
@@ -1387,7 +1378,6 @@ def advance_cup_bracket(fx, db):
             db.flush()
         return
 
-    # Carabao: 1/2 финала, 2-й матч (раунд 7) — считаем сумму и ведём в финал (раунд 8)
     if fx.round_number == 7 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 2:
         leg1 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
@@ -1417,7 +1407,6 @@ def advance_cup_bracket(fx, db):
                 db.flush()
         return
 
-    # Обычный путь (FA Cup, финалы Carabao, любые одноматчевые раунды)
     if fx.home_penalties is not None and fx.away_penalties is not None:
         winner_id = fx.home_club_id if fx.home_penalties > fx.away_penalties else fx.away_club_id
     else:
@@ -1523,6 +1512,7 @@ def simulate_match(fixture_id: int, db: Session):
     match_yellow = {}
     match_red = {}
     match_own_goals = {}
+    match_penalty_miss = {}
     
     def pick_minute(lo=1, hi=90, is_sub=False):
         if is_sub:
@@ -1555,12 +1545,16 @@ def simulate_match(fixture_id: int, db: Session):
     h_bench = db.query(Player).filter(
         Player.club_id == home.id,
         ~Player.id.in_(xi_ids_h),
-        Player.injury_weeks == 0
+        func.coalesce(Player.injury_weeks, 0) == 0,
+        func.coalesce(Player.injury_days, 0) == 0,
+        func.coalesce(Player.suspension_matches, 0) == 0
     ).order_by(Player.overall_rating.desc()).limit(9).all()
     a_bench = db.query(Player).filter(
         Player.club_id == away.id,
         ~Player.id.in_(xi_ids_a),
-        Player.injury_weeks == 0
+        func.coalesce(Player.injury_weeks, 0) == 0,
+        func.coalesce(Player.injury_days, 0) == 0,
+        func.coalesce(Player.suspension_matches, 0) == 0
     ).order_by(Player.overall_rating.desc()).limit(9).all()
     
     h_on_pitch = list(h_xi)
@@ -1631,11 +1625,21 @@ def simulate_match(fixture_id: int, db: Session):
         minute = pick_minute()
         is_goal = random.random() < 0.75
         add_event(minute, 'penalty_goal' if is_goal else 'penalty_miss', side, scorer.id)
+        if side == home.id:
+            total_shots_h += 1
+        else:
+            total_shots_a += 1
         if is_goal:
-            if side == home.id: h_goals += 1
-            else: a_goals += 1
+            if side == home.id:
+                h_goals += 1
+                h_sot += 1
+            else:
+                a_goals += 1
+                a_sot += 1
             scorer.goals = (scorer.goals or 0) + 1
             match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
+        else:
+            match_penalty_miss[scorer.id] = match_penalty_miss.get(scorer.id, 0) + 1
 
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
@@ -1645,7 +1649,7 @@ def simulate_match(fixture_id: int, db: Session):
             minute = pick_minute()
             if side == home.id: h_goals += 1
             else: a_goals += 1
-            add_event(minute, 'own_goal', side, scorer.id)
+            add_event(minute, 'own_goal', scorer.club_id, scorer.id)
             match_own_goals[scorer.id] = match_own_goals.get(scorer.id, 0) + 1
 
     for _ in range(random.randint(1, 4)):
@@ -1803,6 +1807,11 @@ def simulate_match(fixture_id: int, db: Session):
             
         rating += 0.6 * assists
         
+        og = match_own_goals.get(p.id, 0)
+        if og > 0: rating -= 1.5 * og
+        pm = match_penalty_miss.get(p.id, 0)
+        if pm > 0: rating -= 0.5 * pm
+        
         if is_gk:
             rating += 0.15 * saves
             rating -= 0.3 * conceded
@@ -1881,6 +1890,11 @@ def simulate_match(fixture_id: int, db: Session):
     elif a_goals > h_goals:
         for p in a_xi: p.morale = "green"
         for p in h_xi: p.morale = "red" if p.morale == "orange" else "orange"
+
+    total_shots_h = max(total_shots_h, h_goals)
+    total_shots_a = max(total_shots_a, a_goals)
+    h_sot = max(h_sot, h_goals)
+    a_sot = max(a_sot, a_goals)
         
     fx.home_goals = h_goals
     fx.away_goals = a_goals
