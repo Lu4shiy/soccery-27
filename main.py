@@ -1060,11 +1060,11 @@ def reset_game(req: dict):
     
     db = Session(engine)
     try:
-        db.query(MatchEvent).delete()
-        db.query(MatchPlayerStats).delete()
-        db.query(Fixture).delete()
-        db.query(Tactic).delete()
-        db.query(Manager).delete()
+        db.execute(text("DELETE FROM match_events"))
+        db.execute(text("DELETE FROM match_player_stats"))
+        db.execute(text("DELETE FROM fixtures"))
+        db.execute(text("DELETE FROM tactics"))
+        db.execute(text("DELETE FROM managers"))
         
         db.query(Player).update({
             Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
@@ -1107,7 +1107,7 @@ def advance_cup_bracket(fx, db):
         if leg2:
             leg2.home_club_id = fx.away_club_id
             leg2.away_club_id = fx.home_club_id
-            db.commit()
+            db.flush()
         return
 
     # Carabao: 1/2 финала, 2-й матч (раунд 7) — считаем сумму и ведём в финал (раунд 8)
@@ -1137,7 +1137,7 @@ def advance_cup_bracket(fx, db):
                     final_fx.home_club_id = winner_id
                 else:
                     final_fx.away_club_id = winner_id
-                db.commit()
+                db.flush()
         return
 
     # Обычный путь (FA Cup, финалы Carabao, любые одноматчевые раунды)
@@ -1164,7 +1164,7 @@ def advance_cup_bracket(fx, db):
                 next_fx.home_club_id = winner_id
             else:
                 next_fx.away_club_id = winner_id
-    db.commit()
+    db.flush()
 
 def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()
@@ -1238,10 +1238,16 @@ def simulate_match(fixture_id: int, db: Session):
 
     if random.random() < 0.2:
         side = home.id if random.random() < 0.5 else away.id
-        minute = random.randint(1, 90)
-        add_event(minute, 'penalty_goal' if random.random() < 0.7 else 'penalty_miss', side)
-        if side == home.id: h_goals += 1
-        else: a_goals += 1
+        players_list = h_players if side == home.id else a_players
+        if players_list:
+            scorer = random.choice(players_list)
+            minute = random.randint(1, 90)
+            is_goal = random.random() < 0.7
+            add_event(minute, 'penalty_goal' if is_goal else 'penalty_miss', side, scorer.id)
+            if is_goal:
+                if side == home.id: h_goals += 1
+                else: a_goals += 1
+                scorer.goals = (scorer.goals or 0) + 1
 
     for _ in range(random.randint(1, 4)):
         side = home.id if random.random() < 0.5 else away.id
@@ -1291,7 +1297,7 @@ def simulate_match(fixture_id: int, db: Session):
     fx.away_offsides = random.randint(0, 4)
     
     for ev in events: db.add(ev)
-    db.commit()
+    db.flush()
     
     advance_cup_bracket(fx, db)
 
@@ -1539,11 +1545,11 @@ async def cmd_admin_reset(message: types.Message):
     
     db = Session(engine)
     try:
-        db.query(MatchEvent).delete()
-        db.query(MatchPlayerStats).delete()
-        db.query(Fixture).delete()
-        db.query(Tactic).delete()
-        db.query(Manager).delete()
+        db.execute(text("DELETE FROM match_events"))
+        db.execute(text("DELETE FROM match_player_stats"))
+        db.execute(text("DELETE FROM fixtures"))
+        db.execute(text("DELETE FROM tactics"))
+        db.execute(text("DELETE FROM managers"))
         
         db.query(Player).update({
             Player.goals: 0, Player.assists: 0, Player.matches_played: 0,

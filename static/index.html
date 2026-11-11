@@ -2605,12 +2605,8 @@
                 if ($("match-date")) $("match-date").innerText = m.date;
                 
                 if (m.is_played) {
-                    const isHome = (m.home_club_id === currentClubId);
-                    const yourGoals = isHome ? m.home_goals : m.away_goals;
-                    const oppGoals = isHome ? m.away_goals : m.home_goals;
-                    
                     if ($("match-score")) {
-                        $("match-score").innerText = yourGoals + " : " + oppGoals;
+                        $("match-score").innerText = m.home_goals + " : " + m.away_goals;
                         $("match-score").setAttribute("data-fixture-id", m.id);
                     }
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
