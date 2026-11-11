@@ -1311,13 +1311,17 @@ def advance_game_date(db, days_to_add):
             except Exception as e:
                 print(f"Match simulation failed for fixture {fx.id}: {e}")
             
-        players = db.query(Player).all()
-        for p in players:
-            p.fatigue = max(0, (p.fatigue or 0) - 15)
-            if p.fatigue > 80: p.fitness = "red"
-            elif p.fatigue > 60: p.fitness = "orange"
-            elif p.fatigue > 40: p.fitness = "yellow"
-            else: p.fitness = "green"
+        db.execute(text("""
+            UPDATE players
+            SET fatigue = GREATEST(0, fatigue - 15),
+                fitness = CASE
+                    WHEN GREATEST(0, fatigue - 15) > 80 THEN 'red'
+                    WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
+                    WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
+                    ELSE 'green'
+                END
+            WHERE fatigue > 0
+        """))
             
     state.current_date = curr.strftime("%Y-%m-%d")
     state.last_month_advance_at = datetime.utcnow()
@@ -1477,12 +1481,22 @@ async def cmd_admin_month(message: types.Message):
                 new_date = date(curr.year, curr.month, last_day)
             delta_days = (new_date - curr).days
             return advance_game_date(db, delta_days)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return f"ERROR: {e}"
         finally:
             db.close()
     await message.answer("⏳ Промотка...")
-    new_date_str = await asyncio.to_thread(do_work)
-    if new_date_str:
-        await message.answer(f"⏩ Промотан месяц. Дата: {new_date_str}")
+    try:
+        result = await asyncio.to_thread(do_work)
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+        return
+    if isinstance(result, str) and result.startswith("ERROR:"):
+        await message.answer(f"❌ {result}")
+    elif result:
+        await message.answer(f"⏩ Промотан месяц. Дата: {result}")
     else:
         await message.answer("❌ Ошибка: состояние игры не найдено")
 

@@ -184,6 +184,9 @@
         .cal-day { background: #17212b; padding: 4px 2px; border-radius: 6px; font-size: 12px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 58px; border-bottom: 3px solid transparent; min-width: 0; width: 100%; overflow: hidden; }
         .cal-date { font-size: 10px; color: #8e9eb5; width: 100%; text-align: center; margin-bottom: 2px; }
         .cal-day.match { border: 1px solid #52a8ff; background: rgba(82,168,255,0.05); border-bottom: 3px solid #52a8ff; }
+        .cal-day.match.win { background: rgba(46, 204, 113, 0.30); }
+        .cal-day.match.draw { background: rgba(230, 197, 68, 0.30); }
+        .cal-day.match.loss { background: rgba(168, 41, 41, 0.35); }
         .cal-day.training { border-bottom: 3px solid #e6c544; }
         .cal-day.rest { border-bottom: 3px solid #2ecc71; }
         .cal-day.past { opacity: 0.4; }
@@ -1387,7 +1390,15 @@
                         const oppLogo = getSmallLogo(d.opponent_name || "");
                         const ha = d.is_home ? "Д" : "В";
                         const tourShort = (d.tournament_name || "").substring(0, 4);
-                        const scoreStr = d.is_played ? `<div style="font-size:10px; font-weight:bold; color:#52a8ff;">${d.is_home ? d.home_goals + '-' + d.away_goals : d.away_goals + '-' + d.home_goals}</div>` : '';
+                        let scoreStr = '';
+                        if (d.is_played) {
+                            scoreStr = `<div style="font-size:10px; font-weight:bold; color:#fff;">${d.home_goals}-${d.away_goals}</div>`;
+                            const myGoals = d.is_home ? d.home_goals : d.away_goals;
+                            const oppGoals = d.is_home ? d.away_goals : d.home_goals;
+                            if (myGoals > oppGoals) cls += " win";
+                            else if (myGoals === oppGoals) cls += " draw";
+                            else cls += " loss";
+                        }
                         inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id})" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
                                     <div class="cal-tour">${tourShort}</div>
                                     <div class="cal-opp">${oppLogo}</div>
@@ -2185,7 +2196,8 @@
 
             reserveList.innerHTML = reserve.map(function(p) {
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
-                return '<div class="bench-card" onclick="onReservePlayerClick(' + p.id + ')">' +
+                const isSel = selectedBenchPlayerId === p.id;
+                return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onReservePlayerClick(' + p.id + ')">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
                     '<div class="bench-name">' + p.name + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
@@ -2225,14 +2237,14 @@
             hint.classList.remove("active");
             if (selectedSlotIndex !== null) {
                 const slot = FORMATIONS[tacticsState.formation][selectedSlotIndex];
-                hint.textContent = 'Слот "' + slot.role + '" выбран. Нажмите другую позицию или игрока в запасе';
+                hint.textContent = 'Слот "' + slot.role + '" выбран. Нажмите другую позицию или игрока в запасе/резерве';
                 hint.classList.add("active");
             } else if (selectedBenchPlayerId !== null) {
                 const p = getPlayerById(selectedBenchPlayerId);
-                hint.textContent = (p ? p.name : "") + ' выбран. Нажмите позицию на поле';
+                hint.textContent = (p ? p.name : "") + ' выбран. Нажмите позицию на поле, запасного или резервиста';
                 hint.classList.add("active");
             } else {
-                hint.textContent = "Нажмите на слот на поле или на игрока в запасе";
+                hint.textContent = "Нажмите на слот, игрока в запасе или резерве";
             }
         }
 
@@ -2245,7 +2257,16 @@
 
         function onSlotClick(idx) {
             if (selectedBenchPlayerId !== null) {
-                placeBenchPlayerIntoSlot(selectedBenchPlayerId, idx);
+                const pid = selectedBenchPlayerId;
+                const wasBench = tacticsState.bench.indexOf(pid) >= 0;
+                const wasReserve = !wasBench && tacticsState.starting_xi.indexOf(pid) < 0;
+                const oldInSlot = tacticsState.starting_xi[idx];
+                if (wasBench) {
+                    const bIdx = tacticsState.bench.indexOf(pid);
+                    if (bIdx >= 0) tacticsState.bench.splice(bIdx, 1);
+                    if (oldInSlot != null) tacticsState.bench.push(oldInSlot);
+                }
+                tacticsState.starting_xi[idx] = pid;
                 selectedBenchPlayerId = null;
                 selectedSlotIndex = null;
                 markDirty();
@@ -2274,38 +2295,69 @@
                 selectedSlotIndex = null;
                 selectedBenchPlayerId = null;
                 markDirty();
-            } else if (selectedBenchPlayerId === playerId) {
-                selectedBenchPlayerId = null;
-            } else if (selectedBenchPlayerId !== null && tacticsState.bench.indexOf(selectedBenchPlayerId) < 0 && tacticsState.starting_xi.indexOf(selectedBenchPlayerId) < 0) {
-                // Резервист выбран, кликнули запасного → свап
-                const benchIdx = tacticsState.bench.indexOf(playerId);
-                if (benchIdx >= 0) {
-                    tacticsState.bench[benchIdx] = selectedBenchPlayerId;
-                }
-                selectedBenchPlayerId = null;
-                markDirty();
-            } else {
-                selectedBenchPlayerId = playerId;
+                renderTactics();
+                return;
             }
+            if (selectedBenchPlayerId === playerId) {
+                selectedBenchPlayerId = null;
+                renderTactics();
+                return;
+            }
+            if (selectedBenchPlayerId !== null) {
+                const selInBench = tacticsState.bench.indexOf(selectedBenchPlayerId);
+                const thisInBench = tacticsState.bench.indexOf(playerId);
+                if (selInBench >= 0 && thisInBench >= 0) {
+                    tacticsState.bench[selInBench] = playerId;
+                    tacticsState.bench[thisInBench] = selectedBenchPlayerId;
+                    selectedBenchPlayerId = null;
+                    markDirty();
+                    renderTactics();
+                    return;
+                }
+                if (selInBench < 0 && thisInBench >= 0) {
+                    tacticsState.bench[thisInBench] = selectedBenchPlayerId;
+                    selectedBenchPlayerId = null;
+                    markDirty();
+                    renderTactics();
+                    return;
+                }
+            }
+            selectedBenchPlayerId = playerId;
             renderTactics();
         }
         window.onBenchPlayerClick = onBenchPlayerClick;
 
         function onReservePlayerClick(playerId) {
-            if (tacticsState.bench.length >= benchTargetSize) {
-                // Скамейка заполнена — подсвечиваем игрока для свапа
-                if (selectedBenchPlayerId === playerId) {
-                    selectedBenchPlayerId = null;
-                } else {
-                    selectedBenchPlayerId = playerId;
-                }
+            if (selectedSlotIndex !== null) {
+                const oldInSlot = tacticsState.starting_xi[selectedSlotIndex];
+                const bIdx = tacticsState.bench.indexOf(playerId);
+                if (bIdx >= 0) tacticsState.bench.splice(bIdx, 1);
+                tacticsState.starting_xi[selectedSlotIndex] = playerId;
+                selectedSlotIndex = null;
+                selectedBenchPlayerId = null;
+                markDirty();
                 renderTactics();
                 return;
             }
-            tacticsState.bench.push(playerId);
-            const xiIdx = tacticsState.starting_xi.indexOf(playerId);
-            if (xiIdx >= 0) tacticsState.starting_xi[xiIdx] = null;
-            markDirty();
+            if (selectedBenchPlayerId === playerId) {
+                selectedBenchPlayerId = null;
+                renderTactics();
+                return;
+            }
+            if (selectedBenchPlayerId !== null) {
+                const selInBench = tacticsState.bench.indexOf(selectedBenchPlayerId);
+                if (selInBench >= 0) {
+                    tacticsState.bench[selInBench] = playerId;
+                    selectedBenchPlayerId = null;
+                    markDirty();
+                    renderTactics();
+                    return;
+                }
+                selectedBenchPlayerId = playerId;
+                renderTactics();
+                return;
+            }
+            selectedBenchPlayerId = playerId;
             renderTactics();
         }
         window.onReservePlayerClick = onReservePlayerClick;
@@ -2560,15 +2612,6 @@
                     if ($("match-score")) {
                         $("match-score").innerText = yourGoals + " : " + oppGoals;
                         $("match-score").setAttribute("data-fixture-id", m.id);
-                    }
-                    if (matchCard) {
-                        if (yourGoals > oppGoals) {
-                            matchCard.style.background = "linear-gradient(135deg, rgba(46, 204, 113, 0.28) 0%, #232e3c 100%)";
-                        } else if (yourGoals === oppGoals) {
-                            matchCard.style.background = "linear-gradient(135deg, rgba(230, 197, 68, 0.28) 0%, #232e3c 100%)";
-                        } else {
-                            matchCard.style.background = "linear-gradient(135deg, rgba(168, 41, 41, 0.35) 0%, #232e3c 100%)";
-                        }
                     }
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
                     
