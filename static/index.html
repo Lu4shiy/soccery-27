@@ -1656,15 +1656,15 @@
                             if (name === "Premier League") {
                                 if (s.pos <= 5) { currentZone = "Лига Чемпионов"; rowStyle = "border-left: 3px solid #52a8ff;"; }
                                 else if (s.pos <= 7) { currentZone = "Лига Европы"; rowStyle = "border-left: 3px solid #e67e22;"; }
-                                else if (s.pos >= total - 2) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
+                                else if (s.pos >= 18) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
                             } else if (name === "EFL Championship") {
                                 if (s.pos <= 2) { currentZone = "Выход в Премьер-Лигу"; rowStyle = "border-left: 3px solid #2ecc71;"; }
                                 else if (s.pos <= 8) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
-                                else if (s.pos >= total - 2) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
+                                else if (s.pos >= 22) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
                             } else if (name === "EFL League One") {
                                 if (s.pos <= 2) { currentZone = "Выход в Чемпионшип"; rowStyle = "border-left: 3px solid #2ecc71;"; }
                                 else if (s.pos <= 6) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
-                                else if (s.pos >= total - 3) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
+                                else if (s.pos >= 21) { currentZone = "Выбывание"; rowStyle = "border-left: 3px solid #a82929;"; }
                             } else if (name === "EFL League Two") {
                                 if (s.pos <= 3) { currentZone = "Выход в Лигу 1"; rowStyle = "border-left: 3px solid #2ecc71;"; }
                                 else if (s.pos <= 7) { currentZone = "Плей-офф"; rowStyle = "border-left: 3px solid #52a8ff;"; }
