@@ -1444,12 +1444,26 @@
         };
 
         window.calPrevMonth = function() {
+            let curr = new Date(currentGameDate + "T00:00:00");
+            let target = new Date(calYear, calMonth - 2, 1);
+            let limit = new Date(curr.getFullYear() - 1, curr.getMonth(), 1);
+            if (target < limit) {
+                tg.showAlert("Максимум на год назад");
+                return;
+            }
             calMonth--;
             if (calMonth < 1) { calMonth = 12; calYear--; }
             renderCalendar();
         };
 
         window.calNextMonth = function() {
+            let curr = new Date(currentGameDate + "T00:00:00");
+            let target = new Date(calYear, calMonth, 1);
+            let limit = new Date(curr.getFullYear() + 1, curr.getMonth(), 1);
+            if (target > limit) {
+                tg.showAlert("Максимум на год вперед");
+                return;
+            }
             calMonth++;
             if (calMonth > 12) { calMonth = 1; calYear++; }
             renderCalendar();

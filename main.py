@@ -246,6 +246,12 @@ def parse_eng_dates(dates_list, start_year=2026):
     return res
 
 def generate_season_fixtures(db, base_year):
+    start_str = f"{base_year}-07-01"
+    end_str = f"{base_year+1}-06-30"
+    existing = db.query(Fixture).filter(Fixture.date >= start_str, Fixture.date <= end_str).first()
+    if existing:
+        return
+        
     eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
     eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
     if not eng_clubs: return
@@ -461,18 +467,7 @@ def init_db():
                 state.season = correct_season
                 db.commit()
 
-        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "EFL Cup", "FA Community Shield"]
-        t_ids = [t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues)).all()]
-
-        old_fixture_ids = [
-            row[0] for row in db.query(Fixture.id).filter(Fixture.tournament_id.in_(t_ids)).all()
-        ]
-
-        if not old_fixture_ids:
-            base_yr = 2026
-            if state:
-                c_date = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-                base_yr = c_date.year if c_date.month >= 7 else c_date.year - 1
+            base_yr = c_date.year if c_date.month >= 7 else c_date.year - 1
             generate_season_fixtures(db, base_yr)
 
     except Exception as e:
@@ -983,7 +978,16 @@ def get_standings(tournament_id: int):
         if not clubs:
             clubs = db.query(Club).filter(Club.league == tour.name).all()
             
-        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, is_played=1).all()
+        state = db.query(GameState).first()
+        season_start_year = int(state.season.split("/")[0])
+        start_str = f"{season_start_year}-07-01"
+        end_str = f"{season_start_year+1}-06-30"
+        fixtures = db.query(Fixture).filter(
+            Fixture.tournament_id == tournament_id,
+            Fixture.is_played == 1,
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).all()
         stats = {c.id: {"pos": 0, "club_name": c.name, "mp": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "gd": 0, "pts": 0} for c in clubs}
         
         for f in fixtures:
@@ -1085,7 +1089,16 @@ def get_stats(tournament_id: int):
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: return {"scorers": [], "assists": [], "rating": [], "mvps": [], "yellows": [], "reds": [], "clean_sheets": []}
         
-        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, is_played=1).all()
+        state = db.query(GameState).first()
+        season_start_year = int(state.season.split("/")[0])
+        start_str = f"{season_start_year}-07-01"
+        end_str = f"{season_start_year+1}-06-30"
+        fixtures = db.query(Fixture).filter(
+            Fixture.tournament_id == tournament_id,
+            Fixture.is_played == 1,
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).all()
         fx_ids = [f.id for f in fixtures]
         
         if not fx_ids:
@@ -1185,7 +1198,15 @@ def get_bracket(tournament_id: int):
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
         
-        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id).order_by(Fixture.round_number, Fixture.match_index, Fixture.leg).all()
+        state = db.query(GameState).first()
+        season_start_year = int(state.season.split("/")[0])
+        start_str = f"{season_start_year}-07-01"
+        end_str = f"{season_start_year+1}-06-30"
+        fixtures = db.query(Fixture).filter(
+            Fixture.tournament_id == tournament_id,
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).order_by(Fixture.round_number, Fixture.match_index, Fixture.leg).all()
         if not fixtures:
             return {"type": tour.type, "rounds": []}
         
@@ -1981,6 +2002,64 @@ def simulate_match(fixture_id: int, db: Session):
     
     advance_cup_bracket(fx, db)
 
+def process_season_end(db, year):
+    def get_league_standings(league_name):
+        tour = db.query(Tournament).filter_by(name=league_name).first()
+        if not tour: return []
+        clubs = db.query(Club).filter(Club.league == league_name).all()
+        fixtures = db.query(Fixture).filter_by(tournament_id=tour.id, is_played=1).filter(
+            Fixture.date >= f"{year}-07-01", Fixture.date <= f"{year+1}-06-30"
+        ).all()
+        stats = {c.id: {"club": c, "pts": 0, "gf": 0, "ga": 0, "gd": 0} for c in clubs}
+        for f in fixtures:
+            if f.home_club_id in stats and f.away_club_id in stats:
+                h, a = stats[f.home_club_id], stats[f.away_club_id]
+                h["gf"] += f.home_goals; a["gf"] += f.away_goals
+                h["ga"] += f.away_goals; a["ga"] += f.home_goals
+                if f.home_goals > f.away_goals: h["pts"] += 3
+                elif f.home_goals < f.away_goals: a["pts"] += 3
+                else: h["pts"] += 1; a["pts"] += 1
+        for s in stats.values():
+            s["gd"] = s["gf"] - s["ga"]
+        standings = sorted(stats.values(), key=lambda x: (-x["pts"], -x["gd"], -x["gf"]))
+        return standings
+
+    pl_standings = get_league_standings("Premier League")
+    champ_standings = get_league_standings("EFL Championship")
+    l1_standings = get_league_standings("EFL League One")
+    l2_standings = get_league_standings("EFL League Two")
+    
+    pl_relegated = [s["club"] for s in pl_standings[-3:]] if len(pl_standings) >= 3 else []
+    champ_promoted = [s["club"] for s in champ_standings[:2]]
+    if len(champ_standings) >= 6:
+        champ_promoted.append(random.choice([s["club"] for s in champ_standings[2:6]]))
+    champ_relegated = [s["club"] for s in champ_standings[-3:]] if len(champ_standings) >= 3 else []
+    l1_promoted = [s["club"] for s in l1_standings[:2]]
+    if len(l1_standings) >= 6:
+        l1_promoted.append(random.choice([s["club"] for s in l1_standings[2:6]]))
+    l1_relegated = [s["club"] for s in l1_standings[-4:]] if len(l1_standings) >= 4 else []
+    l2_promoted = [s["club"] for s in l2_standings[:3]]
+    if len(l2_standings) >= 7:
+        l2_promoted.append(random.choice([s["club"] for s in l2_standings[3:7]]))
+
+    def update_club_tournament(club, new_league_name):
+        club.league = new_league_name
+        new_tour = db.query(Tournament).filter_by(name=new_league_name).first()
+        if new_tour:
+            league_tours = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
+            old_tours = db.query(Tournament).filter(Tournament.name.in_(league_tours)).all()
+            old_tour_ids = [t.id for t in old_tours]
+            db.query(ClubTournament).filter(ClubTournament.club_id == club.id, ClubTournament.tournament_id.in_(old_tour_ids)).delete(synchronize_session=False)
+            db.add(ClubTournament(club_id=club.id, tournament_id=new_tour.id))
+
+    for c in pl_relegated: update_club_tournament(c, "EFL Championship")
+    for c in champ_promoted: update_club_tournament(c, "Premier League")
+    for c in champ_relegated: update_club_tournament(c, "EFL League One")
+    for c in l1_promoted: update_club_tournament(c, "EFL Championship")
+    for c in l1_relegated: update_club_tournament(c, "EFL League Two")
+    for c in l2_promoted: update_club_tournament(c, "EFL League One")
+    db.commit()
+
 def advance_game_date(db, days_to_add):
     with db_lock:
         state = db.query(GameState).first()
@@ -1992,6 +2071,8 @@ def advance_game_date(db, days_to_add):
             date_str = curr.strftime("%Y-%m-%d")
             
             if curr.month == 7 and curr.day == 1:
+                process_season_end(db, curr.year - 1)
+                
                 db.query(Player).update({
                     Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
                     Player.rating_sum: 0.0, Player.consecutive_yellows: 0, 
@@ -2001,13 +2082,6 @@ def advance_game_date(db, days_to_add):
                 }, synchronize_session=False)
                 
                 state.season = f"{curr.year}/{curr.year+1}"
-                
-                old_fix = [r[0] for r in db.query(Fixture.id).all()]
-                if old_fix:
-                    db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fix)).delete(synchronize_session=False)
-                    db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fix)).delete(synchronize_session=False)
-                    db.query(Fixture).delete(synchronize_session=False)
-                
                 generate_season_fixtures(db, curr.year)
 
             db.execute(text("""
@@ -2084,7 +2158,15 @@ def advance_month(req: dict):
 def get_tournament_rounds(tournament_id: int):
     db = Session(engine)
     try:
-        rounds = db.query(Fixture.round_number).filter_by(tournament_id=tournament_id).distinct().order_by(Fixture.round_number).all()
+        state = db.query(GameState).first()
+        season_start_year = int(state.season.split("/")[0])
+        start_str = f"{season_start_year}-07-01"
+        end_str = f"{season_start_year+1}-06-30"
+        rounds = db.query(Fixture.round_number).filter(
+            Fixture.tournament_id == tournament_id,
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).distinct().order_by(Fixture.round_number).all()
         return [r[0] for r in rounds]
     finally:
         db.close()
@@ -2093,7 +2175,16 @@ def get_tournament_rounds(tournament_id: int):
 def get_round_matches(tournament_id: int, round_number: int):
     db = Session(engine)
     try:
-        fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, round_number=round_number).all()
+        state = db.query(GameState).first()
+        season_start_year = int(state.season.split("/")[0])
+        start_str = f"{season_start_year}-07-01"
+        end_str = f"{season_start_year+1}-06-30"
+        fixtures = db.query(Fixture).filter(
+            Fixture.tournament_id == tournament_id,
+            Fixture.round_number == round_number,
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).all()
         result = []
         for f in fixtures:
             h = db.query(Club).filter_by(id=f.home_club_id).first()
