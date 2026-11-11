@@ -69,6 +69,7 @@ class Club(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     league = Column(String, index=True)
+    original_league = Column(String, nullable=True)
     stars = Column(Float, default=3.0)
     continent = Column(String, default="UEFA")
 
@@ -112,6 +113,8 @@ class Player(Base):
     injury_name = Column(String, nullable=True)
     suspension_matches = Column(Integer, default=0)
     consecutive_yellows = Column(Integer, default=0)
+    potential = Column(Integer, default=85)
+    growth_progress = Column(Integer, default=0)
 
 class Fixture(Base):
     __tablename__ = "fixtures"
@@ -218,6 +221,13 @@ class ClubTournament(Base):
     club_id = Column(Integer, ForeignKey("clubs.id"), index=True)
     tournament_id = Column(Integer, ForeignKey("tournaments.id"), index=True)
     season = Column(String, default="2026/27")
+
+class Trophy(Base):
+    __tablename__ = "trophies"
+    id = Column(Integer, primary_key=True, index=True)
+    club_id = Column(Integer, ForeignKey("clubs.id"), index=True)
+    tournament_name = Column(String)
+    season = Column(String)
 
 class GameState(Base):
     __tablename__ = "game_state"
@@ -355,12 +365,14 @@ def generate_season_fixtures(db, base_year):
         db.bulk_insert_mappings(Fixture, fixtures_data)
         db.commit()
         
+    season_str = f"{base_year}/{base_year+1}"
     for c in eng_clubs:
         for t_name in [c.league, "FA Cup", "EFL Cup"]:
             t = db.query(Tournament).filter_by(name=t_name).first()
             if t:
-                if not db.query(ClubTournament).filter_by(club_id=c.id, tournament_id=t.id).first():
-                    db.add(ClubTournament(club_id=c.id, tournament_id=t.id))
+                existing_ct = db.query(ClubTournament).filter_by(club_id=c.id, tournament_id=t.id, season=season_str).first()
+                if not existing_ct:
+                    db.add(ClubTournament(club_id=c.id, tournament_id=t.id, season=season_str))
     db.commit()
 
 def get_double_round_robin(clubs):
@@ -386,6 +398,8 @@ def get_double_round_robin(clubs):
 def init_db():
     db = Session(engine)
     try:
+        db.execute(text("ALTER TABLE clubs ADD COLUMN IF NOT EXISTS original_league VARCHAR;"))
+        db.execute(text("UPDATE clubs SET original_league = league WHERE original_league IS NULL;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS morale VARCHAR DEFAULT 'green';"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS fitness VARCHAR DEFAULT 'green';"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS goals INTEGER DEFAULT 0;"))
@@ -417,6 +431,9 @@ def init_db():
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_days INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS suspension_matches INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS consecutive_yellows INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS potential INTEGER DEFAULT 85;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS growth_progress INTEGER DEFAULT 0;"))
+        db.execute(text("UPDATE players SET potential = LEAST(99, overall_rating + (random() * 10)::int) WHERE potential = 85;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS has_extra_time INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_penalties INTEGER;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_penalties INTEGER;"))
@@ -598,6 +615,32 @@ def position_penalty(native_pos: str, target_pos: str, alt_positions: list) -> i
     ng = group_of(native)
     tg = group_of(target)
     return GROUP_PENALTY.get((ng, tg), 20)
+
+def recalculate_overall(player: Player) -> int:
+    pos = normalize_pos(player.position)
+    if pos == "GK":
+        ovr = int((player.gk_reflexes * 0.35) + (player.gk_handling * 0.25) + (player.gk_positioning * 0.2) + (player.gk_diving * 0.1) + (player.gk_kicking * 0.1))
+    elif pos in ["CB", "LB", "RB", "LWB", "RWB"]:
+        ovr = int((player.defending * 0.45) + (player.physicality * 0.25) + (player.pace * 0.2) + (player.passing * 0.1))
+    elif pos in ["CDM", "CM", "CAM", "LM", "RM"]:
+        ovr = int((player.passing * 0.3) + (player.dribbling * 0.2) + (player.defending * 0.2) + (player.physicality * 0.15) + (player.shooting * 0.15))
+    else:
+        ovr = int((player.shooting * 0.4) + (player.pace * 0.25) + (player.dribbling * 0.25) + (player.physicality * 0.1))
+    return max(1, min(99, ovr))
+
+def recalculate_market_value(player: Player) -> int:
+    age = player.age
+    ovr = player.overall_rating
+    pot = player.potential or ovr
+    base = (ovr ** 3) * 10
+    if age <= 21: age_mult = 2.0
+    elif age <= 24: age_mult = 1.5
+    elif age <= 27: age_mult = 1.2
+    elif age <= 30: age_mult = 0.9
+    elif age <= 33: age_mult = 0.5
+    else: age_mult = 0.2
+    pot_bonus = max(0, pot - ovr) * 100000
+    return int((base * age_mult) + pot_bonus)
 
 def apply_training_if_done(player: Player, db: Session) -> bool:
     if not player.training_program_id or not player.training_started_at: return False
@@ -884,6 +927,15 @@ def get_club_tournaments(club_id: int, season: str = None):
         
         tours = db.query(Tournament).filter(Tournament.id.in_(tids)).all()
         return [{"id": t.id, "name": t.name, "continent": t.continent, "type": t.type} for t in tours]
+    finally:
+        db.close()
+
+@app.get("/api/clubs/{club_id}/trophies")
+def get_club_trophies(club_id: int):
+    db = Session(engine)
+    try:
+        trophies = db.query(Trophy).filter_by(club_id=club_id).order_by(Trophy.season.desc()).all()
+        return [{"tournament_name": t.tournament_name, "season": t.season} for t in trophies]
     finally:
         db.close()
 
@@ -1457,8 +1509,10 @@ def reset_career_api(req: AdminActionRequest):
             db.query(Player).update({
                 Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
                 Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+                Player.injury_days: 0, Player.injury_name: None,
                 Player.fitness: "green", Player.morale: "green"
             }, synchronize_session=False)
+            db.execute(text("UPDATE clubs SET league = original_league"))
             state = db.query(GameState).first()
             if state:
                 state.current_date = "2026-08-01"
@@ -1881,11 +1935,42 @@ def simulate_match(fixture_id: int, db: Session):
     target_subs_h = random.randint(3, 5)
     target_subs_a = random.randint(3, 5)
     
+    def pick_substitute(on_pitch, bench, subs_off):
+        available_on = [p for p in on_pitch if p.id not in subs_off]
+        if not available_on or not bench: return None, None
+        out_p = random.choice(available_on)
+        out_pos = out_p.position
+        is_gk_out = "Goalkeeper" in (out_pos or "") or out_pos == "GK"
+        
+        if is_gk_out:
+            gk_bench = [p for p in bench if "Goalkeeper" in (p.position or "") or p.position == "GK"]
+            if gk_bench:
+                in_p = min(gk_bench, key=lambda p: position_penalty(p.position, out_pos, []))
+                return out_p, in_p
+            else:
+                in_p = min(bench, key=lambda p: position_penalty(p.position, "GK", []))
+                return out_p, in_p
+        
+        gk_bench_ids = {p.id for p in bench if "Goalkeeper" in (p.position or "") or p.position == "GK"}
+        field_bench = [p for p in bench if p.id not in gk_bench_ids]
+        if not field_bench:
+            return out_p, random.choice(bench)
+        
+        in_p = min(field_bench, key=lambda p: position_penalty(p.position, out_pos, []))
+        return out_p, in_p
+
     for _ in range(target_subs_h):
-        if h_subs_used >= max_subs or not h_on_pitch or not h_bench_available: break
-        out_p = random.choice([p for p in h_on_pitch if p.id not in h_subs_off])
-        if not out_p: break
-        in_p = random.choice(h_bench_available)
+        if h_subs_used >= max_subs: break
+        out_p, in_p = pick_substitute(h_on_pitch, h_bench_available, h_subs_off)
+        if not out_p or not in_p: break
+        sub_min = pick_minute(60, 85, is_sub=True)
+        add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
+        h_subs_off[out_p.id] = sub_min
+        h_subs_on[in_p.id] = sub_min
+        h_on_pitch.remove(out_p)
+        h_on_pitch.append(in_p)
+        h_bench_available.remove(in_p)
+        h_subs_used += 1
         sub_min = pick_minute(60, 85, is_sub=True)
         add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
         h_subs_off[out_p.id] = sub_min
@@ -1896,10 +1981,9 @@ def simulate_match(fixture_id: int, db: Session):
         h_subs_used += 1
         
     for _ in range(target_subs_a):
-        if a_subs_used >= max_subs or not a_on_pitch or not a_bench_available: break
-        out_p = random.choice([p for p in a_on_pitch if p.id not in a_subs_off])
-        if not out_p: break
-        in_p = random.choice(a_bench_available)
+        if a_subs_used >= max_subs: break
+        out_p, in_p = pick_substitute(a_on_pitch, a_bench_available, a_subs_off)
+        if not out_p or not in_p: break
         sub_min = pick_minute(60, 85, is_sub=True)
         add_event(sub_min, 'substitution', away.id, out_p.id, in_p.id)
         a_subs_off[out_p.id] = sub_min
@@ -2234,6 +2318,38 @@ def process_season_end(db, year):
     for c in l1_promoted: update_club_tournament(c, "EFL Championship")
     for c in l1_relegated: update_club_tournament(c, "EFL League Two")
     for c in l2_promoted: update_club_tournament(c, "EFL League One")
+    def award_trophy(club, tour_name):
+        if not club: return
+        season_str = f"{year}/{year+1}"
+        if not db.query(Trophy).filter_by(club_id=club.id, tournament_name=tour_name, season=season_str).first():
+            db.add(Trophy(club_id=club.id, tournament_name=tour_name, season=season_str))
+
+    if pl_standings: award_trophy(pl_standings[0]["club"], "Premier League")
+    if champ_standings: award_trophy(champ_standings[0]["club"], "EFL Championship")
+    if l1_standings: award_trophy(l1_standings[0]["club"], "EFL League One")
+    if l2_standings: award_trophy(l2_standings[0]["club"], "EFL League Two")
+    
+    if fa_cup:
+        fa_final = db.query(Fixture).filter_by(tournament_id=fa_cup.id, round_number=7).first()
+        if fa_final and fa_final.is_played:
+            if fa_final.home_penalties is not None:
+                fa_win_id = fa_final.home_club_id if fa_final.home_penalties > fa_final.away_penalties else fa_final.away_club_id
+            else:
+                fa_win_id = fa_final.home_club_id if (fa_final.home_goals or 0) > (fa_final.away_goals or 0) else fa_final.away_club_id
+            fa_winner = db.query(Club).get(fa_win_id)
+            award_trophy(fa_winner, "FA Cup")
+
+    carabao = db.query(Tournament).filter(Tournament.name.in_(["Carabao Cup", "EFL Cup"])).first()
+    if carabao:
+        car_final = db.query(Fixture).filter_by(tournament_id=carabao.id, round_number=8).first()
+        if car_final and car_final.is_played:
+            if car_final.home_penalties is not None:
+                car_win_id = car_final.home_club_id if car_final.home_penalties > car_final.away_penalties else car_final.away_club_id
+            else:
+                car_win_id = car_final.home_club_id if (car_final.home_goals or 0) > (car_final.away_goals or 0) else car_final.away_club_id
+            car_winner = db.query(Club).get(car_win_id)
+            award_trophy(car_winner, "EFL Cup")
+
     db.commit()
 
     fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
@@ -2318,6 +2434,41 @@ def advance_game_date(db, days_to_add):
                 WHERE fatigue > 0 OR suspension_matches > 0
             """))
             
+            if curr.weekday() == 6:
+                all_players = db.query(Player).all()
+                for p in all_players:
+                    if p.age < 24: growth_chance = 0.05
+                    elif p.age <= 29: growth_chance = 0.01
+                    else: growth_chance = -0.03
+                        
+                    if p.training_program_id:
+                        prog = db.query(TrainingProgram).filter_by(id=p.training_program_id).first()
+                        if prog:
+                            p.growth_progress = (p.growth_progress or 0) + random.randint(10, 25)
+                            if p.growth_progress >= 100:
+                                p.growth_progress = 0
+                                if prog.stat_boosts:
+                                    boosts = json.loads(prog.stat_boosts)
+                                    for stat, val in boosts.items():
+                                        if hasattr(p, stat):
+                                            setattr(p, stat, min(99, getattr(p, stat) + 1))
+                                            
+                    if p.overall_rating < (p.potential or 99) and random.random() < growth_chance:
+                        stats_pool = ["pace", "shooting", "passing", "dribbling", "defending", "physicality"]
+                        if "Goalkeeper" in p.position or p.position == "GK":
+                            stats_pool = ["gk_reflexes", "gk_handling", "gk_positioning", "gk_diving"]
+                        chosen_stat = random.choice(stats_pool)
+                        setattr(p, chosen_stat, min(99, getattr(p, chosen_stat) + 1))
+                    elif p.age > 29 and random.random() < abs(growth_chance):
+                        stats_pool = ["pace", "physicality"]
+                        chosen_stat = random.choice(stats_pool)
+                        setattr(p, chosen_stat, max(1, getattr(p, chosen_stat) - 1))
+                        
+                    new_ovr = recalculate_overall(p)
+                    if new_ovr != p.overall_rating:
+                        p.overall_rating = new_ovr
+                        p.market_value = recalculate_market_value(p)
+
             state.current_date = curr.strftime("%Y-%m-%d")
             db.commit()
             

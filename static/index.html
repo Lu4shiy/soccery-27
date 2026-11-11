@@ -335,12 +335,19 @@
             <h3>Управление клубом</h3>
             <p>Текущий клуб: <b id="account-club-name" style="color:#52a8ff;"></b></p>
             <button class="btn" id="btn-change-club" style="background-color: #a82929; margin-top: 10px;">Сменить клуб</button>
+            <button class="btn" id="btn-open-trophies" style="background-color: #e6c544; color: #1a1a1a; margin-top: 10px;">🏆 Трофеи</button>
         </div>
         
         <div id="admin-block" class="card hidden" style="border: 1px solid #a82929;">
             <h3 style="color: #a82929;">👑 Админ-панель</h3>
             <button class="btn" id="btn-admin-reset" style="background-color: #a82929;">Сбросить карьеру</button>
         </div>
+    </div>
+
+    <div id="screen-trophies" class="screen hidden">
+        <button class="btn-back" id="btn-back-from-trophies">← Назад в аккаунт</button>
+        <h2>🏆 Трофеи клуба</h2>
+        <div id="trophies-list" class="tour-list"></div>
     </div>
 
     <div id="screen-player" class="screen hidden">
@@ -1974,7 +1981,7 @@
                     const oldY = parseInt(oldDate.split("-")[0]);
                     const newY = parseInt(currentGameDate.split("-")[0]);
                     
-                    if (oldM !== newM || oldY !== newY) {
+                    if ((calMonth === oldM && calYear === oldY) && (oldM !== newM || oldY !== newY)) {
                         calMonth = newM;
                         calYear = newY;
                     }
@@ -2934,6 +2941,30 @@
                 }
             });
         };
+
+        if ($("btn-open-trophies")) $("btn-open-trophies").onclick = async function() {
+            showScreen("trophies");
+            window.scrollTo(0, 0);
+            const container = $("trophies-list");
+            container.innerHTML = "Загрузка...";
+            try {
+                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/trophies');
+                const trophies = await res.json();
+                if (trophies.length === 0) {
+                    container.innerHTML = "<p>Пока нет трофеев.</p>";
+                } else {
+                    container.innerHTML = trophies.map(t => `
+                        <div class="tour-item" style="display: flex; align-items: center;">
+                            ${getSmallLogo(currentClubName)}
+                            <span style="margin-left: 8px;">${t.tournament_name} — ${t.season}</span>
+                        </div>
+                    `).join("");
+                }
+            } catch(e) {
+                container.innerHTML = "Ошибка загрузки";
+            }
+        };
+        if ($("btn-back-from-trophies")) $("btn-back-from-trophies").onclick = function() { showScreen("account"); };
 
         if ($("btn-start")) $("btn-start").onclick = async function() {
             const hasClub = await checkManager(false);
