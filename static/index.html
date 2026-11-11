@@ -32,6 +32,7 @@
         .btn-back { background-color: transparent; color: #52a8ff; border: 1px solid #52a8ff; padding: 8px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; cursor: pointer; }
         .btn-secondary { background: #232e3c; color: #52a8ff; border: 1px solid #2f3b4d; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background-color 0.15s; }
         .btn-secondary:active { background: #2f3b4d; }
+        .btn-secondary.active { background: #52a8ff; color: #fff; border-color: #52a8ff; }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #232e3c; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); z-index: 1000; }
         .nav-item { color: #8e9eb5; text-align: center; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; padding: 4px 0; }
@@ -459,6 +460,8 @@
                 <div id="stat-assists" style="font-size: 12px; margin-bottom: 15px;"></div>
                 <h4 style="color: #52a8ff; margin-bottom: 5px;">Лучшие по средней оценке</h4>
                 <div id="stat-rating" style="font-size: 12px; margin-bottom: 15px;"></div>
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">MVP матчей</h4>
+                <div id="stat-mvps" style="font-size: 12px; margin-bottom: 15px;"></div>
                 <h4 style="color: #52a8ff; margin-bottom: 5px;">Сухие матчи (команды)</h4>
                 <div id="stat-clean-sheets" style="font-size: 12px;"></div>
             </div>
@@ -559,8 +562,14 @@
         </div>
 
         <div id="match-players-block" class="card hidden">
-            <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="loadMatchPlayers()">👥 Игроки матча</button>
-            <div id="match-players-list" style="font-size:12px;"></div>
+            <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="toggleMatchPlayers()">👥 Игроки матча</button>
+            <div id="match-players-content" class="hidden">
+                <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button class="btn-secondary" id="btn-mp-home" style="flex:1; font-size:12px; padding:8px 6px;" onclick="switchMatchPlayersTeam('home')">Дом</button>
+                    <button class="btn-secondary" id="btn-mp-away" style="flex:1; font-size:12px; padding:8px 6px;" onclick="switchMatchPlayersTeam('away')">Гости</button>
+                </div>
+                <div id="match-players-list" style="font-size:12px;"></div>
+            </div>
         </div>
 
         <div id="match-stats-block" class="card hidden">
@@ -569,6 +578,11 @@
                 <span id="stat-poss-home" style="font-weight:bold;"></span>
                 <span style="color:#8e9eb5;">Владение</span>
                 <span id="stat-poss-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-xg-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">xG</span>
+                <span id="stat-xg-away" style="font-weight:bold;"></span>
             </div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                 <span id="stat-shots-home" style="font-weight:bold;"></span>
@@ -581,6 +595,26 @@
                 <span id="stat-fouls-away" style="font-weight:bold;"></span>
             </div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-yellow-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Жёлтые карточки</span>
+                <span id="stat-yellow-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-red-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Красные карточки</span>
+                <span id="stat-red-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-freekicks-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Штрафные удары</span>
+                <span id="stat-freekicks-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-pens-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Пенальти</span>
+                <span id="stat-pens-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                 <span id="stat-corners-home" style="font-weight:bold;"></span>
                 <span style="color:#8e9eb5;">Угловые</span>
                 <span id="stat-corners-away" style="font-weight:bold;"></span>
@@ -589,6 +623,11 @@
                 <span id="stat-offsides-home" style="font-weight:bold;"></span>
                 <span style="color:#8e9eb5;">Офсайды</span>
                 <span id="stat-offsides-away" style="font-weight:bold;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span id="stat-subs-home" style="font-weight:bold;"></span>
+                <span style="color:#8e9eb5;">Замены</span>
+                <span id="stat-subs-away" style="font-weight:bold;"></span>
             </div>
         </div>
     </div>
@@ -1563,6 +1602,9 @@
 
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
                 else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+
+                if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
+                else $("stat-mvps").innerHTML = stats.mvps.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
@@ -2635,6 +2677,9 @@
                     
                     if ($("match-events-block")) $("match-events-block").classList.remove("hidden");
                     if ($("match-players-block")) $("match-players-block").classList.remove("hidden");
+                    mpData = null;
+                    mpActiveTeam = "home";
+                    if ($("match-players-content")) $("match-players-content").classList.add("hidden");
                     if ($("match-players-list")) $("match-players-list").innerHTML = "";
                     
                     const sortedEvents = m.events.slice().sort((a, b) => b.minute - a.minute);
@@ -2654,8 +2699,15 @@
                         else if (e.type === 'substitution') { icon = "🔄"; text = `Замена: <b>${e.player}</b> ➡️ <b>${e.assist}</b>`; }
                         else { text = e.type; }
                         
-                        return `<div style="display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid #2f3b4d;">
+                        let logoHtml = '<span style="display:inline-block; width:22px; flex-shrink:0;"></span>';
+                        if (e.club_id) {
+                            const clubName = e.club_id === m.home_club_id ? m.home_club : (e.club_id === m.away_club_id ? m.away_club : null);
+                            if (clubName) logoHtml = getSmallLogo(clubName);
+                        }
+                        
+                        return `<div style="display:flex; align-items:center; gap:6px; padding:4px 0; border-bottom:1px solid #2f3b4d;">
                             <span style="color:#8e9eb5; min-width:25px;">${e.minute}'</span>
+                            ${logoHtml}
                             <span>${icon}</span>
                             <span>${text}</span>
                         </div>`;
@@ -2666,14 +2718,26 @@
                     if ($("match-stats-block")) $("match-stats-block").classList.remove("hidden");
                     if ($("stat-poss-home")) $("stat-poss-home").innerText = m.home_poss + "%";
                     if ($("stat-poss-away")) $("stat-poss-away").innerText = m.away_poss + "%";
+                    if ($("stat-xg-home")) $("stat-xg-home").innerText = (m.home_xg || 0).toFixed(2);
+                    if ($("stat-xg-away")) $("stat-xg-away").innerText = (m.away_xg || 0).toFixed(2);
                     if ($("stat-shots-home")) $("stat-shots-home").innerText = m.home_shots + " (" + m.home_sot + ")";
                     if ($("stat-shots-away")) $("stat-shots-away").innerText = m.away_shots + " (" + m.away_sot + ")";
                     if ($("stat-fouls-home")) $("stat-fouls-home").innerText = m.home_fouls;
                     if ($("stat-fouls-away")) $("stat-fouls-away").innerText = m.away_fouls;
+                    if ($("stat-yellow-home")) $("stat-yellow-home").innerText = m.home_yellow || 0;
+                    if ($("stat-yellow-away")) $("stat-yellow-away").innerText = m.away_yellow || 0;
+                    if ($("stat-red-home")) $("stat-red-home").innerText = m.home_red || 0;
+                    if ($("stat-red-away")) $("stat-red-away").innerText = m.away_red || 0;
+                    if ($("stat-freekicks-home")) $("stat-freekicks-home").innerText = m.home_freekicks || 0;
+                    if ($("stat-freekicks-away")) $("stat-freekicks-away").innerText = m.away_freekicks || 0;
+                    if ($("stat-pens-home")) $("stat-pens-home").innerText = m.home_pens || 0;
+                    if ($("stat-pens-away")) $("stat-pens-away").innerText = m.away_pens || 0;
                     if ($("stat-corners-home")) $("stat-corners-home").innerText = m.home_corners;
                     if ($("stat-corners-away")) $("stat-corners-away").innerText = m.away_corners;
                     if ($("stat-offsides-home")) $("stat-offsides-home").innerText = m.home_offsides;
                     if ($("stat-offsides-away")) $("stat-offsides-away").innerText = m.away_offsides;
+                    if ($("stat-subs-home")) $("stat-subs-home").innerText = m.home_subs || 0;
+                    if ($("stat-subs-away")) $("stat-subs-away").innerText = m.away_subs || 0;
                 } else {
                     if ($("match-days-left")) {
                         const matchDate = new Date(m.date);
@@ -2689,30 +2753,75 @@
             }
         };
 
-        window.loadMatchPlayers = async function() {
-            const container = $("match-players-list");
-            if (!container) return;
-            container.innerHTML = "Загрузка...";
-            try {
-                const fxId = window.currentMatchId;
-                const res = await fetch(API_BASE + `/api/match/${fxId}/players`);
-                const players = await res.json();
-                
-                let html = "";
-                players.sort((a, b) => b.rating - a.rating).forEach(p => {
-                    const isHome = p.club_id === currentClubId;
-                    const color = p.rating >= 8 ? "#2ecc71" : p.rating >= 7 ? "#e6c544" : p.rating >= 6 ? "#fff" : "#a82929";
-                    html += `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #2f3b4d;">
-                        <span>${p.name} ${isHome ? '(Д)' : '(Г)'}</span>
-                        <div>
-                            <span style="color:#8e9eb5; margin-right:10px;">${p.minutes}'</span>
-                            <span style="color:${color}; font-weight:bold;">${p.rating}</span>
-                        </div>
-                    </div>`;
-                });
-                container.innerHTML = html;
-            } catch(e) {
-                container.innerHTML = "Ошибка загрузки";
+        let mpData = null;
+        let mpActiveTeam = "home";
+
+        function getRatingColor(r) {
+            if (r >= 10.0) return "#52a8ff";
+            if (r >= 9.0) return "#00e5ff";
+            if (r >= 8.0) return "#2ecc71";
+            if (r >= 6.5) return "#e6c544";
+            if (r >= 5.5) return "#e67e22";
+            if (r >= 4.0) return "#e74c3c";
+            return "#8b0000";
+        }
+
+        function getMvpStarSvg() {
+            return '<svg width="13" height="13" viewBox="0 0 24 24" style="margin-left:6px; vertical-align:middle;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#e6c544"/></svg>';
+        }
+
+        function renderMatchPlayersList() {
+            if (!mpData) return;
+            const list = $("match-players-list");
+            if (!list) return;
+            
+            if ($("btn-mp-home")) $("btn-mp-home").innerText = mpData.home_name || "Дом";
+            if ($("btn-mp-away")) $("btn-mp-away").innerText = mpData.away_name || "Гости";
+            if ($("btn-mp-home")) $("btn-mp-home").classList.toggle("active", mpActiveTeam === "home");
+            if ($("btn-mp-away")) $("btn-mp-away").classList.toggle("active", mpActiveTeam === "away");
+            
+            const players = mpActiveTeam === "home" ? (mpData.home || []) : (mpData.away || []);
+            
+            list.innerHTML = players.map(p => {
+                const color = getRatingColor(p.rating);
+                const mvp = p.is_mvp ? getMvpStarSvg() : '';
+                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #2f3b4d;">
+                    <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span>${mvp}</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="color:#8e9eb5; font-size:11px;">${p.minutes}'</span>
+                        <span style="background:${color}; color:#fff; font-weight:bold; padding:2px 8px; border-radius:4px; min-width:40px; text-align:center; font-size:12px;">${p.rating.toFixed(1)}</span>
+                    </div>
+                </div>`;
+            }).join("");
+        }
+
+        window.switchMatchPlayersTeam = function(team) {
+            mpActiveTeam = team;
+            renderMatchPlayersList();
+        };
+
+        window.toggleMatchPlayers = async function() {
+            const content = $("match-players-content");
+            if (!content) return;
+            if (content.classList.contains("hidden")) {
+                content.classList.remove("hidden");
+                if (!mpData) {
+                    const list = $("match-players-list");
+                    if (list) list.innerHTML = "Загрузка...";
+                    try {
+                        const fxId = window.currentMatchId;
+                        const res = await fetch(API_BASE + `/api/match/${fxId}/players`);
+                        mpData = await res.json();
+                        mpActiveTeam = "home";
+                        renderMatchPlayersList();
+                    } catch(e) {
+                        if (list) list.innerHTML = "Ошибка загрузки";
+                    }
+                } else {
+                    renderMatchPlayersList();
+                }
+            } else {
+                content.classList.add("hidden");
             }
         };
 

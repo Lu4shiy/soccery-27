@@ -101,6 +101,10 @@ class Fixture(Base):
     away_corners = Column(Integer, default=0)
     home_offsides = Column(Integer, default=0)
     away_offsides = Column(Integer, default=0)
+    home_xg = Column(Float, default=0.0)
+    away_xg = Column(Float, default=0.0)
+    home_freekicks = Column(Integer, default=0)
+    away_freekicks = Column(Integer, default=0)
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
@@ -120,6 +124,7 @@ class MatchPlayerStats(Base):
     club_id = Column(Integer, ForeignKey("clubs.id"))
     minutes_played = Column(Integer, default=0)
     rating = Column(Float, default=6.0)
+    is_mvp = Column(Integer, default=0)
 
 class Manager(Base):
     __tablename__ = "managers"
@@ -241,6 +246,11 @@ def init_db():
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_offsides INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_offsides INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE game_state ADD COLUMN IF NOT EXISTS last_month_advance_at TIMESTAMP DEFAULT NOW();"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_xg FLOAT DEFAULT 0.0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_xg FLOAT DEFAULT 0.0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_freekicks INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_freekicks INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE match_player_stats ADD COLUMN IF NOT EXISTS is_mvp INTEGER DEFAULT 0;"))
         db.commit()
         
         if not db.query(GameState).first():
@@ -929,16 +939,42 @@ def get_standings(tournament_id: int):
 def get_match_players(fixture_id: int):
     db = Session(engine)
     try:
+        fx = db.query(Fixture).filter_by(id=fixture_id).first()
+        if not fx:
+            return {"home": [], "away": [], "home_name": "", "away_name": "", "home_club_id": None, "away_club_id": None}
+        
+        home = db.query(Club).filter_by(id=fx.home_club_id).first()
+        away = db.query(Club).filter_by(id=fx.away_club_id).first()
+        
         stats = db.query(MatchPlayerStats).filter_by(fixture_id=fixture_id).all()
-        res = []
+        home_players = []
+        away_players = []
         for s in stats:
             p = db.query(Player).filter_by(id=s.player_id).first()
-            if p:
-                res.append({
-                    "name": p.name, "club_id": s.club_id,
-                    "minutes": s.minutes_played, "rating": round(s.rating, 1)
-                })
-        return res
+            if not p: continue
+            entry = {
+                "name": p.name,
+                "position": p.position,
+                "minutes": s.minutes_played,
+                "rating": round(s.rating, 1),
+                "is_mvp": bool(s.is_mvp)
+            }
+            if s.club_id == fx.home_club_id:
+                home_players.append(entry)
+            else:
+                away_players.append(entry)
+        
+        home_players.sort(key=lambda x: -x["rating"])
+        away_players.sort(key=lambda x: -x["rating"])
+        
+        return {
+            "home": home_players,
+            "away": away_players,
+            "home_name": home.name if home else "TBD",
+            "away_name": away.name if away else "TBD",
+            "home_club_id": fx.home_club_id,
+            "away_club_id": fx.away_club_id
+        }
     finally:
         db.close()
 
@@ -990,6 +1026,18 @@ def get_stats(tournament_id: int):
             if p:
                 club = db.query(Club).filter_by(id=p.club_id).first()
                 avg_ratings.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": round(avg_r, 2)})
+        
+        mvp_q = db.query(MatchPlayerStats.player_id, func.count(MatchPlayerStats.id)).filter(
+            MatchPlayerStats.fixture_id.in_(fx_ids),
+            MatchPlayerStats.is_mvp == 1
+        ).group_by(MatchPlayerStats.player_id).order_by(func.count(MatchPlayerStats.id).desc()).limit(10).all()
+        
+        mvps = []
+        for pid, count in mvp_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                mvps.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
             
         cs_dict = {}
         for f in fixtures:
@@ -1002,7 +1050,7 @@ def get_stats(tournament_id: int):
             if c: clean_sheets.append({"team": c.name, "val": count})
         clean_sheets.sort(key=lambda x: x["val"], reverse=True)
 
-        return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "clean_sheets": clean_sheets[:10]}
+        return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "mvps": mvps, "clean_sheets": clean_sheets[:10]}
     finally:
         db.close()
 
@@ -1308,6 +1356,27 @@ def simulate_match(fixture_id: int, db: Session):
     
     h_goals, a_goals = 0, 0
     events = []
+    used_by_any = set()
+    used_by_non_sub = set()
+    match_goals = {}
+    match_assists = {}
+    
+    def pick_minute(lo=1, hi=90, is_sub=False):
+        if is_sub:
+            available = [m for m in range(lo, hi+1) if m not in used_by_non_sub]
+            if not available:
+                m = random.randint(lo, hi)
+            else:
+                m = random.choice(available)
+            used_by_any.add(m)
+            return m
+        available = [m for m in range(lo, hi+1) if m not in used_by_any]
+        if not available:
+            return random.randint(lo, hi)
+        m = random.choice(available)
+        used_by_any.add(m)
+        used_by_non_sub.add(m)
+        return m
     
     def add_event(minute, e_type, club_id, p_id=None, a_id=None):
         events.append(MatchEvent(fixture_id=fx.id, minute=minute, event_type=e_type, club_id=club_id, player_id=p_id, assist_id=a_id))
@@ -1316,6 +1385,7 @@ def simulate_match(fixture_id: int, db: Session):
     add_event(45, "half_end", None)
     add_event(46, "second_half", None)
     add_event(90, "end", None)
+    used_by_any.update([0, 45, 46, 90])
 
     total_shots_h = max(2, int((h_att - a_def) * 1.5) + 10)
     total_shots_a = max(2, int((a_att - h_def) * 1.5) + 8)
@@ -1329,62 +1399,99 @@ def simulate_match(fixture_id: int, db: Session):
     for _ in range(total_shots_h):
         if random.random() < 0.4:
             h_sot += 1
-            minute = random.randint(1, 90)
             if random.random() < 0.35:
                 h_goals += 1
+                minute = pick_minute()
                 scorer = random.choice(h_players)
                 assist = random.choice([p for p in h_players if p.id != scorer.id]) if random.random() < 0.65 else None
                 add_event(minute, 'goal', home.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
-                if assist: assist.assists = (assist.assists or 0) + 1
+                match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
+                if assist:
+                    assist.assists = (assist.assists or 0) + 1
+                    match_assists[assist.id] = match_assists.get(assist.id, 0) + 1
                 
     for _ in range(total_shots_a):
         if random.random() < 0.4:
             a_sot += 1
-            minute = random.randint(1, 90)
             if random.random() < 0.30:
                 a_goals += 1
+                minute = pick_minute()
                 scorer = random.choice(a_players)
                 assist = random.choice([p for p in a_players if p.id != scorer.id]) if random.random() < 0.65 else None
                 add_event(minute, 'goal', away.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
-                if assist: assist.assists = (assist.assists or 0) + 1
+                match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
+                if assist:
+                    assist.assists = (assist.assists or 0) + 1
+                    match_assists[assist.id] = match_assists.get(assist.id, 0) + 1
 
     if random.random() < 0.2:
         side = home.id if random.random() < 0.5 else away.id
         players_list = h_players if side == home.id else a_players
         if players_list:
             scorer = random.choice(players_list)
-            minute = random.randint(1, 90)
+            minute = pick_minute()
             is_goal = random.random() < 0.7
             add_event(minute, 'penalty_goal' if is_goal else 'penalty_miss', side, scorer.id)
             if is_goal:
                 if side == home.id: h_goals += 1
                 else: a_goals += 1
                 scorer.goals = (scorer.goals or 0) + 1
+                match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
 
     for _ in range(random.randint(1, 4)):
         side = home.id if random.random() < 0.5 else away.id
         p = random.choice(h_players if side == home.id else a_players)
-        add_event(random.randint(10, 85), 'yellow_card', side, p.id)
+        add_event(pick_minute(10, 85), 'yellow_card', side, p.id)
         
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
         p = random.choice(h_players if side == home.id else a_players)
-        add_event(random.randint(20, 80), 'red_card', side, p.id)
+        add_event(pick_minute(20, 80), 'red_card', side, p.id)
         
     for _ in range(random.randint(3, 5)):
         side = home.id if random.random() < 0.5 else away.id
         out_p = random.choice(h_players if side == home.id else a_players)
         in_p = db.query(Player).filter(Player.club_id == side, Player.id != out_p.id).first()
-        add_event(random.randint(60, 85), 'substitution', side, out_p.id, in_p.id if in_p else None)
+        add_event(pick_minute(60, 85, is_sub=True), 'substitution', side, out_p.id, in_p.id if in_p else None)
 
+    all_player_data = []
     for p in h_xi + a_xi:
         p.matches_played = (p.matches_played or 0) + 1
         p.fatigue = min(100, (p.fatigue or 0) + random.randint(20, 35))
         
-        base_rating = 6.0 + random.uniform(-0.5, 0.5)
-        mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=90, rating=base_rating)
+        p_goals = match_goals.get(p.id, 0)
+        p_assists = match_assists.get(p.id, 0)
+        
+        rating = random.gauss(6.1, 1.05)
+        rating += p_goals * 0.85 + p_assists * 0.45
+        
+        is_home = (p.club_id == home.id)
+        conceded = a_goals if is_home else h_goals
+        is_gk = "Goalkeeper" in (p.position or "") or p.position == "GK"
+        
+        if is_gk:
+            if conceded == 0:
+                rating += 0.8
+            if conceded >= 3:
+                rating -= 0.5
+        else:
+            if conceded == 0:
+                rating += 0.25
+        
+        rating = round(max(1.0, min(10.0, rating)), 1)
+        all_player_data.append((p, rating))
+
+    mvp_player = None
+    if all_player_data:
+        max_r = max(r for _, r in all_player_data)
+        mvp_candidates = [p for p, r in all_player_data if r == max_r]
+        mvp_player = random.choice(mvp_candidates)
+
+    for p, rating in all_player_data:
+        is_mvp = 1 if (mvp_player and p.id == mvp_player.id) else 0
+        mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=90, rating=rating, is_mvp=is_mvp)
         db.add(mp_stat)
         
     if h_goals > a_goals:
@@ -1409,6 +1516,10 @@ def simulate_match(fixture_id: int, db: Session):
     fx.away_corners = random.randint(2, 10)
     fx.home_offsides = random.randint(0, 4)
     fx.away_offsides = random.randint(0, 4)
+    fx.home_xg = round(h_sot * random.uniform(0.1, 0.4) + h_goals * 0.15, 2)
+    fx.away_xg = round(a_sot * random.uniform(0.1, 0.4) + a_goals * 0.15, 2)
+    fx.home_freekicks = random.randint(5, 18)
+    fx.away_freekicks = random.randint(5, 18)
     
     for ev in events: db.add(ev)
     db.flush()
@@ -1530,6 +1641,15 @@ def get_match_details(fixture_id: int):
                 "player": p.name if p else "", "assist": a.name if a else ""
             })
             
+        h_yellow = sum(1 for e in events if e.event_type == 'yellow_card' and e.club_id == fx.home_club_id)
+        a_yellow = sum(1 for e in events if e.event_type == 'yellow_card' and e.club_id == fx.away_club_id)
+        h_red = sum(1 for e in events if e.event_type == 'red_card' and e.club_id == fx.home_club_id)
+        a_red = sum(1 for e in events if e.event_type == 'red_card' and e.club_id == fx.away_club_id)
+        h_subs = sum(1 for e in events if e.event_type == 'substitution' and e.club_id == fx.home_club_id)
+        a_subs = sum(1 for e in events if e.event_type == 'substitution' and e.club_id == fx.away_club_id)
+        h_pens = sum(1 for e in events if e.event_type in ('penalty_goal', 'penalty_miss') and e.club_id == fx.home_club_id)
+        a_pens = sum(1 for e in events if e.event_type in ('penalty_goal', 'penalty_miss') and e.club_id == fx.away_club_id)
+        
         return {
             "id": fx.id, "date": fx.date, "is_played": bool(fx.is_played),
             "home_club": home.name if home else "TBD", "away_club": away.name if away else "TBD",
@@ -1541,6 +1661,12 @@ def get_match_details(fixture_id: int):
             "home_fouls": fx.home_fouls, "away_fouls": fx.away_fouls,
             "home_corners": fx.home_corners, "away_corners": fx.away_corners,
             "home_offsides": fx.home_offsides, "away_offsides": fx.away_offsides,
+            "home_xg": fx.home_xg or 0.0, "away_xg": fx.away_xg or 0.0,
+            "home_freekicks": fx.home_freekicks or 0, "away_freekicks": fx.away_freekicks or 0,
+            "home_yellow": h_yellow, "away_yellow": a_yellow,
+            "home_red": h_red, "away_red": a_red,
+            "home_subs": h_subs, "away_subs": a_subs,
+            "home_pens": h_pens, "away_pens": a_pens,
             "tournament": tour.name if tour else "",
             "events": events_data
         }
