@@ -317,7 +317,6 @@ def init_db():
             db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
             db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
             db.query(Fixture).filter(Fixture.id.in_(old_fixture_ids)).delete(synchronize_session=False)
-        db.commit()
 
         if True:
             eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
@@ -1089,6 +1088,7 @@ def reset_game(req: dict):
                 state.current_date = "2026-08-01"
                 state.last_month_advance_at = datetime.utcnow()
             db.commit()
+            init_db()
             return {"status": "ok"}
         finally:
             db.close()
@@ -1184,6 +1184,7 @@ def reset_career_api(req: AdminActionRequest):
                 state.season = "2026/27"
                 state.last_month_advance_at = datetime.utcnow()
             db.commit()
+            init_db()
             return {"status": "ok"}
         except Exception as e:
             db.rollback()
@@ -1428,22 +1429,22 @@ def advance_game_date(db, days_to_add):
                 except Exception as e:
                     print(f"Match simulation failed for fixture {fx.id}: {e}")
             
-        db.execute(text("""
-            UPDATE players
-            SET fatigue = GREATEST(0, fatigue - 15),
-                fitness = CASE
-                    WHEN GREATEST(0, fatigue - 15) > 80 THEN 'red'
-                    WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
-                    WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
-                    ELSE 'green'
-                END
-            WHERE fatigue > 0
-        """))
+            db.execute(text("""
+                UPDATE players
+                SET fatigue = GREATEST(0, fatigue - 15),
+                    fitness = CASE
+                        WHEN GREATEST(0, fatigue - 15) > 80 THEN 'red'
+                        WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
+                        WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
+                        ELSE 'green'
+                    END
+                WHERE fatigue > 0
+            """))
             
-    state.current_date = curr.strftime("%Y-%m-%d")
-    state.last_month_advance_at = datetime.utcnow()
-    db.commit()
-    return state.current_date
+        state.current_date = curr.strftime("%Y-%m-%d")
+        state.last_month_advance_at = datetime.utcnow()
+        db.commit()
+        return state.current_date
 
 @app.post("/api/admin/advance-month")
 def advance_month(req: dict):
@@ -1677,6 +1678,7 @@ async def cmd_admin_reset(message: types.Message):
                 state.last_month_advance_at = datetime.utcnow()
                 
             db.commit()
+            init_db()
             await message.answer("💥 Карьера полностью сброшена! Время вернулось на 01.08.2026.")
         except Exception as e:
             db.rollback()
