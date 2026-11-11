@@ -288,10 +288,25 @@ def init_db():
                     if t4: db.add(ClubTournament(club_id=club.id, tournament_id=t4.id))
             db.commit()
 
-        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "FA Community Shield"]
+        # Слить Carabao Cup → EFL Cup, если существуют оба
+        carabao_old = db.query(Tournament).filter_by(name="Carabao Cup").first()
+        carabao_new = db.query(Tournament).filter_by(name="EFL Cup").first()
+        if carabao_old and carabao_new:
+            old_fix = [r[0] for r in db.query(Fixture.id).filter(Fixture.tournament_id == carabao_old.id).all()]
+            if old_fix:
+                db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fix)).delete(synchronize_session=False)
+                db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fix)).delete(synchronize_session=False)
+                db.query(Fixture).filter(Fixture.id.in_(old_fix)).delete(synchronize_session=False)
+            db.query(ClubTournament).filter(ClubTournament.tournament_id == carabao_old.id).update({ClubTournament.tournament_id: carabao_new.id}, synchronize_session=False)
+            db.delete(carabao_old)
+            db.commit()
+        elif carabao_old:
+            carabao_old.name = "EFL Cup"
+            db.commit()
+
+        eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", "FA Cup", "Carabao Cup", "EFL Cup", "FA Community Shield"]
         t_ids = [t.id for t in db.query(Tournament).filter(Tournament.name.in_(eng_leagues)).all()]
 
-        # Сначала удаляем зависимые записи, иначе PostgreSQL не даст удалить Fixture
         old_fixture_ids = [
             row[0] for row in db.query(Fixture.id).filter(Fixture.tournament_id.in_(t_ids)).all()
         ]
@@ -390,7 +405,9 @@ def init_db():
                     db.commit()
 
     except Exception as e:
+        import traceback
         print("DB Init Error:", e)
+        traceback.print_exc()
         db.rollback()
     finally:
         db.close()
@@ -738,29 +755,40 @@ def get_club_tournaments(club_id: int):
         db.close()
 
 def maybe_auto_advance_month(db):
-    state = db.query(GameState).first()
-    if not state: return
-    now = datetime.utcnow()
-    if state.last_month_advance_at is None:
+    try:
+        state = db.query(GameState).first()
+        if not state: return
+        now = datetime.utcnow()
+        if state.last_month_advance_at is None:
+            state.last_month_advance_at = now
+            db.commit()
+            return
+        try:
+            elapsed = (now - state.last_month_advance_at).total_seconds()
+        except Exception:
+            state.last_month_advance_at = now
+            db.commit()
+            return
+        months = int(elapsed // (8 * 3600))
+        if months <= 0: return
+        # Сбрасываем таймер СРАЗУ, чтобы не зацикливаться при ошибке
         state.last_month_advance_at = now
         db.commit()
-        return
-    elapsed = (now - state.last_month_advance_at).total_seconds()
-    months = int(elapsed // (8 * 3600))
-    if months <= 0: return
-    for _ in range(months):
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        last_day = calendar.monthrange(curr.year, curr.month)[1]
-        if curr.day == last_day:
-            if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
-            else: next_month = date(curr.year, curr.month + 1, 1)
-            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
-            new_date = date(next_month.year, next_month.month, next_month_last_day)
-        else:
-            new_date = date(curr.year, curr.month, last_day)
-        advance_game_date(db, (new_date - curr).days)
-    state.last_month_advance_at = now
-    db.commit()
+        try:
+            curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+            last_day = calendar.monthrange(curr.year, curr.month)[1]
+            if curr.day == last_day:
+                if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
+                else: next_month = date(curr.year, curr.month + 1, 1)
+                next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+                new_date = date(next_month.year, next_month.month, next_month_last_day)
+            else:
+                new_date = date(curr.year, curr.month, last_day)
+            advance_game_date(db, (new_date - curr).days)
+        except Exception as e:
+            print("Auto-advance failed:", e)
+    except Exception as e:
+        print("maybe_auto_advance_month error:", e)
 
 @app.get("/api/game/time")
 def get_game_time():
@@ -1166,6 +1194,8 @@ def simulate_match(fixture_id: int, db: Session):
     
     h_players = [p for p in h_xi if "Goalkeeper" not in p.position]
     a_players = [p for p in a_xi if "Goalkeeper" not in p.position]
+    if not h_players or not a_players:
+        return
     
     for _ in range(total_shots_h):
         if random.random() < 0.4:
@@ -1211,7 +1241,7 @@ def simulate_match(fixture_id: int, db: Session):
     for _ in range(random.randint(3, 5)):
         side = home.id if random.random() < 0.5 else away.id
         out_p = random.choice(h_players if side == home.id else a_players)
-        in_p = db.query(Player).filter_by(club_id=side).first()
+        in_p = db.query(Player).filter(Player.club_id == side, Player.id != out_p.id).first()
         add_event(random.randint(60, 85), 'substitution', side, out_p.id, in_p.id if in_p else None)
 
     for p in h_xi + a_xi:
@@ -1261,7 +1291,10 @@ def advance_game_date(db, days_to_add):
         
         fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
         for fx in fixtures:
-            simulate_match(fx.id, db)
+            try:
+                simulate_match(fx.id, db)
+            except Exception as e:
+                print(f"Match simulation failed for fixture {fx.id}: {e}")
             
         players = db.query(Player).all()
         for p in players:
@@ -1353,6 +1386,7 @@ def get_match_details(fixture_id: int):
         return {
             "id": fx.id, "date": fx.date, "is_played": bool(fx.is_played),
             "home_club": home.name if home else "TBD", "away_club": away.name if away else "TBD",
+            "home_club_id": fx.home_club_id, "away_club_id": fx.away_club_id,
             "home_goals": fx.home_goals, "away_goals": fx.away_goals,
             "home_poss": fx.home_poss, "away_poss": fx.away_poss,
             "home_shots": fx.home_shots, "away_shots": fx.away_shots,

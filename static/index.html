@@ -413,9 +413,9 @@
             <button class="btn-back" id="btn-back-to-sc">← Назад в спортцентр</button>
             <div class="card">
                 <div class="calendar-header">
-                    <button class="btn-secondary" id="btn-prev-month">◀</button>
+                    <button class="btn-secondary" id="btn-prev-month" onclick="window.calPrevMonth && window.calPrevMonth()">◀</button>
                     <span class="calendar-title" id="cal-title">Август 2026</span>
-                    <button class="btn-secondary" id="btn-next-month">▶</button>
+                    <button class="btn-secondary" id="btn-next-month" onclick="window.calNextMonth && window.calNextMonth()">▶</button>
                 </div>
                 <div style="display: flex; gap: 10px; font-size: 10px; justify-content: center; margin-bottom: 10px;">
                     <span style="color: #52a8ff;">■ Матч</span>
@@ -1336,19 +1336,17 @@
             if ($("center-schedule")) $("center-schedule").classList.add("hidden");
         };
 
-        if ($("btn-prev-month")) $("btn-prev-month").addEventListener("click", function(e) {
-            e.preventDefault();
+        window.calPrevMonth = function() {
             calMonth--;
             if (calMonth < 1) { calMonth = 12; calYear--; }
             renderCalendar();
-        });
+        };
 
-        if ($("btn-next-month")) $("btn-next-month").addEventListener("click", function(e) {
-            e.preventDefault();
+        window.calNextMonth = function() {
             calMonth++;
             if (calMonth > 12) { calMonth = 1; calYear++; }
             renderCalendar();
-        });
+        };
 
         async function renderCalendar() {
             const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -2278,6 +2276,14 @@
                 markDirty();
             } else if (selectedBenchPlayerId === playerId) {
                 selectedBenchPlayerId = null;
+            } else if (selectedBenchPlayerId !== null && tacticsState.bench.indexOf(selectedBenchPlayerId) < 0 && tacticsState.starting_xi.indexOf(selectedBenchPlayerId) < 0) {
+                // Резервист выбран, кликнули запасного → свап
+                const benchIdx = tacticsState.bench.indexOf(playerId);
+                if (benchIdx >= 0) {
+                    tacticsState.bench[benchIdx] = selectedBenchPlayerId;
+                }
+                selectedBenchPlayerId = null;
+                markDirty();
             } else {
                 selectedBenchPlayerId = playerId;
             }
@@ -2287,7 +2293,13 @@
 
         function onReservePlayerClick(playerId) {
             if (tacticsState.bench.length >= benchTargetSize) {
-                tg.showAlert("Скамейка заполнена (максимум " + benchTargetSize + "). Сначала уберите кого-то в резерв.");
+                // Скамейка заполнена — подсвечиваем игрока для свапа
+                if (selectedBenchPlayerId === playerId) {
+                    selectedBenchPlayerId = null;
+                } else {
+                    selectedBenchPlayerId = playerId;
+                }
+                renderTactics();
                 return;
             }
             tacticsState.bench.push(playerId);
@@ -2541,7 +2553,7 @@
                 if ($("match-date")) $("match-date").innerText = m.date;
                 
                 if (m.is_played) {
-                    const isHome = (m.home_club === currentClubName);
+                    const isHome = (m.home_club_id === currentClubId);
                     const yourGoals = isHome ? m.home_goals : m.away_goals;
                     const oppGoals = isHome ? m.away_goals : m.home_goals;
                     
