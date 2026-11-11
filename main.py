@@ -823,6 +823,15 @@ def get_schedule(year: int, month: int, club_id: int = None):
                 Fixture.date <= end_str,
                 (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id)
             ).all()
+        
+        _club_ids = set()
+        _tour_ids = set()
+        for f in fixtures:
+            _club_ids.add(f.home_club_id)
+            _club_ids.add(f.away_club_id)
+            _tour_ids.add(f.tournament_id)
+        _clubs_map = {c.id: c for c in db.query(Club).filter(Club.id.in_(_club_ids)).all()} if _club_ids else {}
+        _tours_map = {t.id: t for t in db.query(Tournament).filter(Tournament.id.in_(_tour_ids)).all()} if _tour_ids else {}
             
         fixture_map = {f.date: f for f in fixtures}
         
@@ -842,10 +851,10 @@ def get_schedule(year: int, month: int, club_id: int = None):
             
             if date_str in fixture_map:
                 f = fixture_map[date_str]
-                tour = db.query(Tournament).filter_by(id=f.tournament_id).first()
+                tour = _tours_map.get(f.tournament_id)
                 is_home = (f.home_club_id == club_id)
                 opp_id = f.away_club_id if is_home else f.home_club_id
-                opp = db.query(Club).filter_by(id=opp_id).first()
+                opp = _clubs_map.get(opp_id)
                 
                 entry = {
                     "date": date_str, "type": "match", "fixture_id": f.id,
@@ -998,14 +1007,20 @@ def get_bracket(tournament_id: int):
         fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id).order_by(Fixture.round_number, Fixture.match_index, Fixture.leg).all()
         if not fixtures:
             return {"type": tour.type, "rounds": []}
+        
+        _club_ids = set()
+        for f in fixtures:
+            _club_ids.add(f.home_club_id)
+            _club_ids.add(f.away_club_id)
+        _clubs_map = {c.id: c for c in db.query(Club).filter(Club.id.in_(_club_ids)).all()} if _club_ids else {}
             
         rounds_dict = {}
         for f in fixtures:
             if f.round_number not in rounds_dict:
                 rounds_dict[f.round_number] = []
                 
-            h = db.query(Club).filter_by(id=f.home_club_id).first()
-            a = db.query(Club).filter_by(id=f.away_club_id).first()
+            h = _clubs_map.get(f.home_club_id)
+            a = _clubs_map.get(f.away_club_id)
             
             rounds_dict[f.round_number].append({
                 "id": f.id,
@@ -1374,10 +1389,15 @@ def get_match_details(fixture_id: int):
         tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
         
         events = db.query(MatchEvent).filter_by(fixture_id=fx.id).order_by(MatchEvent.minute).all()
+        _pids = set()
+        for e in events:
+            if e.player_id: _pids.add(e.player_id)
+            if e.assist_id: _pids.add(e.assist_id)
+        _players_map = {p.id: p for p in db.query(Player).filter(Player.id.in_(_pids)).all()} if _pids else {}
         events_data = []
         for e in events:
-            p = db.query(Player).filter_by(id=e.player_id).first()
-            a = db.query(Player).filter_by(id=e.assist_id).first() if e.assist_id else None
+            p = _players_map.get(e.player_id)
+            a = _players_map.get(e.assist_id) if e.assist_id else None
             events_data.append({
                 "minute": e.minute, "type": e.event_type, "club_id": e.club_id,
                 "player": p.name if p else "", "assist": a.name if a else ""
@@ -1405,9 +1425,13 @@ async def cmd_admin_day(message: types.Message):
     if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
         await message.answer("⛔ У вас нет прав.")
         return
-    db = Session(engine)
-    new_date = advance_game_date(db, 1)
-    db.close()
+    def do_work():
+        db = Session(engine)
+        try:
+            return advance_game_date(db, 1)
+        finally:
+            db.close()
+    new_date = await asyncio.to_thread(do_work)
     await message.answer(f"⏩ Промотан 1 день. Дата: {new_date}")
 
 @dp.message(Command("week"))
@@ -1415,39 +1439,52 @@ async def cmd_admin_week(message: types.Message):
     if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
         await message.answer("⛔ У вас нет прав.")
         return
-    db = Session(engine)
-    state = db.query(GameState).first()
-    if state:
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        days_to_sunday = 6 - curr.weekday()
-        if days_to_sunday == 0: days_to_sunday = 7
-        new_date = advance_game_date(db, days_to_sunday)
+    def do_work():
+        db = Session(engine)
+        try:
+            state = db.query(GameState).first()
+            if not state: return None
+            curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+            days_to_sunday = 6 - curr.weekday()
+            if days_to_sunday == 0: days_to_sunday = 7
+            return advance_game_date(db, days_to_sunday)
+        finally:
+            db.close()
+    new_date = await asyncio.to_thread(do_work)
+    if new_date:
         await message.answer(f"⏩ Промотано до конца недели. Дата: {new_date}")
-    db.close()
+    else:
+        await message.answer("❌ Ошибка: состояние игры не найдено")
 
 @dp.message(Command("month"))
 async def cmd_admin_month(message: types.Message):
     if str(message.from_user.id) != ADMIN_TELEGRAM_ID:
         await message.answer("⛔ У вас нет прав.")
         return
-    db = Session(engine)
-    state = db.query(GameState).first()
-    if state:
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        last_day = calendar.monthrange(curr.year, curr.month)[1]
-        
-        if curr.day == last_day:
-            if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
-            else: next_month = date(curr.year, curr.month + 1, 1)
-            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
-            new_date = date(next_month.year, next_month.month, next_month_last_day)
-        else:
-            new_date = date(curr.year, curr.month, last_day)
-            
-        delta_days = (new_date - curr).days
-        new_date_str = advance_game_date(db, delta_days)
+    def do_work():
+        db = Session(engine)
+        try:
+            state = db.query(GameState).first()
+            if not state: return None
+            curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+            last_day = calendar.monthrange(curr.year, curr.month)[1]
+            if curr.day == last_day:
+                if curr.month == 12: next_month = date(curr.year + 1, 1, 1)
+                else: next_month = date(curr.year, curr.month + 1, 1)
+                next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+                new_date = date(next_month.year, next_month.month, next_month_last_day)
+            else:
+                new_date = date(curr.year, curr.month, last_day)
+            delta_days = (new_date - curr).days
+            return advance_game_date(db, delta_days)
+        finally:
+            db.close()
+    await message.answer("⏳ Промотка...")
+    new_date_str = await asyncio.to_thread(do_work)
+    if new_date_str:
         await message.answer(f"⏩ Промотан месяц. Дата: {new_date_str}")
-    db.close()
+    else:
+        await message.answer("❌ Ошибка: состояние игры не найдено")
 
 @dp.message(Command("date"))
 async def cmd_admin_date(message: types.Message, command: CommandObject):
@@ -1458,24 +1495,27 @@ async def cmd_admin_date(message: types.Message, command: CommandObject):
         await message.answer("⚠️ Укажите дату: /date 2026-09-15")
         return
     try:
-        new_date = datetime.strptime(command.args.strip(), "%Y-%m-%d").date()
+        target = datetime.strptime(command.args.strip(), "%Y-%m-%d").date()
     except ValueError:
         await message.answer("⚠️ Неверный формат. Используйте ГГГГ-ММ-ДД.")
         return
-    
-    db = Session(engine)
-    state = db.query(GameState).first()
-    if state:
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        if new_date < curr:
-            await message.answer("⚠️ Нельзя промотать время назад.")
+    def do_work():
+        db = Session(engine)
+        try:
+            state = db.query(GameState).first()
+            if not state: return None
+            curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+            if target < curr: return "past"
+            return advance_game_date(db, (target - curr).days)
+        finally:
             db.close()
-            return
-        
-        delta_days = (new_date - curr).days
-        new_date_str = advance_game_date(db, delta_days)
-        await message.answer(f"⏩ Установлена дата: {new_date_str}")
-    db.close()
+    result = await asyncio.to_thread(do_work)
+    if result == "past":
+        await message.answer("⚠️ Нельзя промотать время назад.")
+    elif result:
+        await message.answer(f"⏩ Установлена дата: {result}")
+    else:
+        await message.answer("❌ Ошибка")
 
 @dp.message(Command("reset"))
 async def cmd_admin_reset(message: types.Message):
@@ -1512,7 +1552,14 @@ async def cmd_admin_reset(message: types.Message):
         db.close()
 
 async def start_bot():
-    await dp.start_polling(bot)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception as e:
+        print("delete_webhook error:", e)
+    try:
+        await dp.start_polling(bot, drop_pending_updates=True)
+    except Exception as e:
+        print("start_polling error:", e)
 
 @app.on_event("startup")
 async def on_startup():
