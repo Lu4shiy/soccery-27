@@ -339,11 +339,6 @@
         
         <div id="admin-block" class="card hidden" style="border: 1px solid #a82929;">
             <h3 style="color: #a82929;">👑 Админ-панель</h3>
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button class="btn" id="btn-admin-day" style="background-color: #3498db;">+1 день</button>
-                <button class="btn" id="btn-admin-week" style="background-color: #f39c12;">+1 неделя</button>
-                <button class="btn" id="btn-admin-month" style="background-color: #e67e22;">+1 месяц</button>
-            </div>
             <button class="btn" id="btn-admin-reset" style="background-color: #a82929;">Сбросить карьеру</button>
         </div>
     </div>
@@ -1522,10 +1517,46 @@
                         cls += " rest";
                     }
                     
-                    html += `<div class="${cls}">${inner}</div>`;
+                    html += `<div class="${cls}" data-date="${d.date}">${inner}</div>`;
                 });
                 
                 container.innerHTML = html;
+
+                let pressTimer;
+                const daysElements = container.querySelectorAll('.cal-day');
+                daysElements.forEach(el => {
+                    const d = el.getAttribute('data-date');
+                    if (!d) return;
+                    
+                    const triggerSim = (e) => {
+                        if (e) e.preventDefault();
+                        tg.showConfirm("Симулировать до " + d + " (не включая)?", function(ok) {
+                            if (!ok) return;
+                            const pwd = prompt("Введите пароль администратора:");
+                            if (pwd === "soccery27admin") {
+                                simulateToDate(d);
+                            } else if (pwd !== null) {
+                                tg.showAlert("❌ Неверный пароль");
+                            }
+                        });
+                    };
+
+                    el.addEventListener('contextmenu', triggerSim);
+
+                    el.addEventListener('touchstart', (e) => {
+                        pressTimer = window.setTimeout(() => {
+                            triggerSim(e);
+                        }, 600);
+                    }, {passive: true});
+
+                    el.addEventListener('touchend', (e) => {
+                        clearTimeout(pressTimer);
+                    });
+
+                    el.addEventListener('touchmove', (e) => {
+                        clearTimeout(pressTimer);
+                    });
+                });
             } catch (e) {
                 console.error("Calendar Error:", e);
                 container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
@@ -1681,13 +1712,14 @@
 
                 const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
 
-                const renderStatRow = (s) => {
+                const renderStatRow = (s, isRating) => {
                     const isOwn = (s.team === currentClubName);
+                    const valStr = isRating ? parseFloat(s.val).toFixed(2) : s.val;
                     return `<div style="display: flex; align-items: center; ${isOwn ? 'background: rgba(82,168,255,0.15); border-radius:4px;' : ''} padding: 4px 8px; margin-bottom: 2px;">
                         ${getPlayerFlagImg(s.nationality || '')}
                         <span class="${isOwn ? 'own-team-text' : ''}" style="margin-right: 4px;">${s.player}</span>
                         <span style="display: flex; align-items: center; color: #8e9eb5; font-size: 11px;">(${getSmallLogo(s.team)} ${s.team})</span>
-                        <span style="margin-left: auto; font-weight: bold;">${s.val}</span>
+                        <span style="margin-left: auto; font-weight: bold;">${valStr}</span>
                     </div>`;
                 };
 
@@ -1698,7 +1730,7 @@
                 else $("stat-assists").innerHTML = stats.assists.map(renderStatRow).join("");
 
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
-                else $("stat-rating").innerHTML = stats.rating.map(renderStatRow).join("");
+                else $("stat-rating").innerHTML = stats.rating.map(s => renderStatRow(s, true)).join("");
 
                 if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
                 else $("stat-mvps").innerHTML = stats.mvps.map(renderStatRow).join("");
@@ -1858,17 +1890,31 @@
             }
         }
 
-        if ($("btn-admin-day")) $("btn-admin-day").onclick = function() {
-            adminAction("/api/admin/advance-day", "Промотан 1 день!");
-        };
-
-        if ($("btn-admin-week")) $("btn-admin-week").onclick = function() {
-            adminAction("/api/admin/advance-week", "Промотана 1 неделя!");
-        };
-
-        if ($("btn-admin-month")) $("btn-admin-month").onclick = function() {
-            adminAction("/api/admin/advance-month", "Промотан 1 месяц!");
-        };
+        async function simulateToDate(targetDate) {
+            tg.showAlert("⏳ Симуляция...");
+            try {
+                const res = await fetch(API_BASE + '/api/admin/simulate-to-date', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ telegram_id: userId, password: "soccery27admin", target_date: targetDate })
+                });
+                if (!res.ok) throw new Error("Ошибка");
+                const data = await res.json();
+                if (data.message) {
+                    tg.showAlert(data.message);
+                } else {
+                    tg.showAlert("✅ Симуляция завершена!");
+                }
+                await fetchGameTime();
+                await renderCalendar(true);
+                window.currentPlayers = null;
+                if ($("screen-office") && !$("screen-office").classList.contains("hidden")) {
+                    await loadSquad();
+                }
+            } catch(e) {
+                tg.showAlert("❌ Ошибка симуляции");
+            }
+        }
 
         if ($("btn-admin-reset")) $("btn-admin-reset").onclick = function() {
             tg.showConfirm("ВНИМАНИЕ! Это сбросит карьеру у ВСЕХ игроков. Продолжить?", function(ok1) {
@@ -2293,15 +2339,10 @@
                     tacticsState.starting_xi = Array.isArray(data.starting_xi) ? data.starting_xi : [];
                     tacticsState.bench = Array.isArray(data.bench) ? data.bench : [];
                     tacticsState.starting_xi = tacticsState.starting_xi.map(function(id) {
-                        if (id == null) return null;
-                        const p = players.find(function(x) { return x.id === id; });
-                        if (p && p.injury_weeks && p.injury_weeks > 0) return null;
-                        return id;
+                        return id != null ? id : null;
                     });
                     tacticsState.bench = tacticsState.bench.filter(function(id) {
-                        if (id == null) return false;
-                        const p = players.find(function(x) { return x.id === id; });
-                        return !(p && p.injury_weeks && p.injury_weeks > 0);
+                        return id != null;
                     });
                     tacticsState.captain_id = data.captain_id || null;
                     tacticsState.free_kick_taker_id = data.free_kick_taker_id || null;
@@ -2370,10 +2411,13 @@
                     ovr = effectiveOverall(player, slot.role);
                     hasPenalty = ovr < player.overall;
                     const oc = ovrClass(ovr);
+                    const isInj = (player.injury_weeks > 0 || player.injury_days > 0 || player.suspension_matches > 0);
+                    const injBadge = isInj ? '<div class="slot-warning" style="background:#e74c3c; color:#fff;" title="Недоступен">✚</div>' : '';
                     cardInner = '<span style="font-size:12px; line-height:1;">' + shortPosOf(player.position) + '</span>' +
                         '<div class="slot-ovr-badge ' + oc + '">' + ovr + '</div>' +
                         (tacticsState.captain_id === player.id ? '<div class="slot-captain-badge">C</div>' : '') +
-                        (hasPenalty ? '<div class="slot-warning">!</div>' : '');
+                        (hasPenalty ? '<div class="slot-warning">!</div>' : '') +
+                        injBadge;
                 } else {
                     cardInner = '<span>+</span>';
                 }
@@ -2640,12 +2684,16 @@
             if (tacticsState.bench.length < benchTargetSize) {
                 const xiSet = new Set(tacticsState.starting_xi.filter(x => x != null));
                 const benchSet = new Set(tacticsState.bench);
-                const reserve = (window.currentPlayers || []).filter(p => !xiSet.has(p.id) && !benchSet.has(p.id));
+                const reserve = (window.currentPlayers || []).filter(p => 
+                    !xiSet.has(p.id) && !benchSet.has(p.id) && 
+                    !(p.injury_weeks > 0) && !(p.injury_days > 0) && !(p.suspension_matches > 0)
+                );
                 reserve.sort((a,b) => b.overall - a.overall);
                 for (const p of reserve) {
                     if (tacticsState.bench.length >= benchTargetSize) break;
                     tacticsState.bench.push(p.id);
                 }
+                benchTargetSize = tacticsState.bench.length;
             }
             markDirty();
             renderTactics();

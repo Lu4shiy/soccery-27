@@ -1290,6 +1290,35 @@ def advance_week_api(req: AdminActionRequest):
     finally:
         db.close()
 
+class SimulateToDateRequest(BaseModel):
+    telegram_id: str
+    password: str
+    target_date: str
+
+@app.post("/api/admin/simulate-to-date")
+def simulate_to_date_api(req: SimulateToDateRequest):
+    if req.password != "soccery27admin":
+        raise HTTPException(status_code=403, detail="Неверный пароль")
+    db = Session(engine)
+    try:
+        state = db.query(GameState).first()
+        if not state:
+            raise HTTPException(status_code=404, detail="Состояние игры не найдено")
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        target = datetime.strptime(req.target_date, "%Y-%m-%d").date()
+        
+        days_to_add = (target - curr).days - 1
+        if days_to_add <= 0:
+            return {"status": "ok", "new_date": state.current_date, "message": "Дата уже наступила или прошла"}
+            
+        new_date = advance_game_date(db, days_to_add)
+        return {"status": "ok", "new_date": new_date}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
 @app.post("/api/admin/advance-month")
 def advance_month_api(req: AdminActionRequest):
     if req.password != "soccery27admin":
@@ -1446,54 +1475,52 @@ def simulate_match(fixture_id: int, db: Session):
     away = db.query(Club).filter_by(id=fx.away_club_id).first()
     if not home or not away: return
 
-    def fix_tactic_if_needed(t, club_id):
-        if not t or not t.starting_xi: return
+    def get_xi(club_id):
+        t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
+        if not t or not t.starting_xi:
+            return db.query(Player).filter_by(club_id=club_id, injury_weeks=0, injury_days=0, suspension_matches=0).order_by(Player.overall_rating.desc()).limit(11).all()
+            
         xi_ids = json.loads(t.starting_xi)
         bench_ids = json.loads(t.bench) if t.bench else []
         all_players = {p.id: p for p in db.query(Player).filter_by(club_id=club_id).all()}
-        changed = False
-        new_xi, new_bench = [], []
         
+        available_bench_objs = [all_players[pid] for pid in bench_ids if pid in all_players and all_players[pid].injury_weeks == 0 and all_players[pid].injury_days == 0 and all_players[pid].suspension_matches == 0]
+        
+        available_reserve_objs = [p for p in all_players.values() if p.id not in xi_ids and p.id not in bench_ids and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0]
+        available_reserve_objs.sort(key=lambda p: p.overall_rating, reverse=True)
+        
+        def get_best_replacement(target_pos):
+            nonlocal available_bench_objs, available_reserve_objs
+            if available_bench_objs:
+                best = min(available_bench_objs, key=lambda p: position_penalty(p.position, target_pos, json.loads(p.alt_positions or "[]")))
+                available_bench_objs.remove(best)
+                return best
+            if available_reserve_objs:
+                best = min(available_reserve_objs, key=lambda p: position_penalty(p.position, target_pos, json.loads(p.alt_positions or "[]")))
+                available_reserve_objs.remove(best)
+                return best
+            return None
+
+        final_xi = []
         for pid in xi_ids:
             p = all_players.get(pid)
-            if p and (p.injury_weeks > 0 or p.injury_days > 0 or p.suspension_matches > 0): changed = True
-            else: new_xi.append(pid)
+            if p and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0:
+                final_xi.append(p)
+            else:
+                target_pos = p.position if p else "CM"
+                rep = get_best_replacement(target_pos)
+                if rep:
+                    final_xi.append(rep)
+                    
+        while len(final_xi) < 11:
+            if available_bench_objs:
+                final_xi.append(available_bench_objs.pop(0))
+            elif available_reserve_objs:
+                final_xi.append(available_reserve_objs.pop(0))
+            else:
+                break
                 
-        for pid in bench_ids:
-            p = all_players.get(pid)
-            if p and (p.injury_weeks > 0 or p.injury_days > 0 or p.suspension_matches > 0): changed = True
-            else: new_bench.append(pid)
-                
-        if len(new_xi) < 11:
-            while len(new_xi) < 11 and new_bench:
-                new_xi.append(new_bench.pop(0))
-            if len(new_xi) < 11:
-                reserve = [p.id for p in all_players.values() if p.id not in new_xi and p.id not in new_bench and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0]
-                reserve.sort(key=lambda pid: all_players[pid].overall_rating, reverse=True)
-                while len(new_xi) < 11 and reserve:
-                    new_xi.append(reserve.pop(0))
-        
-        if len(new_bench) < 5:
-            reserve = [p.id for p in all_players.values() if p.id not in new_xi and p.id not in new_bench and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0]
-            reserve.sort(key=lambda pid: all_players[pid].overall_rating, reverse=True)
-            while len(new_bench) < 7 and reserve:
-                new_bench.append(reserve.pop(0))
-                
-        if changed:
-            t.starting_xi = json.dumps(new_xi)
-            t.bench = json.dumps(new_bench)
-            db.commit()
-
-    def get_xi(club_id):
-        t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
-        fix_tactic_if_needed(t, club_id)
-        players = []
-        if t and t.starting_xi:
-            xi_ids = json.loads(t.starting_xi)
-            players = db.query(Player).filter(Player.id.in_(xi_ids)).all()
-        if not players:
-            players = db.query(Player).filter_by(club_id=club_id, injury_weeks=0, injury_days=0, suspension_matches=0).order_by(Player.overall_rating.desc()).limit(11).all()
-        return players
+        return final_xi
 
     h_xi = get_xi(home.id)
     a_xi = get_xi(away.id)
@@ -1652,17 +1679,32 @@ def simulate_match(fixture_id: int, db: Session):
             add_event(minute, 'own_goal', scorer.club_id, scorer.id)
             match_own_goals[scorer.id] = match_own_goals.get(scorer.id, 0) + 1
 
+    def get_card_weight(p):
+        pos = normalize_pos(p.position)
+        if pos in ["CB", "LB", "RB", "LWB", "RWB"]: return 10
+        if pos in ["CM", "LM", "CDM", "RM"]: return 8
+        if pos in ["CAM", "CF"]: return 6
+        if pos in ["LW", "ST", "RW"]: return 4
+        if pos == "GK": return 1
+        return 5
+
     for _ in range(random.randint(1, 4)):
         side = home.id if random.random() < 0.5 else away.id
-        p = random.choice(h_players if side == home.id else a_players)
-        add_event(pick_minute(10, 85), 'yellow_card', side, p.id)
-        match_yellow[p.id] = match_yellow.get(p.id, 0) + 1
+        pool = h_players if side == home.id else a_players
+        if pool:
+            weights = [get_card_weight(p) for p in pool]
+            p = random.choices(pool, weights=weights, k=1)[0]
+            add_event(pick_minute(10, 85), 'yellow_card', side, p.id)
+            match_yellow[p.id] = match_yellow.get(p.id, 0) + 1
         
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
-        p = random.choice(h_players if side == home.id else a_players)
-        add_event(pick_minute(20, 80), 'red_card', side, p.id)
-        match_red[p.id] = match_red.get(p.id, 0) + 1
+        pool = h_players if side == home.id else a_players
+        if pool:
+            weights = [get_card_weight(p) for p in pool]
+            p = random.choices(pool, weights=weights, k=1)[0]
+            add_event(pick_minute(20, 80), 'red_card', side, p.id)
+            match_red[p.id] = match_red.get(p.id, 0) + 1
     
     num_injuries = 0
     if random.random() < 0.55:
@@ -1692,9 +1734,7 @@ def simulate_match(fixture_id: int, db: Session):
                 chosen = i
                 break
         
-        weeks = random.randint(chosen["min_weeks"], chosen["max_weeks"])
-        if weeks < 1:
-            weeks = 1
+        days = random.randint(max(1, chosen["min_weeks"] * 7), max(1, chosen["max_weeks"] * 7))
         
         inj_min = pick_minute(5, 88)
         
@@ -1719,8 +1759,8 @@ def simulate_match(fixture_id: int, db: Session):
                 a_subs_used += 1
         
         if not victim.injury_weeks and not victim.injury_days:
-            victim.injury_weeks = weeks
-            victim.injury_days = 0
+            victim.injury_weeks = days // 7
+            victim.injury_days = days % 7
             victim.injury_name = chosen["name"]
     
     target_subs_h = random.randint(3, 5)
@@ -1934,6 +1974,22 @@ def advance_game_date(db, days_to_add):
             curr += timedelta(days=1)
             date_str = curr.strftime("%Y-%m-%d")
             
+            db.execute(text("""
+                UPDATE players
+                SET injury_days = injury_days - 1
+                WHERE injury_days > 0
+            """))
+            db.execute(text("""
+                UPDATE players
+                SET injury_weeks = injury_weeks - 1, injury_days = 6
+                WHERE injury_days = 0 AND injury_weeks > 0
+            """))
+            db.execute(text("""
+                UPDATE players
+                SET injury_name = NULL
+                WHERE injury_days = 0 AND injury_weeks = 0
+            """))
+            
             fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
             for fx in fixtures:
                 try:
@@ -1952,21 +2008,6 @@ def advance_game_date(db, days_to_add):
                     END,
                     suspension_matches = CASE WHEN suspension_matches > 0 THEN suspension_matches - 1 ELSE 0 END
                 WHERE fatigue > 0 OR suspension_matches > 0
-            """))
-            db.execute(text("""
-                UPDATE players
-                SET injury_days = injury_days - 1
-                WHERE injury_days > 0
-            """))
-            db.execute(text("""
-                UPDATE players
-                SET injury_weeks = injury_weeks - 1, injury_days = 6
-                WHERE injury_days = 0 AND injury_weeks > 0
-            """))
-            db.execute(text("""
-                UPDATE players
-                SET injury_name = NULL
-                WHERE injury_days = 0 AND injury_weeks = 0
             """))
             
             state.current_date = curr.strftime("%Y-%m-%d")
