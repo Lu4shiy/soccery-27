@@ -92,7 +92,7 @@
         .ovr-silver { background: #a3a3a3; color: #1a1a1a; }
         .ovr-bronze { background: #b87d4b; color: #1a1a1a; }
         .player-name-block { display: flex; flex-direction: column; }
-        .player-name { font-weight: bold; font-size: 14px; }
+        .player-name { font-weight: bold; font-size: 14px; display: flex; align-items: center; overflow: hidden; gap: 4px; }
         .player-meta { color: #8e9eb5; font-size: 11px; margin-top: 2px; display: flex; align-items: center; }
         .player-pos { background: #17212b; color: #52a8ff; font-weight: bold; font-size: 12px; padding: 4px 6px; border-radius: 4px; width: 38px; text-align: center; }
         .player-val { font-weight: bold; color: #2ecc71; font-size: 13px; text-align: right; }
@@ -387,6 +387,10 @@
                 <div class="detail-item" id="pd-injury-wrap" style="display:none;">
                     <div class="detail-label">Травма</div>
                     <div class="detail-value" style="color:#e74c3c;" id="pd-injury">--</div>
+                </div>
+                <div class="detail-item" id="pd-susp-wrap" style="display:none;">
+                    <div class="detail-label">Дисквалификация</div>
+                    <div class="detail-value" style="color:#e74c3c;" id="pd-susp">--</div>
                 </div>
             </div>
 
@@ -779,6 +783,7 @@
             "Panama": "pa", "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
             "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw",
+            "Congo DR": "cd", "Republic of the Congo": "cg", "Dem. Rep. Congo": "cd",
             "Kenya": "ke", "Latvia": "lv", "Indonesia": "id", "Malaysia": "my", "Thailand": "th",
             "Vietnam": "vn", "Philippines": "ph", "Singapore": "sg", "India": "in",
             "Haiti": "ht", "Tunisia": "tn", "Cape Verde": "cv", "Sierra Leone": "sl",
@@ -1146,15 +1151,16 @@
                     const val = formatMoney(p.market_value);
 
                     const moraleEmoji = p.morale === 'green' ? '😃' : p.morale === 'yellow' ? '🙂' : p.morale === 'orange' ? '😐' : '☹️';
-                    const injuryBadge = (p.injury_weeks && p.injury_weeks > 0)
-                        ? '<span class="injury-plus" title="' + (p.injury_name || 'Травма') + '">+</span>'
-                        : '';
+                    const isInjured = (p.injury_weeks > 0 || p.injury_days > 0);
+                    const isSuspended = (p.suspension_matches > 0);
+                    const injuryBadge = isInjured ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;" title="' + (p.injury_name || 'Травма') + '">✚</span>' : '';
+                    const suspBadge = isSuspended ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;" title="Дисквалификация">🟥</span>' : '';
                     return '<div class="player-row" onclick="openPlayerDetails(' + p.id + ')">' +
                         '<div class="player-info">' +
                         '<div class="player-ovr ' + ovrClass + '">' + p.overall + '</div>' +
                         '<div class="player-pos">' + shortPos + '</div>' +
                         '<div class="player-name-block">' +
-                        '<div class="player-name">' + p.name + injuryBadge + '</div>' +
+                        '<div class="player-name"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.name + '</span>' + injuryBadge + suspBadge + '</div>' +
                         '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет' +
                         '<span class="morale-emoji" title="Настрой">' + moraleEmoji + '</span>' +
                         '<span class="status-dot status-' + (p.fitness || 'green') + '" title="Тонус"></span>' +
@@ -1191,11 +1197,21 @@
             if ($("pd-fitness")) $("pd-fitness").innerHTML = '<span class="status-dot status-' + (p.fitness || 'green') + '" style="width:12px;height:12px;margin-right:6px;"></span>' + (fitnessMap[p.fitness] || "Зеленый");
             
             if ($("pd-injury-wrap") && $("pd-injury")) {
-                if (p.injury_weeks && p.injury_weeks > 0) {
+                if ((p.injury_weeks && p.injury_weeks > 0) || (p.injury_days && p.injury_days > 0)) {
                     $("pd-injury-wrap").style.display = "block";
-                    $("pd-injury").innerText = (p.injury_name || "Травма") + " (" + p.injury_weeks + " нед.)";
+                    const w = p.injury_weeks || 0;
+                    const d = p.injury_days || 0;
+                    $("pd-injury").innerText = (p.injury_name || "Травма") + " (" + w + " нед. " + d + " дн.)";
                 } else {
                     $("pd-injury-wrap").style.display = "none";
+                }
+            }
+            if ($("pd-susp-wrap") && $("pd-susp")) {
+                if (p.suspension_matches && p.suspension_matches > 0) {
+                    $("pd-susp-wrap").style.display = "block";
+                    $("pd-susp").innerText = "Дисквалификация (" + p.suspension_matches + " матчей)";
+                } else {
+                    $("pd-susp-wrap").style.display = "none";
                 }
             }
 
@@ -1656,14 +1672,17 @@
 
                 const renderStatRow = (s) => {
                     const isOwn = (s.team === currentClubName);
-                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.1); padding:2px 6px; border-radius:4px;' : ''}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${s.team}) - <b>${s.val}</b></div>`;
+                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${s.team}) - <b>${s.val}</b></div>`;
                 };
 
                 if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
                 else $("stat-mvps").innerHTML = stats.mvps.map(renderStatRow).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
-                else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
+                else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => {
+                    const isOwn = (s.team === currentClubName);
+                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}"><span class="${isOwn ? 'own-team-text' : ''}">${s.team}</span> - <b>${s.val}</b></div>`;
+                }).join("");
 
             } catch (e) {
                 console.error(e);
@@ -2152,6 +2171,24 @@
             return familyOf(p) === slotFamily ? 40 : 0;
         }
 
+        function autoAssignRoles() {
+            const xiPlayers = tacticsState.starting_xi.map(id => getPlayerById(id)).filter(Boolean);
+            if (xiPlayers.length === 0) return;
+            if (!tacticsState.captain_id) tacticsState.captain_id = xiPlayers.sort((a,b) => b.overall - a.overall)[0].id;
+            if (!tacticsState.penalty_taker_id) {
+                const sorted = [...xiPlayers].sort((a,b) => b.shooting - a.shooting);
+                tacticsState.penalty_taker_id = sorted[0].id;
+            }
+            if (!tacticsState.free_kick_taker_id) {
+                const sorted = [...xiPlayers].sort((a,b) => (b.shooting + b.passing) - (a.shooting + a.passing));
+                tacticsState.free_kick_taker_id = sorted[0].id;
+            }
+            if (!tacticsState.corner_taker_id) {
+                const sorted = [...xiPlayers].sort((a,b) => b.passing - a.passing);
+                tacticsState.corner_taker_id = sorted[0].id;
+            }
+        }
+
         function autoAssignStartingXI(players) {
             const formation = FORMATIONS[tacticsState.formation];
             const availablePlayers = players.filter(function(p) { return !(p.injury_weeks && p.injury_weeks > 0); }).sort(function(a, b) { return b.overall - a.overall; });
@@ -2214,6 +2251,7 @@
                     const filled = tacticsState.starting_xi.filter(function(x) { return x != null; }).length;
                     if (filled < 11) {
                         autoAssignStartingXI(players);
+                        autoAssignRoles();
                     }
                     const needed = FORMATIONS[tacticsState.formation].length;
                     while (tacticsState.starting_xi.length < needed) tacticsState.starting_xi.push(null);
@@ -2227,6 +2265,8 @@
                     benchTargetSize = tacticsState.bench.length;
                     if (benchTargetSize < 5) benchTargetSize = 5;
                     if (benchTargetSize > 9) benchTargetSize = 9;
+
+                    autoAssignRoles();
 
                     tacticsLoaded = true;
                 }
@@ -2327,10 +2367,11 @@
             benchList.innerHTML = benchPlayers.map(function(p) {
                 const isSel = selectedBenchPlayerId === p.id;
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
-                const inj = (p.injury_weeks && p.injury_weeks > 0) ? '<span class="injury-plus">+</span>' : '';
+                const isInj = (p.injury_weeks > 0 || p.injury_days > 0);
+                const inj = isInj ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;">✚</span>' : '';
                 return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onBenchPlayerClick(' + p.id + ')">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
-                    '<div class="bench-name">' + p.name + inj + '</div>' +
+                    '<div class="bench-name" style="display:flex; align-items:center; gap:4px; overflow:hidden;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.name + '</span>' + inj + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
                     '</div>';
             }).join("");
@@ -2338,13 +2379,13 @@
             reserveList.innerHTML = reserve.map(function(p) {
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
                 const isSel = selectedBenchPlayerId === p.id;
-                const injured = (p.injury_weeks && p.injury_weeks > 0);
-                const inj = injured ? '<span class="injury-plus" title="' + (p.injury_name || 'Травма') + ' (' + p.injury_weeks + ' нед.)">+</span>' : '';
+                const injured = (p.injury_weeks > 0 || p.injury_days > 0 || p.suspension_matches > 0);
+                const inj = injured ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;" title="Недоступен">✚</span>' : '';
                 const opacity = injured ? 'opacity:0.55;' : '';
                 const clickHandler = injured ? '' : 'onclick="onReservePlayerClick(' + p.id + ')"';
                 return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" ' + clickHandler + ' style="' + opacity + '">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
-                    '<div class="bench-name">' + p.name + inj + '</div>' +
+                    '<div class="bench-name" style="display:flex; align-items:center; gap:4px; overflow:hidden;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.name + '</span>' + inj + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
                     '</div>';
             }).join("");
@@ -2751,7 +2792,11 @@
                 
                 if (m.is_played) {
                     if ($("match-score")) {
-                        $("match-score").innerText = m.home_goals + " : " + m.away_goals;
+                        let scoreText = m.home_goals + " : " + m.away_goals;
+                        if (m.has_extra_time && m.home_penalties !== null) {
+                            scoreText += ` (Пен. ${m.home_penalties}:${m.away_penalties})`;
+                        }
+                        $("match-score").innerText = scoreText;
                         $("match-score").setAttribute("data-fixture-id", m.id);
                     }
                     if ($("match-days-left")) $("match-days-left").innerText = "Матч завершен";
@@ -2877,8 +2922,16 @@
                 const color = getRatingColor(p.rating);
                 const mvp = p.is_mvp ? getMvpStarSvg() : '';
                 const highlight = isMyTeam ? 'background: rgba(82,168,255,0.1);' : '';
+                
+                let icons = '';
+                if (p.goals > 0) icons += `⚽${p.goals > 1 ? p.goals : ''} `;
+                if (p.assists > 0) icons += `👟${p.assists > 1 ? p.assists : ''} `;
+                if (p.own_goals > 0) icons += `🅰️${p.own_goals > 1 ? p.own_goals : ''} `;
+                if (p.yellow > 0) icons += `🟨 `;
+                if (p.red > 0) icons += `🟥 `;
+                
                 return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #2f3b4d; ${highlight}">
-                    <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span>${mvp}</span>
+                    <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span>${mvp} <span style="margin-left:4px; font-size:12px;">${icons}</span></span>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="color:#8e9eb5; font-size:11px;">${p.minutes}'</span>
                         <span style="background:${color}; color:#fff; font-weight:bold; padding:2px 8px; border-radius:4px; min-width:40px; text-align:center; font-size:12px;">${p.rating.toFixed(1)}</span>

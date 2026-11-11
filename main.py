@@ -108,7 +108,10 @@ class Player(Base):
     rating_sum = Column(Float, default=0.0)
     fatigue = Column(Integer, default=0)
     injury_weeks = Column(Integer, default=0)
+    injury_days = Column(Integer, default=0)
     injury_name = Column(String, nullable=True)
+    suspension_matches = Column(Integer, default=0)
+    consecutive_yellows = Column(Integer, default=0)
 
 class Fixture(Base):
     __tablename__ = "fixtures"
@@ -141,6 +144,9 @@ class Fixture(Base):
     away_freekicks = Column(Integer, default=0)
     first_half_added = Column(Integer, default=0)
     second_half_added = Column(Integer, default=0)
+    has_extra_time = Column(Integer, default=0)
+    home_penalties = Column(Integer, nullable=True)
+    away_penalties = Column(Integer, nullable=True)
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
@@ -290,6 +296,12 @@ def init_db():
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS second_half_added INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE match_player_stats ADD COLUMN IF NOT EXISTS is_mvp INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_name VARCHAR;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_days INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS suspension_matches INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS consecutive_yellows INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS has_extra_time INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_penalties INTEGER;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_penalties INTEGER;"))
         db.commit()
         
         if not db.query(GameState).first():
@@ -680,7 +692,8 @@ def get_club_players(club_id: int):
                 "overall": p.overall_rating, "nationality": p.nationality,
                 "market_value": p.market_value or 0, "wage": p.wage or 0, "contract_until": p.contract_until,
                 "alt_positions": alts, "morale": p.morale or "green", "fitness": p.fitness or "green",
-                "injury_weeks": p.injury_weeks or 0, "injury_name": p.injury_name,
+                "injury_weeks": p.injury_weeks or 0, "injury_days": p.injury_days or 0, "injury_name": p.injury_name,
+                "suspension_matches": p.suspension_matches or 0,
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
                 "dribbling": p.dribbling or 50, "defending": p.defending or 50, "physicality": p.physicality or 50,
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10, "gk_kicking": p.gk_kicking or 10,
@@ -982,18 +995,37 @@ def get_match_players(fixture_id: int):
         home = db.query(Club).filter_by(id=fx.home_club_id).first()
         away = db.query(Club).filter_by(id=fx.away_club_id).first()
         
+        events = db.query(MatchEvent).filter_by(fixture_id=fixture_id).all()
+        p_events = {}
+        for e in events:
+            if e.player_id:
+                if e.player_id not in p_events: p_events[e.player_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0}
+                if e.event_type == 'goal': p_events[e.player_id]["goals"] += 1
+                if e.event_type == 'own_goal': p_events[e.player_id]["own_goals"] += 1
+                if e.event_type == 'yellow_card': p_events[e.player_id]["yellow"] += 1
+                if e.event_type == 'red_card': p_events[e.player_id]["red"] += 1
+            if e.assist_id:
+                if e.assist_id not in p_events: p_events[e.assist_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0}
+                p_events[e.assist_id]["assists"] += 1
+
         stats = db.query(MatchPlayerStats).filter_by(fixture_id=fixture_id).all()
         home_players = []
         away_players = []
         for s in stats:
             p = db.query(Player).filter_by(id=s.player_id).first()
             if not p: continue
+            ev = p_events.get(p.id, {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0})
             entry = {
                 "name": p.name,
                 "position": p.position,
                 "minutes": s.minutes_played,
                 "rating": round(s.rating, 1),
-                "is_mvp": bool(s.is_mvp)
+                "is_mvp": bool(s.is_mvp),
+                "goals": ev["goals"],
+                "assists": ev["assists"],
+                "own_goals": ev["own_goals"],
+                "yellow": ev["yellow"],
+                "red": ev["red"]
             }
             if s.club_id == fx.home_club_id:
                 home_players.append(entry)
@@ -1372,14 +1404,53 @@ def simulate_match(fixture_id: int, db: Session):
     away = db.query(Club).filter_by(id=fx.away_club_id).first()
     if not home or not away: return
 
+    def fix_tactic_if_needed(t, club_id):
+        if not t or not t.starting_xi: return
+        xi_ids = json.loads(t.starting_xi)
+        bench_ids = json.loads(t.bench) if t.bench else []
+        all_players = {p.id: p for p in db.query(Player).filter_by(club_id=club_id).all()}
+        changed = False
+        new_xi, new_bench = [], []
+        
+        for pid in xi_ids:
+            p = all_players.get(pid)
+            if p and (p.injury_weeks > 0 or p.injury_days > 0 or p.suspension_matches > 0): changed = True
+            else: new_xi.append(pid)
+                
+        for pid in bench_ids:
+            p = all_players.get(pid)
+            if p and (p.injury_weeks > 0 or p.injury_days > 0 or p.suspension_matches > 0): changed = True
+            else: new_bench.append(pid)
+                
+        if len(new_xi) < 11:
+            while len(new_xi) < 11 and new_bench:
+                new_xi.append(new_bench.pop(0))
+            if len(new_xi) < 11:
+                reserve = [p.id for p in all_players.values() if p.id not in new_xi and p.id not in new_bench and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0]
+                reserve.sort(key=lambda pid: all_players[pid].overall_rating, reverse=True)
+                while len(new_xi) < 11 and reserve:
+                    new_xi.append(reserve.pop(0))
+        
+        if len(new_bench) < 5:
+            reserve = [p.id for p in all_players.values() if p.id not in new_xi and p.id not in new_bench and p.injury_weeks == 0 and p.injury_days == 0 and p.suspension_matches == 0]
+            reserve.sort(key=lambda pid: all_players[pid].overall_rating, reverse=True)
+            while len(new_bench) < 7 and reserve:
+                new_bench.append(reserve.pop(0))
+                
+        if changed:
+            t.starting_xi = json.dumps(new_xi)
+            t.bench = json.dumps(new_bench)
+            db.commit()
+
     def get_xi(club_id):
         t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
+        fix_tactic_if_needed(t, club_id)
         players = []
         if t and t.starting_xi:
             xi_ids = json.loads(t.starting_xi)
             players = db.query(Player).filter(Player.id.in_(xi_ids)).all()
         if not players:
-            players = db.query(Player).filter_by(club_id=club_id).order_by(Player.overall_rating.desc()).limit(11).all()
+            players = db.query(Player).filter_by(club_id=club_id, injury_weeks=0, injury_days=0, suspension_matches=0).order_by(Player.overall_rating.desc()).limit(11).all()
         return players
 
     h_xi = get_xi(home.id)
@@ -1398,6 +1469,7 @@ def simulate_match(fixture_id: int, db: Session):
     match_assists = {}
     match_yellow = {}
     match_red = {}
+    match_own_goals = {}
     
     def pick_minute(lo=1, hi=90, is_sub=False):
         if is_sub:
@@ -1455,8 +1527,8 @@ def simulate_match(fixture_id: int, db: Session):
     total_shots_a = max(2, int((a_att - h_def) * 1.5) + 8)
     h_sot, a_sot = 0, 0
     
-    h_players = [p for p in h_xi if "Goalkeeper" not in p.position]
-    a_players = [p for p in a_xi if "Goalkeeper" not in p.position]
+    h_players = [p for p in h_xi if normalize_pos(p.position) != "GK"]
+    a_players = [p for p in a_xi if normalize_pos(p.position) != "GK"]
     if not h_players or not a_players:
         return
     
@@ -1492,17 +1564,36 @@ def simulate_match(fixture_id: int, db: Session):
 
     if random.random() < 0.2:
         side = home.id if random.random() < 0.5 else away.id
-        players_list = h_players if side == home.id else a_players
-        if players_list:
-            scorer = random.choice(players_list)
+        tactic_h = db.query(Tactic).join(Manager).filter(Manager.club_id == home.id).first()
+        tactic_a = db.query(Tactic).join(Manager).filter(Manager.club_id == away.id).first()
+        pen_taker = tactic_h.penalty_taker_id if side == home.id and tactic_h else (tactic_a.penalty_taker_id if side == away.id and tactic_a else None)
+        
+        pool = h_players if side == home.id else a_players
+        if pen_taker:
+            scorer = next((p for p in (h_xi if side == home.id else a_xi) if p.id == pen_taker), None)
+            if not scorer or scorer not in pool: scorer = random.choice(pool)
+        else:
+            scorer = random.choice(pool)
+            
+        minute = pick_minute()
+        is_goal = random.random() < 0.75
+        add_event(minute, 'penalty_goal' if is_goal else 'penalty_miss', side, scorer.id)
+        if is_goal:
+            if side == home.id: h_goals += 1
+            else: a_goals += 1
+            scorer.goals = (scorer.goals or 0) + 1
+            match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
+
+    if random.random() < 0.05:
+        side = home.id if random.random() < 0.5 else away.id
+        defenders = [p for p in (a_xi if side == home.id else h_xi) if normalize_pos(p.position) in ["CB", "LB", "RB", "LWB", "RWB"]]
+        if defenders:
+            scorer = random.choice(defenders)
             minute = pick_minute()
-            is_goal = random.random() < 0.7
-            add_event(minute, 'penalty_goal' if is_goal else 'penalty_miss', side, scorer.id)
-            if is_goal:
-                if side == home.id: h_goals += 1
-                else: a_goals += 1
-                scorer.goals = (scorer.goals or 0) + 1
-                match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
+            if side == home.id: h_goals += 1
+            else: a_goals += 1
+            add_event(minute, 'own_goal', side, scorer.id)
+            match_own_goals[scorer.id] = match_own_goals.get(scorer.id, 0) + 1
 
     for _ in range(random.randint(1, 4)):
         side = home.id if random.random() < 0.5 else away.id
@@ -1548,11 +1639,11 @@ def simulate_match(fixture_id: int, db: Session):
             weeks = 1
         
         inj_min = pick_minute(5, 88)
-        add_event(inj_min, 'injury', side, victim.id)
         
         if bench:
             replacement = random.choice(bench)
             add_event(inj_min, 'substitution', side, victim.id, replacement.id)
+            add_event(inj_min, 'injury', side, victim.id)
             
             if side == home.id:
                 h_subs_off[victim.id] = inj_min
@@ -1603,6 +1694,18 @@ def simulate_match(fixture_id: int, db: Session):
         a_bench_available.remove(in_p)
         a_subs_used += 1
     
+    tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
+    if tour and tour.type in ["Cup", "SuperCup"] and h_goals == a_goals:
+        fx.has_extra_time = 1
+        if random.random() < 0.25: h_goals += 1
+        if random.random() < 0.25: a_goals += 1
+        if h_goals == a_goals:
+            fx.home_penalties = random.randint(3, 6)
+            fx.away_penalties = random.randint(3, 6)
+            while fx.home_penalties == fx.away_penalties:
+                fx.home_penalties += random.randint(0, 1)
+                fx.away_penalties += random.randint(0, 1)
+
     total_goals = h_goals + a_goals
     total_fouls_fixed = random.randint(5, 15) + random.randint(5, 15)
     num_yellow = sum(1 for e in events if e.event_type == 'yellow_card')
@@ -1676,6 +1779,18 @@ def simulate_match(fixture_id: int, db: Session):
         p.matches_played = (p.matches_played or 0) + 1
         p.fatigue = min(100, (p.fatigue or 0) + random.randint(20, 35))
         
+        if p.id in match_yellow:
+            p.consecutive_yellows = (p.consecutive_yellows or 0) + 1
+            if p.consecutive_yellows >= 2:
+                p.suspension_matches = (p.suspension_matches or 0) + 1
+                p.consecutive_yellows = 0
+        else:
+            p.consecutive_yellows = 0
+            
+        if p.id in match_red:
+            p.suspension_matches = (p.suspension_matches or 0) + random.randint(1, 2)
+            p.consecutive_yellows = 0
+            
         is_home = (p.club_id == home.id)
         rating = calculate_rating(p, is_home)
         
@@ -1764,8 +1879,20 @@ def advance_game_date(db, days_to_add):
                         WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
                         WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
                         ELSE 'green'
-                    END
-                WHERE fatigue > 0
+                    END,
+                    injury_days = CASE WHEN injury_days > 0 THEN injury_days - 1 ELSE 0 END,
+                    suspension_matches = CASE WHEN suspension_matches > 0 THEN suspension_matches - 1 ELSE 0 END
+                WHERE fatigue > 0 OR injury_days > 0 OR suspension_matches > 0
+            """))
+            db.execute(text("""
+                UPDATE players
+                SET injury_weeks = injury_weeks - 1, injury_days = 7
+                WHERE injury_days = 0 AND injury_weeks > 0
+            """))
+            db.execute(text("""
+                UPDATE players
+                SET injury_name = NULL
+                WHERE injury_days = 0 AND injury_weeks = 0
             """))
             
             state.current_date = curr.strftime("%Y-%m-%d")
@@ -1877,6 +2004,9 @@ def get_match_details(fixture_id: int):
             "home_xg": fx.home_xg or 0.0, "away_xg": fx.away_xg or 0.0,
             "first_half_added": fx.first_half_added or 0,
             "second_half_added": fx.second_half_added or 0,
+            "has_extra_time": fx.has_extra_time or 0,
+            "home_penalties": fx.home_penalties,
+            "away_penalties": fx.away_penalties,
             "home_yellow": h_yellow, "away_yellow": a_yellow,
             "home_red": h_red, "away_red": a_red,
             "home_subs": h_subs, "away_subs": a_subs,
