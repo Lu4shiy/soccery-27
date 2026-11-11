@@ -4,8 +4,11 @@ import random
 import unicodedata
 import calendar
 import asyncio
+import threading
 from datetime import datetime, timedelta, date
 from typing import Optional, List
+
+db_lock = threading.Lock()
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandObject
@@ -1065,29 +1068,30 @@ def reset_game(req: dict):
     tg_id = req.get("telegram_id")
     if tg_id != ADMIN_TELEGRAM_ID: raise HTTPException(status_code=403, detail="Нет прав")
     
-    db = Session(engine)
-    try:
-        db.execute(text("DELETE FROM match_events"))
-        db.execute(text("DELETE FROM match_player_stats"))
-        db.execute(text("DELETE FROM fixtures"))
-        db.execute(text("DELETE FROM tactics"))
-        db.execute(text("DELETE FROM managers"))
-        db.commit()
-        
-        db.query(Player).update({
-            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-            Player.fitness: "green", Player.morale: "green"
-        }, synchronize_session=False)
-        
-        state = db.query(GameState).first()
-        if state:
-            state.current_date = "2026-08-01"
-            state.last_month_advance_at = datetime.utcnow()
-        db.commit()
-        return {"status": "ok"}
-    finally:
-        db.close()
+    with db_lock:
+        db = Session(engine)
+        try:
+            db.execute(text("DELETE FROM match_events"))
+            db.execute(text("DELETE FROM match_player_stats"))
+            db.execute(text("DELETE FROM fixtures"))
+            db.execute(text("DELETE FROM tactics"))
+            db.execute(text("DELETE FROM managers"))
+            db.commit()
+            
+            db.query(Player).update({
+                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+                Player.fitness: "green", Player.morale: "green"
+            }, synchronize_session=False)
+            
+            state = db.query(GameState).first()
+            if state:
+                state.current_date = "2026-08-01"
+                state.last_month_advance_at = datetime.utcnow()
+            db.commit()
+            return {"status": "ok"}
+        finally:
+            db.close()
 
 class AdminActionRequest(BaseModel):
     telegram_id: str
@@ -1161,30 +1165,31 @@ def advance_month_api(req: AdminActionRequest):
 def reset_career_api(req: AdminActionRequest):
     if req.password != "soccery27admin":
         raise HTTPException(status_code=403, detail="Неверный пароль")
-    db = Session(engine)
-    try:
-        db.execute(text("DELETE FROM match_events"))
-        db.execute(text("DELETE FROM match_player_stats"))
-        db.execute(text("DELETE FROM fixtures"))
-        db.execute(text("DELETE FROM tactics"))
-        db.execute(text("DELETE FROM managers"))
-        db.query(Player).update({
-            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-            Player.fitness: "green", Player.morale: "green"
-        }, synchronize_session=False)
-        state = db.query(GameState).first()
-        if state:
-            state.current_date = "2026-08-01"
-            state.season = "2026/27"
-            state.last_month_advance_at = datetime.utcnow()
-        db.commit()
-        return {"status": "ok"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
+    with db_lock:
+        db = Session(engine)
+        try:
+            db.execute(text("DELETE FROM match_events"))
+            db.execute(text("DELETE FROM match_player_stats"))
+            db.execute(text("DELETE FROM fixtures"))
+            db.execute(text("DELETE FROM tactics"))
+            db.execute(text("DELETE FROM managers"))
+            db.query(Player).update({
+                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+                Player.fitness: "green", Player.morale: "green"
+            }, synchronize_session=False)
+            state = db.query(GameState).first()
+            if state:
+                state.current_date = "2026-08-01"
+                state.season = "2026/27"
+                state.last_month_advance_at = datetime.utcnow()
+            db.commit()
+            return {"status": "ok"}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            db.close()
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
@@ -1407,20 +1412,21 @@ def simulate_match(fixture_id: int, db: Session):
     advance_cup_bracket(fx, db)
 
 def advance_game_date(db, days_to_add):
-    state = db.query(GameState).first()
-    if not state: return None
-    curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-    
-    for _ in range(days_to_add):
-        curr += timedelta(days=1)
-        date_str = curr.strftime("%Y-%m-%d")
+    with db_lock:
+        state = db.query(GameState).first()
+        if not state: return None
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
         
-        fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
-        for fx in fixtures:
-            try:
-                simulate_match(fx.id, db)
-            except Exception as e:
-                print(f"Match simulation failed for fixture {fx.id}: {e}")
+        for _ in range(days_to_add):
+            curr += timedelta(days=1)
+            date_str = curr.strftime("%Y-%m-%d")
+            
+            fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
+            for fx in fixtures:
+                try:
+                    simulate_match(fx.id, db)
+                except Exception as e:
+                    print(f"Match simulation failed for fixture {fx.id}: {e}")
             
         db.execute(text("""
             UPDATE players
@@ -1648,34 +1654,35 @@ async def cmd_admin_reset(message: types.Message):
         await message.answer("⛔ У вас нет прав.")
         return
     
-    db = Session(engine)
-    try:
-        db.execute(text("DELETE FROM match_events"))
-        db.execute(text("DELETE FROM match_player_stats"))
-        db.execute(text("DELETE FROM fixtures"))
-        db.execute(text("DELETE FROM tactics"))
-        db.execute(text("DELETE FROM managers"))
-        db.commit()
-        
-        db.query(Player).update({
-            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-            Player.fitness: "green", Player.morale: "green"
-        }, synchronize_session=False)
-        
-        state = db.query(GameState).first()
-        if state:
-            state.current_date = "2026-08-01"
-            state.season = "2026/27"
-            state.last_month_advance_at = datetime.utcnow()
+    with db_lock:
+        db = Session(engine)
+        try:
+            db.execute(text("DELETE FROM match_events"))
+            db.execute(text("DELETE FROM match_player_stats"))
+            db.execute(text("DELETE FROM fixtures"))
+            db.execute(text("DELETE FROM tactics"))
+            db.execute(text("DELETE FROM managers"))
+            db.commit()
             
-        db.commit()
-        await message.answer("💥 Карьера полностью сброшена! Время вернулось на 01.08.2026.")
-    except Exception as e:
-        db.rollback()
-        await message.answer(f"❌ Ошибка: {e}")
-    finally:
-        db.close()
+            db.query(Player).update({
+                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+                Player.fitness: "green", Player.morale: "green"
+            }, synchronize_session=False)
+            
+            state = db.query(GameState).first()
+            if state:
+                state.current_date = "2026-08-01"
+                state.season = "2026/27"
+                state.last_month_advance_at = datetime.utcnow()
+                
+            db.commit()
+            await message.answer("💥 Карьера полностью сброшена! Время вернулось на 01.08.2026.")
+        except Exception as e:
+            db.rollback()
+            await message.answer(f"❌ Ошибка: {e}")
+        finally:
+            db.close()
 
 async def start_bot():
     try:

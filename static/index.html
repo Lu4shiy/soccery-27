@@ -708,7 +708,7 @@
             { n: "Швейцария", c: "ch" }, { n: "Швеция", c: "se" }, { n: "Шотландия", c: "gb-sct" }, { n: "Шри-Ланка", c: "lk" },
             { n: "Эквадор", c: "ec" }, { n: "Экваториальная Гвинея", c: "gq" }, { n: "Эритрея", c: "er" }, { n: "Эстония", c: "ee" },
             { n: "Эфиопия", c: "et" }, { n: "ЮАР", c: "za" }, { n: "Южный Судан", c: "ss" }, { n: "Ямайка", c: "jm" },
-            { n: "Япония", c: "jp" }, { n: "Китай", c: "cn" }, { n: "Тайвань", c: "tw" }
+            { n: "Япония", c: "jp" }, { n: "Китай", c: "cn" }, { n: "Тайвань", c: "tw" }, "Сьерра-Леоне": "sl"
         ].sort((a, b) => a.n.localeCompare(b.n));
 
         const playerFlagMap = {
@@ -734,7 +734,7 @@
             "Kenya": "ke", "Latvia": "lv", "Indonesia": "id", "Malaysia": "my", "Thailand": "th",
             "Vietnam": "vn", "Philippines": "ph", "Singapore": "sg", "India": "in",
             "Panama": "pa", "Haiti": "ht", "Congo": "cg", "DR Congo": "cd",
-            "Tunisia": "tn", "Cape Verde": "cv"
+            "Tunisia": "tn", "Cape Verde": "cv", "Sierra Leone": "sl"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -1274,8 +1274,7 @@
                     if (mData.is_admin) isAdmin = true;
                 } catch(e) {}
                 if ($("admin-block")) {
-                    if (isAdmin) $("admin-block").classList.remove("hidden");
-                    else $("admin-block").classList.add("hidden");
+                    $("admin-block").classList.remove("hidden");
                 }
                 fetch(API_BASE + '/api/manager/' + userId)
                     .then(r => r.json())
