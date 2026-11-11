@@ -862,17 +862,28 @@ def save_tactics(req: SaveTacticsRequest):
         db.close()
 
 @app.get("/api/clubs/{club_id}/tournaments")
-def get_club_tournaments(club_id: int):
+def get_club_tournaments(club_id: int, season: str = None):
     db = Session(engine)
     try:
-        rows = db.query(Tournament).join(ClubTournament).filter(ClubTournament.club_id == club_id).all()
-        if not rows:
-            club = db.query(Club).filter_by(id=club_id).first()
-            if club and club.league:
-                t = db.query(Tournament).filter_by(name=club.league).first()
-                if t: return [{"id": t.id, "name": t.name, "continent": t.continent, "type": t.type}]
-            return []
-        return [{"id": t.id, "name": t.name, "continent": t.continent, "type": t.type} for t in rows]
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        
+        start_yr = int(season.split("/")[0])
+        start_str = f"{start_yr}-07-01"
+        end_str = f"{start_yr+1}-06-30"
+        
+        tour_ids = db.query(Fixture.tournament_id).filter(
+            (Fixture.home_club_id == club_id) | (Fixture.away_club_id == club_id),
+            Fixture.date >= start_str,
+            Fixture.date <= end_str
+        ).distinct().all()
+        
+        tids = [t[0] for t in tour_ids]
+        if not tids: return []
+        
+        tours = db.query(Tournament).filter(Tournament.id.in_(tids)).all()
+        return [{"id": t.id, "name": t.name, "continent": t.continent, "type": t.type} for t in tours]
     finally:
         db.close()
 
@@ -1565,7 +1576,7 @@ def advance_cup_bracket(fx, db):
                 next_fx.home_club_id = winner_id
             else:
                 next_fx.away_club_id = winner_id
-    db.flush()
+    db.commit()
 
 def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()

@@ -449,6 +449,10 @@
         <div id="center-tournaments-list" class="hidden">
             <button class="btn-back" id="btn-back-to-sc2">← Назад в спортцентр</button>
             <h3>Ваши турниры</h3>
+            <div id="tour-season-toggle" class="sc-tabs" style="margin-bottom: 12px; display: none;">
+                <div class="sc-tab active" onclick="loadTournamentsList('current')" id="tab-season-current">Текущий сезон</div>
+                <div class="sc-tab" onclick="loadTournamentsList('past')" id="tab-season-past">Прошлый сезон</div>
+            </div>
             <div class="tour-list" id="tour-list-container"></div>
         </div>
 
@@ -711,6 +715,7 @@
         let calYear = 2026;
         let calMonth = 8;
         let currentGameDate = "2026-08-01";
+        let currentSeason = "2026/27";
         let nextAdvanceAt = null;
 
         const STAT_NAMES = {
@@ -1180,6 +1185,7 @@
         async function openPlayerDetails(playerId) {
             const p = window.currentPlayers.find(function(x) { return x.id === playerId; });
             if (!p) return;
+            window.scrollTo(0, 0);
 
             if ($("pd-name")) $("pd-name").innerText = p.name;
             if ($("pd-club")) $("pd-club").innerText = currentClubName;
@@ -1415,6 +1421,7 @@
                 calYear = parseInt(parts[0]);
                 calMonth = parseInt(parts[1]);
                 currentGameDate = data.current_date;
+                currentSeason = data.season;
                 if ($("current-game-date")) $("current-game-date").innerText = data.current_date;
                 if (data.next_advance_at) nextAdvanceAt = new Date(data.next_advance_at).getTime();
             } catch (e) { console.error(e); }
@@ -1568,16 +1575,26 @@
             }
         }
 
-        if ($("btn-open-tournaments")) $("btn-open-tournaments").onclick = async function() {
-            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
-            if ($("center-tournaments-list")) $("center-tournaments-list").classList.remove("hidden");
+        window.loadTournamentsList = async function(mode) {
+            document.querySelectorAll('#tour-season-toggle .sc-tab').forEach(el => el.classList.remove('active'));
+            if (mode === 'current') {
+                if ($("tab-season-current")) $("tab-season-current").classList.add("active");
+            } else {
+                if ($("tab-season-past")) $("tab-season-past").classList.add("active");
+            }
             
             const container = $("tour-list-container");
             if (!container) return;
             container.innerHTML = "Загрузка...";
             
+            let seasonParam = "";
+            if (mode === 'past') {
+                const startYr = parseInt(currentSeason.split("/")[0]) - 1;
+                seasonParam = "?season=" + startYr + "/" + (startYr+1);
+            }
+            
             try {
-                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments');
+                const res = await fetch(API_BASE + '/api/clubs/' + currentClubId + '/tournaments' + seasonParam);
                 const currentTours = await res.json();
                 
                 container.innerHTML = currentTours.map(t => `
@@ -1590,12 +1607,29 @@
             }
         };
 
+        if ($("btn-open-tournaments")) $("btn-open-tournaments").onclick = async function() {
+            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+            if ($("center-tournaments-list")) $("center-tournaments-list").classList.remove("hidden");
+            
+            const startYr = parseInt(currentSeason.split("/")[0]);
+            if ($("tour-season-toggle")) {
+                if (startYr > 2026) {
+                    $("tour-season-toggle").style.display = "flex";
+                } else {
+                    $("tour-season-toggle").style.display = "none";
+                }
+            }
+            
+            await loadTournamentsList('current');
+        };
+
         if ($("btn-back-to-sc2")) $("btn-back-to-sc2").onclick = function() {
             if ($("center-main-menu")) $("center-main-menu").classList.remove("hidden");
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
         };
 
         window.openTournament = async function(id, name) {
+            window.scrollTo(0, 0);
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
             if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
             if ($("detail-tour-name")) $("detail-tour-name").innerText = name;
@@ -2965,6 +2999,7 @@
         window.openMatchDetails = async function(fixtureId, origin) {
             matchOrigin = origin || "schedule";
             showScreen("match");
+            window.scrollTo(0, 0);
             if ($("match-score")) $("match-score").innerText = "- : -";
             if ($("match-events-block")) $("match-events-block").classList.add("hidden");
             if ($("match-stats-block")) $("match-stats-block").classList.add("hidden");
