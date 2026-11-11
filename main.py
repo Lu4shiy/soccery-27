@@ -1638,6 +1638,10 @@ def simulate_match(fixture_id: int, db: Session):
     if not fx or fx.is_played: return
         
     if fx.home_club_id == 9999 or fx.away_club_id == 9999:
+        fx.is_played = 1
+        fx.home_goals = 0
+        fx.away_goals = 0
+        db.commit()
         return
             
     home = db.query(Club).filter_by(id=fx.home_club_id).first()
@@ -2419,7 +2423,7 @@ def advance_game_date(db, days_to_add):
                 WHERE injury_days = 0 AND injury_weeks = 0
             """))
             
-            fixtures = db.query(Fixture).filter(Fixture.date <= date_str, Fixture.is_played == 0).all()
+            fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
             for fx in fixtures:
                 try:
                     simulate_match(fx.id, db)
