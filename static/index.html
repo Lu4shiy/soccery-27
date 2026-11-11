@@ -1834,6 +1834,7 @@
         if ($("btn-back-to-tours")) $("btn-back-to-tours").onclick = function() {
             if ($("center-tournaments-list")) $("center-tournaments-list").classList.remove("hidden");
             if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
+            if ($("btn-open-tournaments")) $("btn-open-tournaments").click();
         };
 
         async function adminAction(endpoint, successMsg) {
@@ -1931,7 +1932,18 @@
                     if (!res.ok) throw new Error("Ошибка симуляции");
                     const data = await res.json();
                     
+                    const oldDate = currentGameDate;
                     currentGameDate = data.new_date;
+                    
+                    const oldM = parseInt(oldDate.split("-")[1]);
+                    const newM = parseInt(currentGameDate.split("-")[1]);
+                    const oldY = parseInt(oldDate.split("-")[0]);
+                    const newY = parseInt(currentGameDate.split("-")[0]);
+                    
+                    if (oldM !== newM || oldY !== newY) {
+                        calMonth = newM;
+                        calYear = newY;
+                    }
                     
                     if ($("current-game-date")) $("current-game-date").innerText = currentGameDate;
                     
@@ -2970,7 +2982,37 @@
                 const matchCard = document.querySelector('#screen-match > .card');
                 if (matchCard) matchCard.style.background = "#232e3c";
                 
-                if ($("match-tour-name")) $("match-tour-name").innerText = m.tournament;
+                if ($("match-tour-name")) {
+                    let tourDisplay = m.tournament;
+                    if (m.type === "League") {
+                        tourDisplay += " - Тур " + m.round_number;
+                    } else if (m.type === "Cup") {
+                        let rName = "Тур " + m.round_number;
+                        if (m.tournament === "FA Cup") {
+                            const faRounds = ["", "Предварительный этап", "1/64 финала", "1/32 финала", "1/16 финала", "1/4 финала", "1/2 финала", "Финал"];
+                            rName = faRounds[m.round_number] || rName;
+                        } else if (m.tournament.includes("Carabao") || m.tournament.includes("EFL Cup")) {
+                            const carRounds = ["", "Предварительный этап", "1/64 финала", "1/32 финала", "1/16 финала", "1/4 финала", "1/2 финала", "1/2 финала", "Финал"];
+                            rName = carRounds[m.round_number] || rName;
+                        } else if (m.tournament.includes("Playoffs")) {
+                            if (m.tournament.includes("Championship")) {
+                                const poRounds = ["", "Предварительный этап", "1/2 финала", "1/2 финала", "Финал"];
+                                rName = poRounds[m.round_number] || rName;
+                            } else {
+                                const poRounds = ["", "1/2 финала", "1/2 финала", "Финал"];
+                                rName = poRounds[m.round_number] || rName;
+                            }
+                        }
+                        if (m.leg === 1) {
+                            tourDisplay += " - " + rName + " (1-й матч)";
+                        } else if (m.leg === 2) {
+                            tourDisplay += " - " + rName + " (2-й матч)";
+                        } else {
+                            tourDisplay += " - " + rName;
+                        }
+                    }
+                    $("match-tour-name").innerText = tourDisplay;
+                }
                 if ($("match-home-logo")) $("match-home-logo").innerHTML = getLogoHTML('clubs', m.home_club, 'logo-large');
                 if ($("match-away-logo")) $("match-away-logo").innerHTML = getLogoHTML('clubs', m.away_club, 'logo-large');
                 if ($("match-home-name")) $("match-home-name").innerText = m.home_club;
@@ -3228,6 +3270,7 @@
                     if (data.current_date !== currentGameDate) {
                         const oldDate = currentGameDate;
                         currentGameDate = data.current_date;
+                        await checkManager(true);
                         
                         const parts = currentGameDate.split("-");
                         const newY = parseInt(parts[0]);

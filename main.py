@@ -1521,9 +1521,9 @@ def advance_cup_bracket(fx, db):
             agg_home = (leg1.home_goals or 0) + (fx.away_goals or 0)
             agg_away = (leg1.away_goals or 0) + (fx.home_goals or 0)
             if agg_home > agg_away:
-                winner_id = fx.home_club_id
-            elif agg_away > agg_home:
                 winner_id = fx.away_club_id
+            elif agg_away > agg_home:
+                winner_id = fx.home_club_id
             else:
                 winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
 
@@ -1900,15 +1900,35 @@ def simulate_match(fixture_id: int, db: Session):
     
     tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
     if tour and tour.type in ["Cup", "SuperCup"] and h_goals == a_goals:
-        fx.has_extra_time = 1
-        if random.random() < 0.25: h_goals += 1
-        if random.random() < 0.25: a_goals += 1
-        if h_goals == a_goals:
-            fx.home_penalties = random.randint(3, 6)
-            fx.away_penalties = random.randint(3, 6)
-            while fx.home_penalties == fx.away_penalties:
-                fx.home_penalties += random.randint(0, 1)
-                fx.away_penalties += random.randint(0, 1)
+        is_two_legged = False
+        if tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number in [6, 7]:
+            is_two_legged = True
+        elif tour.name == "EFL Championship Playoffs" and fx.round_number in [2, 3]:
+            is_two_legged = True
+        elif tour.name in ["EFL League One Playoffs", "EFL League Two Playoffs"] and fx.round_number in [1, 2]:
+            is_two_legged = True
+
+        trigger_et_pens = False
+        if not is_two_legged:
+            trigger_et_pens = True
+        elif fx.leg == 2:
+            leg1 = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=fx.round_number-1, match_index=fx.match_index, leg=1).first()
+            if leg1 and leg1.is_played:
+                agg_home = (leg1.home_goals or 0) + a_goals
+                agg_away = (leg1.away_goals or 0) + h_goals
+                if agg_home == agg_away:
+                    trigger_et_pens = True
+
+        if trigger_et_pens:
+            fx.has_extra_time = 1
+            if random.random() < 0.25: h_goals += 1
+            if random.random() < 0.25: a_goals += 1
+            if h_goals == a_goals:
+                fx.home_penalties = random.randint(3, 6)
+                fx.away_penalties = random.randint(3, 6)
+                while fx.home_penalties == fx.away_penalties:
+                    fx.home_penalties += random.randint(0, 1)
+                    fx.away_penalties += random.randint(0, 1)
 
     total_goals = h_goals + a_goals
     total_fouls_fixed = random.randint(5, 15) + random.randint(5, 15)
@@ -2421,6 +2441,9 @@ def get_match_details(fixture_id: int):
             "home_subs": h_subs, "away_subs": a_subs,
             "home_pens": h_pens, "away_pens": a_pens,
             "tournament": tour.name if tour else "",
+            "round_number": fx.round_number,
+            "leg": fx.leg,
+            "type": tour.type if tour else "League",
             "events": events_data
         }
     finally:
