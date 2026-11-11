@@ -1232,8 +1232,8 @@
 
             let contractText = "Неизвестно";
             if (p.contract_until) {
-                const startDate = new Date('2026-08-01');
-                const endDate = new Date(p.contract_until);
+                const startDate = new Date(currentGameDate + "T00:00:00");
+                const endDate = new Date(p.contract_until + "T00:00:00");
                 if (endDate > startDate) {
                     let months = (endDate.getFullYear() - startDate.getFullYear()) * 12;
                     months -= startDate.getMonth();
@@ -1894,32 +1894,50 @@
         };
 
         async function simulateToDate(targetDate) {
-            tg.showAlert("⏳ Симуляция...");
-            try {
-                const res = await fetch(API_BASE + '/api/admin/simulate-to-date', {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ telegram_id: userId, password: "soccery27admin", target_date: targetDate })
-                });
-                if (!res.ok) throw new Error("Ошибка сервера");
-                const data = await res.json();
-                
-                currentGameDate = data.new_date;
-                await fetchGameTime();
-                await renderCalendar(true);
-                
-                if (data.message) {
-                    tg.showAlert(data.message);
-                } else {
-                    tg.showAlert("✅ Симуляция завершена!");
+            let curr = new Date(currentGameDate + "T00:00:00");
+            let target = new Date(targetDate + "T00:00:00");
+            
+            if (curr >= target) {
+                tg.showAlert("Дата уже наступила или прошла");
+                return;
+            }
+            
+            target.setDate(target.getDate() - 1);
+            
+            tg.showAlert("⏳ Симуляция началась...");
+            
+            let daysSimulated = 0;
+            while (curr <= target) {
+                try {
+                    const res = await fetch(API_BASE + '/api/admin/advance-day', {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ telegram_id: userId, password: "soccery27admin" })
+                    });
+                    if (!res.ok) throw new Error("Ошибка симуляции");
+                    const data = await res.json();
+                    
+                    currentGameDate = data.new_date;
+                    
+                    if ($("current-game-date")) $("current-game-date").innerText = currentGameDate;
+                    
+                    await renderCalendar(true);
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                    curr = new Date(currentGameDate + "T00:00:00");
+                    daysSimulated++;
+                } catch(e) {
+                    tg.showAlert("❌ Ошибка симуляции: " + e.message);
+                    break;
                 }
-                
+            }
+            
+            if (daysSimulated > 0) {
+                tg.showAlert("✅ Симуляция завершена! Дней: " + daysSimulated);
                 window.currentPlayers = null;
                 if ($("screen-office") && !$("screen-office").classList.contains("hidden")) {
                     await loadSquad();
                 }
-            } catch(e) {
-                tg.showAlert("❌ Ошибка симуляции: " + e.message);
             }
         }
 
