@@ -333,9 +333,27 @@ def generate_season_fixtures(db, base_year):
     if shield and len(pl_clubs) >= 2:
         fixtures_data.append({"date": f"{base_year+1}-06-09", "tournament_id": shield.id, "round_number": 1, "home_club_id": pl_clubs[0].id, "away_club_id": pl_clubs[1].id, "is_played": 0})
         
+    po_names = ["EFL Championship Playoffs", "EFL League One Playoffs", "EFL League Two Playoffs"]
+    po_tours = {t.name: t for t in db.query(Tournament).filter(Tournament.name.in_(po_names)).all()}
+    po_dates = parse_eng_dates(["10.05", "15.05", "25.05"], base_year)
+    for po_name, po_tour in po_tours.items():
+        for i in range(2):
+            fixtures_data.append({"date": po_dates[0].strftime("%Y-%m-%d"), "tournament_id": po_tour.id, "round_number": 1, "match_index": i, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+        for i in range(2):
+            fixtures_data.append({"date": po_dates[1].strftime("%Y-%m-%d"), "tournament_id": po_tour.id, "round_number": 2, "match_index": i, "leg": 2, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+        fixtures_data.append({"date": po_dates[2].strftime("%Y-%m-%d"), "tournament_id": po_tour.id, "round_number": 3, "match_index": 0, "leg": 1, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
+
     if fixtures_data:
         db.bulk_insert_mappings(Fixture, fixtures_data)
         db.commit()
+        
+    for c in eng_clubs:
+        for t_name in [c.league, "FA Cup", "EFL Cup"]:
+            t = db.query(Tournament).filter_by(name=t_name).first()
+            if t:
+                if not db.query(ClubTournament).filter_by(club_id=c.id, tournament_id=t.id).first():
+                    db.add(ClubTournament(club_id=c.id, tournament_id=t.id))
+    db.commit()
 
 def get_double_round_robin(clubs):
     if len(clubs) % 2 != 0: clubs.append(None)
@@ -422,12 +440,20 @@ def init_db():
                 Tournament(name="FA Cup", continent="Domestic", type="Cup"),
                 Tournament(name="EFL Cup", continent="Domestic", type="Cup"),
                 Tournament(name="FA Community Shield", continent="Domestic", type="SuperCup"),
+                Tournament(name="EFL Championship Playoffs", continent="Domestic", type="Cup"),
+                Tournament(name="EFL League One Playoffs", continent="Domestic", type="Cup"),
+                Tournament(name="EFL League Two Playoffs", continent="Domestic", type="Cup"),
                 Tournament(name="UEFA Champions League", continent="UEFA", type="Continental"),
                 Tournament(name="UEFA Europa League", continent="UEFA", type="Continental"),
                 Tournament(name="UEFA Conference League", continent="UEFA", type="Continental")
             ]
             for t in tours: db.add(t)
             db.commit()
+            
+        for po_name in ["EFL Championship Playoffs", "EFL League One Playoffs", "EFL League Two Playoffs"]:
+            if not db.query(Tournament).filter_by(name=po_name).first():
+                db.add(Tournament(name=po_name, continent="Domestic", type="Cup"))
+        db.commit()
 
         if db.query(ClubTournament).count() == 0:
             for club in db.query(Club).all():
@@ -1431,10 +1457,11 @@ def advance_cup_bracket(fx, db):
     if not tour or tour.type not in ["Cup", "SuperCup"]:
         return
 
-    if fx.round_number == 6 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 1:
+    is_two_legged = (tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number == 6) or ("Playoffs" in tour.name and fx.round_number == 1)
+    if is_two_legged and fx.leg == 1:
         leg2 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
-            round_number=7,
+            round_number=fx.round_number + 1,
             match_index=fx.match_index,
             leg=2
         ).first()
@@ -1444,10 +1471,11 @@ def advance_cup_bracket(fx, db):
             db.flush()
         return
 
-    if fx.round_number == 7 and tour.name in ["Carabao Cup", "EFL Cup"] and fx.leg == 2:
+    is_two_legged_2nd = (tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number == 7) or ("Playoffs" in tour.name and fx.round_number == 2)
+    if is_two_legged_2nd and fx.leg == 2:
         leg1 = db.query(Fixture).filter_by(
             tournament_id=fx.tournament_id,
-            round_number=6,
+            round_number=fx.round_number - 1,
             match_index=fx.match_index,
             leg=1
         ).first()
@@ -1463,7 +1491,7 @@ def advance_cup_bracket(fx, db):
 
             final_fx = db.query(Fixture).filter_by(
                 tournament_id=fx.tournament_id,
-                round_number=8
+                round_number=fx.round_number + 1
             ).first()
             if final_fx:
                 if fx.match_index == 0:
@@ -2002,6 +2030,38 @@ def simulate_match(fixture_id: int, db: Session):
     
     advance_cup_bracket(fx, db)
 
+def populate_playoffs(db, year):
+    def get_standings(league_name):
+        tour = db.query(Tournament).filter_by(name=league_name).first()
+        if not tour: return []
+        clubs = db.query(Club).filter(Club.league == league_name).all()
+        fixtures = db.query(Fixture).filter_by(tournament_id=tour.id, is_played=1).filter(Fixture.date >= f"{year}-07-01", Fixture.date <= f"{year+1}-06-30").all()
+        stats = {c.id: {"club": c, "pts": 0, "gd": 0, "gf": 0} for c in clubs}
+        for f in fixtures:
+            if f.home_club_id in stats and f.away_club_id in stats:
+                h, a = stats[f.home_club_id], stats[f.away_club_id]
+                h["gf"] += f.home_goals; a["gf"] += f.away_goals
+                h["gd"] += f.home_goals - f.away_goals; a["gd"] += f.away_goals - f.home_goals
+                if f.home_goals > f.away_goals: h["pts"] += 3
+                elif f.home_goals < f.away_goals: a["pts"] += 3
+                else: h["pts"] += 1; a["pts"] += 1
+        return sorted(stats.values(), key=lambda x: (-x["pts"], -x["gd"], -x["gf"]))
+
+    for league, po_name in [("EFL Championship", "EFL Championship Playoffs"), ("EFL League One", "EFL League One Playoffs"), ("EFL League Two", "EFL League Two Playoffs")]:
+        st = get_standings(league)
+        if len(st) >= 6:
+            t3, t4, t5, t6 = st[2]["club"], st[3]["club"], st[4]["club"], st[5]["club"]
+            po_tour = db.query(Tournament).filter_by(name=po_name).first()
+            if po_tour:
+                fx1 = db.query(Fixture).filter_by(tournament_id=po_tour.id, round_number=1, match_index=0).first()
+                fx2 = db.query(Fixture).filter_by(tournament_id=po_tour.id, round_number=1, match_index=1).first()
+                if fx1: fx1.home_club_id = t3.id; fx1.away_club_id = t6.id
+                if fx2: fx2.home_club_id = t4.id; fx2.away_club_id = t5.id
+                for c in [t3, t4, t5, t6]:
+                    if not db.query(ClubTournament).filter_by(club_id=c.id, tournament_id=po_tour.id).first():
+                        db.add(ClubTournament(club_id=c.id, tournament_id=po_tour.id))
+                db.commit()
+
 def process_season_end(db, year):
     def get_league_standings(league_name):
         tour = db.query(Tournament).filter_by(name=league_name).first()
@@ -2029,24 +2089,40 @@ def process_season_end(db, year):
     l1_standings = get_league_standings("EFL League One")
     l2_standings = get_league_standings("EFL League Two")
     
+    def get_playoff_winner(po_name):
+        po_tour = db.query(Tournament).filter_by(name=po_name).first()
+        if not po_tour: return None
+        final_fx = db.query(Fixture).filter_by(tournament_id=po_tour.id, round_number=3).first()
+        if final_fx and final_fx.is_played:
+            if final_fx.home_penalties is not None and final_fx.away_penalties is not None:
+                winner_id = final_fx.home_club_id if final_fx.home_penalties > final_fx.away_penalties else final_fx.away_club_id
+            else:
+                winner_id = final_fx.home_club_id if final_fx.home_goals > final_fx.away_goals else final_fx.away_club_id
+            return db.query(Club).get(winner_id)
+        return None
+
     pl_relegated = [s["club"] for s in pl_standings[-3:]] if len(pl_standings) >= 3 else []
     champ_promoted = [s["club"] for s in champ_standings[:2]]
-    if len(champ_standings) >= 6:
-        champ_promoted.append(random.choice([s["club"] for s in champ_standings[2:6]]))
+    champ_po = get_playoff_winner("EFL Championship Playoffs")
+    if champ_po: champ_promoted.append(champ_po)
+    
     champ_relegated = [s["club"] for s in champ_standings[-3:]] if len(champ_standings) >= 3 else []
     l1_promoted = [s["club"] for s in l1_standings[:2]]
-    if len(l1_standings) >= 6:
-        l1_promoted.append(random.choice([s["club"] for s in l1_standings[2:6]]))
+    l1_po = get_playoff_winner("EFL League One Playoffs")
+    if l1_po: l1_promoted.append(l1_po)
+    
     l1_relegated = [s["club"] for s in l1_standings[-4:]] if len(l1_standings) >= 4 else []
     l2_promoted = [s["club"] for s in l2_standings[:3]]
-    if len(l2_standings) >= 7:
-        l2_promoted.append(random.choice([s["club"] for s in l2_standings[3:7]]))
+    l2_po = get_playoff_winner("EFL League Two Playoffs")
+    if l2_po: l2_promoted.append(l2_po)
 
     def update_club_tournament(club, new_league_name):
+        if not club: return
         club.league = new_league_name
         new_tour = db.query(Tournament).filter_by(name=new_league_name).first()
         if new_tour:
-            league_tours = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
+            league_tours = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two", 
+                            "EFL Championship Playoffs", "EFL League One Playoffs", "EFL League Two Playoffs"]
             old_tours = db.query(Tournament).filter(Tournament.name.in_(league_tours)).all()
             old_tour_ids = [t.id for t in old_tours]
             db.query(ClubTournament).filter(ClubTournament.club_id == club.id, ClubTournament.tournament_id.in_(old_tour_ids)).delete(synchronize_session=False)
@@ -2070,6 +2146,9 @@ def advance_game_date(db, days_to_add):
             curr += timedelta(days=1)
             date_str = curr.strftime("%Y-%m-%d")
             
+            if curr.month == 5 and curr.day == 9:
+                populate_playoffs(db, curr.year - 1)
+
             if curr.month == 7 and curr.day == 1:
                 process_season_end(db, curr.year - 1)
                 
