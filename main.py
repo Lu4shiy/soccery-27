@@ -362,17 +362,8 @@ def init_db():
         old_fixture_ids = [
             row[0] for row in db.query(Fixture.id).filter(Fixture.tournament_id.in_(t_ids)).all()
         ]
-        has_played_eng = db.query(Fixture).filter(
-            Fixture.tournament_id.in_(t_ids),
-            Fixture.is_played == 1
-        ).first() is not None
 
-        if old_fixture_ids and not has_played_eng:
-            db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
-            db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
-            db.query(Fixture).filter(Fixture.id.in_(old_fixture_ids)).delete(synchronize_session=False)
-
-        if not has_played_eng:
+        if not old_fixture_ids:
             eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
             eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
             if eng_clubs:
@@ -1405,6 +1396,8 @@ def simulate_match(fixture_id: int, db: Session):
     used_by_non_sub = set()
     match_goals = {}
     match_assists = {}
+    match_yellow = {}
+    match_red = {}
     
     def pick_minute(lo=1, hi=90, is_sub=False):
         if is_sub:
@@ -1515,11 +1508,13 @@ def simulate_match(fixture_id: int, db: Session):
         side = home.id if random.random() < 0.5 else away.id
         p = random.choice(h_players if side == home.id else a_players)
         add_event(pick_minute(10, 85), 'yellow_card', side, p.id)
+        match_yellow[p.id] = match_yellow.get(p.id, 0) + 1
         
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
         p = random.choice(h_players if side == home.id else a_players)
         add_event(pick_minute(20, 80), 'red_card', side, p.id)
+        match_red[p.id] = match_red.get(p.id, 0) + 1
     
     num_injuries = 0
     if random.random() < 0.55:
@@ -1528,10 +1523,10 @@ def simulate_match(fixture_id: int, db: Session):
     for _ in range(num_injuries):
         side = home.id if random.random() < 0.5 else away.id
         if side == home.id:
-            pool = h_on_pitch
+            pool = [p for p in h_on_pitch if p.id not in h_subs_off]
             bench = h_bench_available if h_subs_used < max_subs else []
         else:
-            pool = a_on_pitch
+            pool = [p for p in a_on_pitch if p.id not in a_subs_off]
             bench = a_bench_available if a_subs_used < max_subs else []
         
         if not pool:
@@ -1577,34 +1572,36 @@ def simulate_match(fixture_id: int, db: Session):
         victim.injury_weeks = (victim.injury_weeks or 0) + weeks
         victim.injury_name = chosen["name"]
     
-    for _ in range(random.randint(1, 3)):
-        side = home.id if random.random() < 0.5 else away.id
-        if side == home.id:
-            if h_subs_used >= max_subs or not h_on_pitch or not h_bench_available:
-                continue
-            out_p = random.choice(h_on_pitch)
-            in_p = random.choice(h_bench_available)
-            sub_min = pick_minute(60, 85, is_sub=True)
-            add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
-            h_subs_off[out_p.id] = sub_min
-            h_subs_on[in_p.id] = sub_min
-            h_on_pitch.remove(out_p)
-            h_on_pitch.append(in_p)
-            h_bench_available.remove(in_p)
-            h_subs_used += 1
-        else:
-            if a_subs_used >= max_subs or not a_on_pitch or not a_bench_available:
-                continue
-            out_p = random.choice(a_on_pitch)
-            in_p = random.choice(a_bench_available)
-            sub_min = pick_minute(60, 85, is_sub=True)
-            add_event(sub_min, 'substitution', away.id, out_p.id, in_p.id)
-            a_subs_off[out_p.id] = sub_min
-            a_subs_on[in_p.id] = sub_min
-            a_on_pitch.remove(out_p)
-            a_on_pitch.append(in_p)
-            a_bench_available.remove(in_p)
-            a_subs_used += 1
+    target_subs_h = random.randint(3, 5)
+    target_subs_a = random.randint(3, 5)
+    
+    for _ in range(target_subs_h):
+        if h_subs_used >= max_subs or not h_on_pitch or not h_bench_available: break
+        out_p = random.choice([p for p in h_on_pitch if p.id not in h_subs_off])
+        if not out_p: break
+        in_p = random.choice(h_bench_available)
+        sub_min = pick_minute(60, 85, is_sub=True)
+        add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
+        h_subs_off[out_p.id] = sub_min
+        h_subs_on[in_p.id] = sub_min
+        h_on_pitch.remove(out_p)
+        h_on_pitch.append(in_p)
+        h_bench_available.remove(in_p)
+        h_subs_used += 1
+        
+    for _ in range(target_subs_a):
+        if a_subs_used >= max_subs or not a_on_pitch or not a_bench_available: break
+        out_p = random.choice([p for p in a_on_pitch if p.id not in a_subs_off])
+        if not out_p: break
+        in_p = random.choice(a_bench_available)
+        sub_min = pick_minute(60, 85, is_sub=True)
+        add_event(sub_min, 'substitution', away.id, out_p.id, in_p.id)
+        a_subs_off[out_p.id] = sub_min
+        a_subs_on[in_p.id] = sub_min
+        a_on_pitch.remove(out_p)
+        a_on_pitch.append(in_p)
+        a_bench_available.remove(in_p)
+        a_subs_used += 1
     
     total_goals = h_goals + a_goals
     total_fouls_fixed = random.randint(5, 15) + random.randint(5, 15)
@@ -1627,31 +1624,60 @@ def simulate_match(fixture_id: int, db: Session):
     for p in a_bench:
         if p.id in sub_ids:
             all_participants.append(p)
+            
+    h_gk = next((p for p in h_xi if "Goalkeeper" in (p.position or "") or p.position == "GK"), None)
+    a_gk = next((p for p in a_xi if "Goalkeeper" in (p.position or "") or p.position == "GK"), None)
+    saves_h = max(0, a_sot - a_goals)
+    saves_a = max(0, h_sot - h_goals)
+    
+    def calculate_rating(p, is_home_team):
+        rating = 6.0
+        is_gk = "Goalkeeper" in (p.position or "") or p.position == "GK"
+        is_def = any(pos in (p.position or "").upper() for pos in ["CB", "LB", "RB", "LWB", "RWB", "BACK"])
+        
+        goals = match_goals.get(p.id, 0)
+        assists = match_assists.get(p.id, 0)
+        conceded = (a_goals if is_home_team else h_goals)
+        saves = (saves_h if is_home_team else saves_a) if is_gk else 0
+        
+        if goals > 0:
+            if is_gk: rating += 1.5 * goals
+            elif is_def: rating += 1.5 * goals
+            else: rating += 1.0 * goals
+            
+        rating += 0.6 * assists
+        
+        if is_gk:
+            rating += 0.15 * saves
+            rating -= 0.3 * conceded
+        elif is_def:
+            rating -= 0.15 * conceded
+            
+        if conceded == 0 and (is_gk or is_def):
+            rating += 0.5
+            
+        y = match_yellow.get(p.id, 0)
+        r = match_red.get(p.id, 0)
+        rating -= 0.4 * y
+        rating -= 1.5 * r
+        
+        team_goals = h_goals if is_home_team else a_goals
+        opp_goals = a_goals if is_home_team else h_goals
+        if team_goals > opp_goals: rating += 0.3
+        elif team_goals < opp_goals: rating -= 0.3
+        
+        variance = random.uniform(-0.3, 0.3)
+        if (p.overall_rating or 50) > 80: variance *= 0.5
+        rating += variance
+        
+        return round(max(1.0, min(10.0, rating)), 1)
     
     for p in all_participants:
         p.matches_played = (p.matches_played or 0) + 1
         p.fatigue = min(100, (p.fatigue or 0) + random.randint(20, 35))
         
-        p_goals = match_goals.get(p.id, 0)
-        p_assists = match_assists.get(p.id, 0)
-        
-        rating = random.gauss(6.1, 1.05)
-        rating += p_goals * 0.85 + p_assists * 0.45
-        
         is_home = (p.club_id == home.id)
-        conceded = a_goals if is_home else h_goals
-        is_gk = "Goalkeeper" in (p.position or "") or p.position == "GK"
-        
-        if is_gk:
-            if conceded == 0:
-                rating += 0.8
-            if conceded >= 3:
-                rating -= 0.5
-        else:
-            if conceded == 0:
-                rating += 0.25
-        
-        rating = round(max(1.0, min(10.0, rating)), 1)
+        rating = calculate_rating(p, is_home)
         
         if is_home:
             if p.id in h_subs_off:

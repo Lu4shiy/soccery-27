@@ -1762,7 +1762,10 @@
                 const data = await res.json();
                 if (res.ok) {
                     tg.showAlert("✅ " + successMsg);
-                    fetchGameTime();
+                    await fetchGameTime();
+                    if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
+                        renderCalendar();
+                    }
                     window.currentPlayers = null;
                 } else {
                     tg.showAlert("❌ " + (data.detail || "Ошибка"));
