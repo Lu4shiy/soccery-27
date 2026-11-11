@@ -1051,13 +1051,13 @@ def get_stats(tournament_id: int):
     db = Session(engine)
     try:
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
-        if not tour: return {"scorers": [], "assists": [], "rating": [], "clean_sheets": []}
+        if not tour: return {"scorers": [], "assists": [], "rating": [], "mvps": [], "yellows": [], "reds": [], "clean_sheets": []}
         
         fixtures = db.query(Fixture).filter_by(tournament_id=tournament_id, is_played=1).all()
         fx_ids = [f.id for f in fixtures]
         
         if not fx_ids:
-            return {"scorers": [], "assists": [], "rating": [], "clean_sheets": []}
+            return {"scorers": [], "assists": [], "rating": [], "mvps": [], "yellows": [], "reds": [], "clean_sheets": []}
             
         scorers_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
             MatchEvent.fixture_id.in_(fx_ids),
@@ -1142,6 +1142,30 @@ def get_stats(tournament_id: int):
             if c: clean_sheets.append({"team": c.name, "val": count})
         clean_sheets.sort(key=lambda x: x["val"], reverse=True)
 
+        yellows_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type == 'yellow_card'
+        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
+
+        yellows = []
+        for pid, count in yellows_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                yellows.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
+
+        reds_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type == 'red_card'
+        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
+
+        reds = []
+        for pid, count in reds_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                reds.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
+
         return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "mvps": mvps, "yellows": yellows, "reds": reds, "clean_sheets": clean_sheets[:10]}
     finally:
         db.close()
@@ -1177,6 +1201,8 @@ def get_bracket(tournament_id: int):
                 "team2": a.name if a else "TBD",
                 "score1": f.home_goals,
                 "score2": f.away_goals,
+                "pen1": f.home_penalties,
+                "pen2": f.away_penalties,
                 "is_played": bool(f.is_played),
                 "leg": f.leg
             })
@@ -1907,9 +1933,13 @@ def advance_game_date(db, days_to_add):
                         WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
                         ELSE 'green'
                     END,
-                    injury_days = CASE WHEN injury_days > 0 THEN injury_days - 1 ELSE 0 END,
                     suspension_matches = CASE WHEN suspension_matches > 0 THEN suspension_matches - 1 ELSE 0 END
-                WHERE fatigue > 0 OR injury_days > 0 OR suspension_matches > 0
+                WHERE fatigue > 0 OR suspension_matches > 0
+            """))
+            db.execute(text("""
+                UPDATE players
+                SET injury_days = injury_days - 1
+                WHERE injury_days > 0
             """))
             db.execute(text("""
                 UPDATE players

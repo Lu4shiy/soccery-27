@@ -1205,7 +1205,11 @@
                     $("pd-injury-wrap").style.display = "block";
                     const w = p.injury_weeks || 0;
                     const d = p.injury_days || 0;
-                    $("pd-injury").innerText = (p.injury_name || "Травма") + " (" + w + " нед. " + d + " дн.)";
+                    let timeStr = "";
+                    if (w > 0 && d > 0) timeStr = w + " нед. " + d + " дн.";
+                    else if (w > 0) timeStr = w + " нед.";
+                    else timeStr = d + " дн.";
+                    $("pd-injury").innerText = (p.injury_name || "Травма") + " (" + timeStr + ")";
                 } else {
                     $("pd-injury-wrap").style.display = "none";
                 }
@@ -1372,7 +1376,10 @@
             const navEl = $('nav-' + tabId);
             if (navEl) navEl.classList.add('active');
             
-            if (tabId === 'tactics') {
+            if (tabId === 'office' && !window.currentPlayers) {
+                await loadSquad();
+                return;
+            } else if (tabId === 'tactics') {
                 await loadTactics();
             } else if (tabId === 'account') {
                 if ($("account-club-name")) $("account-club-name").innerText = currentClubName;
@@ -1712,7 +1719,10 @@
                 html += `<div style="margin-bottom: 16px;">`;
                 html += `<div style="color: #52a8ff; font-size: 14px; font-weight: bold; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #2f3b4d;">${round.name}</div>`;
                 round.matches.forEach(m => {
-                    const score = (m.score1 !== null && m.score2 !== null) ? `${m.score1} : ${m.score2}` : "—";
+                    let score = (m.score1 !== null && m.score2 !== null) ? `${m.score1} : ${m.score2}` : "—";
+                    if (m.pen1 !== null && m.pen2 !== null && m.pen1 !== undefined && m.pen2 !== undefined) {
+                        score += ` (пен. ${m.pen1}:${m.pen2})`;
+                    }
                     const t1Logo = getSmallLogo(m.team1);
                     const t2Logo = getSmallLogo(m.team2);
                     const t1Own = (m.team1 === currentClubName) ? 'own-team-text' : '';
@@ -1826,7 +1836,9 @@
                     await renderCalendar(true);
                 }
                 window.currentPlayers = null;
-                await loadSquad();
+                if ($("screen-office") && !$("screen-office").classList.contains("hidden")) {
+                    await loadSquad();
+                }
             } catch (e) {
                 tg.showAlert("❌ Сетевая ошибка");
             }
