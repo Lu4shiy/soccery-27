@@ -1368,9 +1368,12 @@ def advance_cup_bracket(fx, db):
         return
 
     # Обычный путь (FA Cup, финалы Carabao, любые одноматчевые раунды)
-    winner_id = fx.home_club_id if (fx.home_goals or 0) > (fx.away_goals or 0) else fx.away_club_id
-    if (fx.home_goals or 0) == (fx.away_goals or 0):
-        winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
+    if fx.home_penalties is not None and fx.away_penalties is not None:
+        winner_id = fx.home_club_id if fx.home_penalties > fx.away_penalties else fx.away_club_id
+    else:
+        winner_id = fx.home_club_id if (fx.home_goals or 0) > (fx.away_goals or 0) else fx.away_club_id
+        if (fx.home_goals or 0) == (fx.away_goals or 0):
+            winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
 
     if fx.round_number == 1:
         next_fx = db.query(Fixture).filter_by(
