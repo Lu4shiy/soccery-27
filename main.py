@@ -1680,6 +1680,7 @@ def simulate_match(fixture_id: int, db: Session):
         if not pool:
             continue
         victim = random.choice(pool)
+        pool.remove(victim)
         
         total_w = sum(i["weight"] for i in INJURY_TYPES)
         r = random.uniform(0, total_w)
@@ -1717,8 +1718,10 @@ def simulate_match(fixture_id: int, db: Session):
                 a_bench_available.remove(replacement)
                 a_subs_used += 1
         
-        victim.injury_weeks = (victim.injury_weeks or 0) + weeks
-        victim.injury_name = chosen["name"]
+        if not victim.injury_weeks and not victim.injury_days:
+            victim.injury_weeks = weeks
+            victim.injury_days = 0
+            victim.injury_name = chosen["name"]
     
     target_subs_h = random.randint(3, 5)
     target_subs_a = random.randint(3, 5)

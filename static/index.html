@@ -469,9 +469,10 @@
             <div id="tour-tab-table" class="card">
                 <div id="tour-bracket-content" class="hidden"></div>
                 <div id="tour-league-content">
-                    <div id="tour-rounds-list" style="display: flex; gap: 5px; overflow-x: auto; margin-bottom: 10px; flex-wrap: wrap;"></div>
-                    <div id="tour-round-details" style="margin-bottom: 15px;"></div>
                     <table class="stats-table" id="standings-table"></table>
+                    <div style="margin-top: 20px; font-weight: bold; color: #52a8ff; font-size: 14px;">Матчи по турам:</div>
+                    <div id="tour-rounds-list" style="display: flex; gap: 5px; overflow-x: auto; margin-bottom: 10px; margin-top: 10px; flex-wrap: wrap;"></div>
+                    <div id="tour-round-details" style="margin-bottom: 15px;"></div>
                 </div>
             </div>
 
@@ -934,10 +935,7 @@
                     isAdmin = !!data.is_admin;
 
                     const ab = $("admin-block");
-                    if (ab) {
-                        if (isAdmin) ab.classList.remove("hidden");
-                        else ab.classList.add("hidden");
-                    }
+                    if (ab) ab.classList.remove("hidden");
 
                     if (!skipConfirm) {
                         showConfirm(data.club_name, data.league, currentStars, false, data.club_id);
@@ -1394,10 +1392,7 @@
                     if (mData.is_admin) isAdmin = true;
                     if (mData.coach_name && $("inp-account-coach-name")) $("inp-account-coach-name").value = mData.coach_name;
                 } catch(e) {}
-                if ($("admin-block")) {
-                    if (isAdmin) $("admin-block").classList.remove("hidden");
-                    else $("admin-block").classList.add("hidden");
-                }
+                if ($("admin-block")) $("admin-block").classList.remove("hidden");
             } else if (tabId === 'center') {
                 if ($("center-main-menu")) $("center-main-menu").classList.remove("hidden");
                 if ($("center-schedule")) $("center-schedule").classList.add("hidden");
@@ -1514,7 +1509,7 @@
                             else if (myGoals === oppGoals) cls += " draw";
                             else cls += " loss";
                         }
-                        inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id})" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
+                        inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id}, 'schedule')" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
                                     <div class="cal-tour">${tourShort}</div>
                                     <div class="cal-opp">${oppLogo}</div>
                                     <div style="font-size:6px; color:#fff; text-align:center; width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; margin-top:1px;">${d.opponent_name}</div>
@@ -1688,7 +1683,12 @@
 
                 const renderStatRow = (s) => {
                     const isOwn = (s.team === currentClubName);
-                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${getSmallLogo(s.team)} ${s.team}) - <b>${s.val}</b></div>`;
+                    return `<div style="display: flex; align-items: center; ${isOwn ? 'background: rgba(82,168,255,0.15); border-radius:4px;' : ''} padding: 4px 8px; margin-bottom: 2px;">
+                        ${getPlayerFlagImg(s.nationality || '')}
+                        <span class="${isOwn ? 'own-team-text' : ''}" style="margin-right: 4px;">${s.player}</span>
+                        <span style="display: flex; align-items: center; color: #8e9eb5; font-size: 11px;">(${getSmallLogo(s.team)} ${s.team})</span>
+                        <span style="margin-left: auto; font-weight: bold;">${s.val}</span>
+                    </div>`;
                 };
 
                 if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
@@ -1712,7 +1712,7 @@
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => {
                     const isOwn = (s.team === currentClubName);
-                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}"><span class="${isOwn ? 'own-team-text' : ''}">${s.team}</span> - <b>${s.val}</b></div>`;
+                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px; display: flex; align-items: center;' : 'padding:4px 8px; display: flex; align-items: center;'}"><span class="${isOwn ? 'own-team-text' : ''}" style="display:flex; align-items:center;">${getSmallLogo(s.team)}${s.team}</span><span style="margin-left:auto; font-weight:bold;">${s.val}</span></div>`;
                 }).join("");
 
             } catch (e) {
@@ -1742,7 +1742,7 @@
                     const t1Own = (m.team1 === currentClubName) ? 'own-team-text' : '';
                     const t2Own = (m.team2 === currentClubName) ? 'own-team-text' : '';
                     const rowBg = (m.team1 === currentClubName || m.team2 === currentClubName) ? 'background: rgba(82,168,255,0.1);' : 'background: #17212b;';
-                    html += `<div style="${rowBg} border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                    html += `<div onclick="openMatchDetails(${m.id}, 'tournament')" style="${rowBg} border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; cursor: pointer;">
                         <span class="${t1Own}" style="flex:1; display:flex; justify-content:flex-end; align-items:center; text-align:right; margin-right:8px;">${m.team1} ${t1Logo}</span>
                         <span style="color:#52a8ff; font-weight:bold; min-width:40px; text-align:center;">${score}</span>
                         <span class="${t2Own}" style="flex:1; display:flex; justify-content:flex-start; align-items:center; margin-left:8px;">${t2Logo} ${m.team2}</span>
@@ -1764,7 +1764,7 @@
                 let html = `<h4 style="color:#52a8ff; margin-bottom:10px;">Тур ${roundNum}</h4>`;
                 matches.forEach(m => {
                     const score = m.is_played ? `<span style="color:#e6c544; font-weight:bold;">${m.home_goals} : ${m.away_goals}</span>` : `<span style="color:#8e9eb5;">- : -</span>`;
-                    html += `<div style="background:#17212b; border-radius:6px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="openMatchDetails(${m.id})">
+                    html += `<div style="background:#17212b; border-radius:6px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="openMatchDetails(${m.id}, 'tournament')">
                         <div style="flex:1; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
                             <span>${m.home_name}</span> ${getSmallLogo(m.home_name)}
                         </div>
@@ -2831,7 +2831,10 @@
             }
         };
 
-        window.openMatchDetails = async function(fixtureId) {
+        let matchOrigin = "schedule";
+
+        window.openMatchDetails = async function(fixtureId, origin) {
+            matchOrigin = origin || "schedule";
             showScreen("match");
             if ($("match-score")) $("match-score").innerText = "- : -";
             if ($("match-events-block")) $("match-events-block").classList.add("hidden");
@@ -3035,8 +3038,17 @@
 
         if ($("btn-back-from-match")) $("btn-back-from-match").onclick = function() {
             showScreen("center");
-            if ($("center-schedule")) $("center-schedule").classList.remove("hidden");
-            if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+            if (matchOrigin === "tournament") {
+                if ($("center-tournament-detail")) $("center-tournament-detail").classList.remove("hidden");
+                if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
+                if ($("center-schedule")) $("center-schedule").classList.add("hidden");
+                if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+            } else {
+                if ($("center-schedule")) $("center-schedule").classList.remove("hidden");
+                if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
+                if ($("center-tournaments-list")) $("center-tournaments-list").classList.add("hidden");
+                if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
+            }
         };
 
         async function preloadLogos() {
