@@ -618,14 +618,15 @@ def position_penalty(native_pos: str, target_pos: str, alt_positions: list) -> i
 
 def recalculate_overall(player: Player) -> int:
     pos = normalize_pos(player.position)
+    def s(val): return val if val is not None else 50
     if pos == "GK":
-        ovr = int((player.gk_reflexes * 0.35) + (player.gk_handling * 0.25) + (player.gk_positioning * 0.2) + (player.gk_diving * 0.1) + (player.gk_kicking * 0.1))
+        ovr = int((s(player.gk_reflexes) * 0.35) + (s(player.gk_handling) * 0.25) + (s(player.gk_positioning) * 0.2) + (s(player.gk_diving) * 0.1) + (s(player.gk_kicking) * 0.1))
     elif pos in ["CB", "LB", "RB", "LWB", "RWB"]:
-        ovr = int((player.defending * 0.45) + (player.physicality * 0.25) + (player.pace * 0.2) + (player.passing * 0.1))
+        ovr = int((s(player.defending) * 0.45) + (s(player.physicality) * 0.25) + (s(player.pace) * 0.2) + (s(player.passing) * 0.1))
     elif pos in ["CDM", "CM", "CAM", "LM", "RM"]:
-        ovr = int((player.passing * 0.3) + (player.dribbling * 0.2) + (player.defending * 0.2) + (player.physicality * 0.15) + (player.shooting * 0.15))
+        ovr = int((s(player.passing) * 0.3) + (s(player.dribbling) * 0.2) + (s(player.defending) * 0.2) + (s(player.physicality) * 0.15) + (s(player.shooting) * 0.15))
     else:
-        ovr = int((player.shooting * 0.4) + (player.pace * 0.25) + (player.dribbling * 0.25) + (player.physicality * 0.1))
+        ovr = int((s(player.shooting) * 0.4) + (s(player.pace) * 0.25) + (s(player.dribbling) * 0.25) + (s(player.physicality) * 0.1))
     return max(1, min(99, ovr))
 
 def recalculate_market_value(player: Player) -> int:
@@ -1625,12 +1626,12 @@ def advance_cup_bracket(fx, db):
             round_number=next_round,
             match_index=next_match_index
         ).first()
-        if next_fx:
-            if fx.match_index % 2 == 0:
-                next_fx.home_club_id = winner_id
-            else:
-                next_fx.away_club_id = winner_id
-    db.commit()
+            if next_fx:
+                if fx.match_index % 2 == 0:
+                    next_fx.home_club_id = winner_id
+                else:
+                    next_fx.away_club_id = winner_id
+        db.flush()
 
 def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()
@@ -1648,8 +1649,8 @@ def simulate_match(fixture_id: int, db: Session):
         if not t or not t.starting_xi:
             return db.query(Player).filter_by(club_id=club_id, injury_weeks=0, injury_days=0, suspension_matches=0).order_by(Player.overall_rating.desc()).limit(11).all()
             
-        xi_ids = json.loads(t.starting_xi)
-        bench_ids = json.loads(t.bench) if t.bench else []
+        xi_ids = json.loads(t.starting_xi or "[]")
+        bench_ids = json.loads(t.bench or "[]") if t.bench else []
         all_players = {p.id: p for p in db.query(Player).filter_by(club_id=club_id).all()}
         
         available_bench_objs = [all_players[pid] for pid in bench_ids if pid in all_players and all_players[pid].injury_weeks == 0 and all_players[pid].injury_days == 0 and all_players[pid].suspension_matches == 0]
@@ -1772,6 +1773,10 @@ def simulate_match(fixture_id: int, db: Session):
     h_players = [p for p in h_xi if normalize_pos(p.position) != "GK"]
     a_players = [p for p in a_xi if normalize_pos(p.position) != "GK"]
     if not h_players or not a_players:
+        fx.is_played = 1
+        fx.home_goals = 0
+        fx.away_goals = 0
+        db.commit()
         return
     
     for _ in range(total_shots_h):
@@ -2420,6 +2425,13 @@ def advance_game_date(db, days_to_add):
                     simulate_match(fx.id, db)
                 except Exception as e:
                     print(f"Match simulation failed for fixture {fx.id}: {e}")
+                    db.rollback()
+                    fx_db = db.query(Fixture).filter_by(id=fx.id).first()
+                    if fx_db:
+                        fx_db.is_played = 1
+                        fx_db.home_goals = 0
+                        fx_db.away_goals = 0
+                        db.commit()
             
             db.execute(text("""
                 UPDATE players
