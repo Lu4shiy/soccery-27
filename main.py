@@ -961,17 +961,22 @@ def get_stats(tournament_id: int):
         scorers = []
         for pid, count in scorers_q:
             p = db.query(Player).filter_by(id=pid).first()
-            if p: scorers.append({"player": p.name, "team": "Клуб", "val": count})
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                scorers.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
             
         assists_q = db.query(MatchEvent.assist_id, func.count(MatchEvent.id)).filter(
             MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type.in_(['goal', 'penalty_goal']),
             MatchEvent.assist_id.isnot(None)
         ).group_by(MatchEvent.assist_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
         
         assists = []
         for pid, count in assists_q:
             p = db.query(Player).filter_by(id=pid).first()
-            if p: assists.append({"player": p.name, "team": "Клуб", "val": count})
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                assists.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
             
         ratings_q = db.query(MatchPlayerStats.player_id, func.avg(MatchPlayerStats.rating)).filter(
             MatchPlayerStats.fixture_id.in_(fx_ids)
@@ -980,7 +985,9 @@ def get_stats(tournament_id: int):
         avg_ratings = []
         for pid, avg_r in ratings_q:
             p = db.query(Player).filter_by(id=pid).first()
-            if p: avg_ratings.append({"player": p.name, "team": "Клуб", "val": round(avg_r, 2)})
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                avg_ratings.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": round(avg_r, 2)})
             
         cs_dict = {}
         for f in fixtures:
@@ -1065,6 +1072,7 @@ def reset_game(req: dict):
         db.execute(text("DELETE FROM fixtures"))
         db.execute(text("DELETE FROM tactics"))
         db.execute(text("DELETE FROM managers"))
+        db.commit()
         
         db.query(Player).update({
             Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
@@ -1078,6 +1086,103 @@ def reset_game(req: dict):
             state.last_month_advance_at = datetime.utcnow()
         db.commit()
         return {"status": "ok"}
+    finally:
+        db.close()
+
+class AdminActionRequest(BaseModel):
+    telegram_id: str
+    password: str
+
+@app.post("/api/admin/advance-day")
+def advance_day_api(req: AdminActionRequest):
+    if req.password != "soccery27admin":
+        raise HTTPException(status_code=403, detail="Неверный пароль")
+    db = Session(engine)
+    try:
+        new_date = advance_game_date(db, 1)
+        return {"status": "ok", "new_date": new_date}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/api/admin/advance-week")
+def advance_week_api(req: AdminActionRequest):
+    if req.password != "soccery27admin":
+        raise HTTPException(status_code=403, detail="Неверный пароль")
+    db = Session(engine)
+    try:
+        state = db.query(GameState).first()
+        if not state:
+            raise HTTPException(status_code=404, detail="Состояние игры не найдено")
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        days_to_sunday = 6 - curr.weekday()
+        if days_to_sunday == 0:
+            days_to_sunday = 7
+        new_date = advance_game_date(db, days_to_sunday)
+        return {"status": "ok", "new_date": new_date}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/api/admin/advance-month")
+def advance_month_api(req: AdminActionRequest):
+    if req.password != "soccery27admin":
+        raise HTTPException(status_code=403, detail="Неверный пароль")
+    db = Session(engine)
+    try:
+        state = db.query(GameState).first()
+        if not state:
+            raise HTTPException(status_code=404, detail="Состояние игры не найдено")
+        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+        last_day = calendar.monthrange(curr.year, curr.month)[1]
+        if curr.day == last_day:
+            if curr.month == 12:
+                next_month = date(curr.year + 1, 1, 1)
+            else:
+                next_month = date(curr.year, curr.month + 1, 1)
+            next_month_last_day = calendar.monthrange(next_month.year, next_month.month)[1]
+            new_date = date(next_month.year, next_month.month, next_month_last_day)
+        else:
+            new_date = date(curr.year, curr.month, last_day)
+        delta_days = (new_date - curr).days
+        new_date_str = advance_game_date(db, delta_days)
+        return {"status": "ok", "new_date": new_date_str}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/api/admin/reset-career")
+def reset_career_api(req: AdminActionRequest):
+    if req.password != "soccery27admin":
+        raise HTTPException(status_code=403, detail="Неверный пароль")
+    db = Session(engine)
+    try:
+        db.execute(text("DELETE FROM match_events"))
+        db.execute(text("DELETE FROM match_player_stats"))
+        db.execute(text("DELETE FROM fixtures"))
+        db.execute(text("DELETE FROM tactics"))
+        db.execute(text("DELETE FROM managers"))
+        db.query(Player).update({
+            Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+            Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+            Player.fitness: "green", Player.morale: "green"
+        }, synchronize_session=False)
+        state = db.query(GameState).first()
+        if state:
+            state.current_date = "2026-08-01"
+            state.season = "2026/27"
+            state.last_month_advance_at = datetime.utcnow()
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
@@ -1550,6 +1655,7 @@ async def cmd_admin_reset(message: types.Message):
         db.execute(text("DELETE FROM fixtures"))
         db.execute(text("DELETE FROM tactics"))
         db.execute(text("DELETE FROM managers"))
+        db.commit()
         
         db.query(Player).update({
             Player.goals: 0, Player.assists: 0, Player.matches_played: 0,

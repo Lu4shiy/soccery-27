@@ -329,8 +329,12 @@
         
         <div id="admin-block" class="card hidden" style="border: 1px solid #a82929;">
             <h3 style="color: #a82929;">👑 Админ-панель</h3>
-            <button class="btn" id="btn-admin-skip" style="background-color: #e67e22;">Промотать месяц</button>
-            <button class="btn" id="btn-admin-reset" style="background-color: #a82929; margin-top: 10px;">Сбросить карьеру</button>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button class="btn" id="btn-admin-day" style="background-color: #3498db;">+1 день</button>
+                <button class="btn" id="btn-admin-week" style="background-color: #f39c12;">+1 неделя</button>
+                <button class="btn" id="btn-admin-month" style="background-color: #e67e22;">+1 месяц</button>
+            </div>
+            <button class="btn" id="btn-admin-reset" style="background-color: #a82929;">Сбросить карьеру</button>
         </div>
     </div>
 
@@ -441,17 +445,11 @@
             
             <div class="sc-tabs" style="margin-top: 10px;">
                 <div class="sc-tab active" onclick="switchTourTab('table')" id="tab-btn-table">Таблица</div>
-                <div class="sc-tab" onclick="switchTourTab('matches')" id="tab-btn-matches">Матчи</div>
                 <div class="sc-tab" onclick="switchTourTab('stats')" id="tab-btn-stats">Статистика</div>
             </div>
 
             <div id="tour-tab-table" class="card">
                 <table class="stats-table" id="standings-table"></table>
-            </div>
-
-            <div id="tour-tab-matches" class="card hidden">
-                <div id="tour-rounds-list" style="margin-bottom:15px; display:flex; flex-wrap:wrap; gap:5px;"></div>
-                <div id="tour-round-details"></div>
             </div>
 
             <div id="tour-tab-stats" class="card hidden">
@@ -1457,7 +1455,6 @@
             document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
             if ($("tab-btn-table")) $("tab-btn-table").classList.add("active");
             if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
-            if ($("tour-tab-matches")) $("tour-tab-matches").classList.add("hidden");
             if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
 
             const container = $("tour-tab-table");
@@ -1560,13 +1557,13 @@
                 const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
 
                 if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
-                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
                 if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
-                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
-                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
@@ -1633,15 +1630,11 @@
         window.switchTourTab = function(tab) {
             document.querySelectorAll('.sc-tab').forEach(el => el.classList.remove("active"));
             if ($("tour-tab-table")) $("tour-tab-table").classList.add("hidden");
-            if ($("tour-tab-matches")) $("tour-tab-matches").classList.add("hidden");
             if ($("tour-tab-stats")) $("tour-tab-stats").classList.add("hidden");
             
             if (tab === 'table') {
                 if ($("tab-btn-table")) $("tab-btn-table").classList.add("active");
                 if ($("tour-tab-table")) $("tour-tab-table").classList.remove("hidden");
-            } else if (tab === 'matches') {
-                if ($("tab-btn-matches")) $("tab-btn-matches").classList.add("active");
-                if ($("tour-tab-matches")) $("tour-tab-matches").classList.remove("hidden");
             } else {
                 if ($("tab-btn-stats")) $("tab-btn-stats").classList.add("active");
                 if ($("tour-tab-stats")) $("tour-tab-stats").classList.remove("hidden");
@@ -1653,21 +1646,42 @@
             if ($("center-tournament-detail")) $("center-tournament-detail").classList.add("hidden");
         };
 
-        if ($("btn-admin-skip")) $("btn-admin-skip").onclick = async function() {
-            tg.showConfirm("Промотать 1 игровой месяц для всех?", async (ok) => {
-                if (!ok) return;
-                const res = await fetch(API_BASE + '/api/admin/advance-month', {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ telegram_id: userId })
+        async function adminAction(endpoint, successMsg) {
+            const password = prompt("Введите пароль администратора:");
+            if (password === null) return;
+            if (password !== "soccery27admin") {
+                tg.showAlert("❌ Неверный пароль");
+                return;
+            }
+            try {
+                const res = await fetch(API_BASE + endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ telegram_id: userId, password: password })
                 });
+                const data = await res.json();
                 if (res.ok) {
-                    tg.showAlert("Месяц промотан!");
+                    tg.showAlert("✅ " + successMsg);
                     fetchGameTime();
                     window.currentPlayers = null;
                 } else {
-                    tg.showAlert("Ошибка прав");
+                    tg.showAlert("❌ " + (data.detail || "Ошибка"));
                 }
-            });
+            } catch (e) {
+                tg.showAlert("❌ Сетевая ошибка");
+            }
+        }
+
+        if ($("btn-admin-day")) $("btn-admin-day").onclick = function() {
+            adminAction("/api/admin/advance-day", "Промотан 1 день!");
+        };
+
+        if ($("btn-admin-week")) $("btn-admin-week").onclick = function() {
+            adminAction("/api/admin/advance-week", "Промотана 1 неделя!");
+        };
+
+        if ($("btn-admin-month")) $("btn-admin-month").onclick = function() {
+            adminAction("/api/admin/advance-month", "Промотан 1 месяц!");
         };
 
         if ($("btn-admin-reset")) $("btn-admin-reset").onclick = function() {
@@ -1675,14 +1689,23 @@
                 if (!ok1) return;
                 tg.showConfirm("Точно уверен? Это действие нельзя отменить.", async function(ok2) {
                     if (!ok2) return;
-                    const res = await fetch(API_BASE + '/api/admin/reset-game', {
+                    const password = prompt("Введите пароль администратора:");
+                    if (password === null) return;
+                    if (password !== "soccery27admin") {
+                        tg.showAlert("❌ Неверный пароль");
+                        return;
+                    }
+                    const res = await fetch(API_BASE + '/api/admin/reset-career', {
                         method: "POST", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ telegram_id: userId })
+                        body: JSON.stringify({ telegram_id: userId, password: password })
                     });
                     if (res.ok) {
                         tg.showAlert("Карьера сброшена.");
                         localStorage.removeItem('soccery_user_id');
                         window.location.reload();
+                    } else {
+                        const data = await res.json();
+                        tg.showAlert("❌ " + (data.detail || "Ошибка"));
                     }
                 });
             });
