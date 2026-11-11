@@ -587,6 +587,18 @@ def group_of(pos: str) -> str:
         if pos in positions: return g
     return "MID"
 
+def position_penalty(native_pos: str, target_pos: str, alt_positions: list) -> int:
+    native = normalize_pos(native_pos)
+    target = normalize_pos(target_pos)
+    if native == target: return 0
+    alts = [normalize_pos(a) for a in alt_positions]
+    if target in alts: return 0
+    exact = POSITION_PENALTY.get((native, target))
+    if exact is not None: return exact
+    ng = group_of(native)
+    tg = group_of(target)
+    return GROUP_PENALTY.get((ng, tg), 20)
+
 def apply_training_if_done(player: Player, db: Session) -> bool:
     if not player.training_program_id or not player.training_started_at: return False
     prog = db.query(TrainingProgram).filter_by(id=player.training_program_id).first()
@@ -2255,7 +2267,7 @@ def advance_game_date(db, days_to_add):
                 WHERE injury_days = 0 AND injury_weeks = 0
             """))
             
-            fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
+            fixtures = db.query(Fixture).filter(Fixture.date <= date_str, Fixture.is_played == 0).all()
             for fx in fixtures:
                 try:
                     simulate_match(fx.id, db)
