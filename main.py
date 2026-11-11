@@ -1277,13 +1277,16 @@ def advance_cup_bracket(fx, db):
                 next_fx.away_club_id = winner_id
     db.flush()
 
-def simulate_match(fixture_id: int, db: Session):
-    fx = db.query(Fixture).filter_by(id=fixture_id).first()
-    if not fx or fx.is_played: return
-    
-    home = db.query(Club).filter_by(id=fx.home_club_id).first()
-    away = db.query(Club).filter_by(id=fx.away_club_id).first()
-    if not home or not away: return
+    def simulate_match(fixture_id: int, db: Session):
+        fx = db.query(Fixture).filter_by(id=fixture_id).first()
+        if not fx or fx.is_played: return
+            
+        if fx.home_club_id == 9999 or fx.away_club_id == 9999:
+            return
+                
+        home = db.query(Club).filter_by(id=fx.home_club_id).first()
+        away = db.query(Club).filter_by(id=fx.away_club_id).first()
+        if not home or not away: return
     
     def get_xi(club_id):
         t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
@@ -1412,39 +1415,41 @@ def simulate_match(fixture_id: int, db: Session):
     
     advance_cup_bracket(fx, db)
 
-def advance_game_date(db, days_to_add):
-    with db_lock:
-        state = db.query(GameState).first()
-        if not state: return None
-        curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
-        
-        for _ in range(days_to_add):
-            curr += timedelta(days=1)
-            date_str = curr.strftime("%Y-%m-%d")
-            
-            fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
-            for fx in fixtures:
-                try:
-                    simulate_match(fx.id, db)
-                except Exception as e:
-                    print(f"Match simulation failed for fixture {fx.id}: {e}")
-            
-            db.execute(text("""
-                UPDATE players
-                SET fatigue = GREATEST(0, fatigue - 15),
-                    fitness = CASE
-                        WHEN GREATEST(0, fatigue - 15) > 80 THEN 'red'
-                        WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
-                        WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
-                        ELSE 'green'
-                    END
-                WHERE fatigue > 0
-            """))
-            
-        state.current_date = curr.strftime("%Y-%m-%d")
-        state.last_month_advance_at = datetime.utcnow()
-        db.commit()
-        return state.current_date
+        def advance_game_date(db, days_to_add):
+            with db_lock:
+                state = db.query(GameState).first()
+                if not state: return None
+                curr = datetime.strptime(state.current_date, "%Y-%m-%d").date()
+                
+                for _ in range(days_to_add):
+                    curr += timedelta(days=1)
+                    date_str = curr.strftime("%Y-%m-%d")
+                    
+                    fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
+                    for fx in fixtures:
+                        try:
+                            simulate_match(fx.id, db)
+                        except Exception as e:
+                            print(f"Match simulation failed for fixture {fx.id}: {e}")
+                    
+                    db.execute(text("""
+                        UPDATE players
+                        SET fatigue = GREATEST(0, fatigue - 15),
+                            fitness = CASE
+                                WHEN GREATEST(0, fatigue - 15) > 80 THEN 'red'
+                                WHEN GREATEST(0, fatigue - 15) > 60 THEN 'orange'
+                                WHEN GREATEST(0, fatigue - 15) > 40 THEN 'yellow'
+                                ELSE 'green'
+                            END
+                        WHERE fatigue > 0
+                    """))
+                    
+                    state.current_date = curr.strftime("%Y-%m-%d")
+                    db.commit()
+                    
+                state.last_month_advance_at = datetime.utcnow()
+                db.commit()
+                return state.current_date
 
 @app.post("/api/admin/advance-month")
 def advance_month(req: dict):
