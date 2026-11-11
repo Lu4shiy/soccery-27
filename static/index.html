@@ -33,6 +33,12 @@
         .btn-secondary { background: #232e3c; color: #52a8ff; border: 1px solid #2f3b4d; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background-color 0.15s; }
         .btn-secondary:active { background: #2f3b4d; }
         .btn-secondary.active { background: #52a8ff; color: #fff; border-color: #52a8ff; }
+        .own-team-row { background: rgba(82,168,255,0.12) !important; box-shadow: inset 3px 0 0 #52a8ff; }
+        .own-team-text { color: #52a8ff !important; font-weight: bold; }
+        .injury-plus { display: inline-block; width: 14px; height: 14px; line-height: 14px; text-align: center; background: #e74c3c; color: #fff; font-weight: bold; font-size: 11px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+        .loading-spinner { width: 44px; height: 44px; border: 4px solid #2f3b4d; border-top-color: #52a8ff; border-radius: 50%; animation: spin 0.9s linear infinite; margin: 20px auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #232e3c; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); z-index: 1000; }
         .nav-item { color: #8e9eb5; text-align: center; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; padding: 4px 0; }
@@ -222,7 +228,11 @@
     </div>
 
     <div id="screen-loading" class="screen">
-        <div class="card"><h2>⏳ Загрузка...</h2></div>
+        <div class="card" style="text-align:center;">
+            <div class="loading-spinner"></div>
+            <h2 id="loading-title">Загрузка Soccery 27...</h2>
+            <p id="loading-step" style="margin-top:8px;">Инициализация игры</p>
+        </div>
     </div>
 
     <div id="screen-leagues" class="screen hidden">
@@ -374,6 +384,10 @@
                 <div class="detail-item">
                     <div class="detail-label">Тонус</div>
                     <div class="detail-value" id="pd-fitness" style="display:flex; align-items:center;">--</div>
+                </div>
+                <div class="detail-item" id="pd-injury-wrap" style="display:none;">
+                    <div class="detail-label">Травма</div>
+                    <div class="detail-value" style="color:#e74c3c;" id="pd-injury">--</div>
                 </div>
             </div>
 
@@ -574,6 +588,7 @@
 
         <div id="match-stats-block" class="card hidden">
             <h3 style="margin-top:0; color:#52a8ff;">Статистика</h3>
+            <p id="match-added-time" style="font-size:11px; color:#8e9eb5; text-align:center; margin:0 0 10px;"></p>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                 <span id="stat-poss-home" style="font-weight:bold;"></span>
                 <span style="color:#8e9eb5;">Владение</span>
@@ -603,11 +618,6 @@
                 <span id="stat-red-home" style="font-weight:bold;"></span>
                 <span style="color:#8e9eb5;">Красные карточки</span>
                 <span id="stat-red-away" style="font-weight:bold;"></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span id="stat-freekicks-home" style="font-weight:bold;"></span>
-                <span style="color:#8e9eb5;">Штрафные удары</span>
-                <span id="stat-freekicks-away" style="font-weight:bold;"></span>
             </div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                 <span id="stat-pens-home" style="font-weight:bold;"></span>
@@ -762,18 +772,45 @@
             "Czech Republic": "cz", "Czechia": "cz", "Slovakia": "sk", "Hungary": "hu", "Romania": "ro",
             "Bulgaria": "bg", "Greece": "gr", "Turkey": "tr", "Türkiye": "tr", "Ukraine": "ua", "Serbia": "rs",
             "Switzerland": "ch", "Austria": "at", "Republic of Ireland": "ie", "Ireland": "ie", "Albania": "al",
-            "Bosnia and Herzegovina": "ba", "North Macedonia": "mk", "Slovenia": "si", "Montenegro": "me",
-            "Kosovo": "xk", "Georgia": "ge", "Armenia": "am", "Azerbaijan": "az", "Kazakhstan": "kz",
-            "Israel": "il", "Iran": "ir", "Iraq": "iq", "Saudi Arabia": "sa", "Qatar": "qa", "UAE": "ae",
-            "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl", "Ecuador": "ec",
-            "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo", "Costa Rica": "cr", "Panama": "pa",
-            "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
+            "Bosnia and Herzegovina": "ba", "North Macedonia": "mk", "Macedonia": "mk", "Slovenia": "si",
+            "Montenegro": "me", "Kosovo": "xk", "Georgia": "ge", "Armenia": "am", "Azerbaijan": "az",
+            "Kazakhstan": "kz", "Israel": "il", "Iran": "ir", "Iraq": "iq", "Saudi Arabia": "sa", "Qatar": "qa",
+            "UAE": "ae", "United Arab Emirates": "ae", "Uzbekistan": "uz", "Peru": "pe", "Chile": "cl",
+            "Ecuador": "ec", "Paraguay": "py", "Venezuela": "ve", "Bolivia": "bo", "Costa Rica": "cr",
+            "Panama": "pa", "Honduras": "hn", "Jamaica": "jm", "New Zealand": "nz", "South Africa": "za",
             "Gabon": "ga", "Guinea-Bissau": "gw", "Guinea Bissau": "gw", "Guinea": "gn", "Mali": "ml",
             "Burkina Faso": "bf", "Congo": "cg", "DR Congo": "cd", "China": "cn", "Taiwan": "tw",
             "Kenya": "ke", "Latvia": "lv", "Indonesia": "id", "Malaysia": "my", "Thailand": "th",
             "Vietnam": "vn", "Philippines": "ph", "Singapore": "sg", "India": "in",
-            "Panama": "pa", "Haiti": "ht", "Congo": "cg", "DR Congo": "cd",
-            "Tunisia": "tn", "Cape Verde": "cv", "Sierra Leone": "sl"
+            "Haiti": "ht", "Tunisia": "tn", "Cape Verde": "cv", "Sierra Leone": "sl",
+            "Guyana": "gy", "Zimbabwe": "zw",
+            "Angola": "ao", "Benin": "bj", "Botswana": "bw", "Burundi": "bi", "Central African Republic": "cf",
+            "Chad": "td", "Comoros": "km", "Djibouti": "dj", "Equatorial Guinea": "gq", "Eritrea": "er",
+            "Eswatini": "sz", "Swaziland": "sz", "Ethiopia": "et", "Gambia": "gm", "Lesotho": "ls",
+            "Liberia": "lr", "Libya": "ly", "Madagascar": "mg", "Malawi": "mw", "Mauritania": "mr",
+            "Mauritius": "mu", "Mozambique": "mz", "Namibia": "na", "Niger": "ne", "Rwanda": "rw",
+            "Sao Tome and Principe": "st", "Seychelles": "sc", "Somalia": "so", "South Sudan": "ss",
+            "Sudan": "sd", "Tanzania": "tz", "Togo": "tg", "Uganda": "ug", "Zambia": "zm",
+            "Afghanistan": "af", "Bahrain": "bh", "Bangladesh": "bd", "Bhutan": "bt", "Brunei": "bn",
+            "Cambodia": "kh", "Hong Kong": "hk", "Jordan": "jo", "Kuwait": "kw", "Kyrgyzstan": "kg",
+            "Laos": "la", "Lebanon": "lb", "Macau": "mo", "Maldives": "mv", "Mongolia": "mn",
+            "Myanmar": "mm", "Nepal": "np", "North Korea": "kp", "Oman": "om", "Pakistan": "pk",
+            "Palestine": "ps", "Sri Lanka": "lk", "Syria": "sy", "Tajikistan": "tj", "Timor-Leste": "tl",
+            "Turkmenistan": "tm", "Yemen": "ye",
+            "American Samoa": "as", "Cook Islands": "ck", "Fiji": "fj", "Guam": "gu", "Kiribati": "ki",
+            "New Caledonia": "nc", "Papua New Guinea": "pg", "Samoa": "ws", "Solomon Islands": "sb",
+            "Tahiti": "pf", "Tonga": "to", "Vanuatu": "vu",
+            "Antigua and Barbuda": "ag", "Aruba": "aw", "Bahamas": "bs", "Barbados": "bb", "Belize": "bz",
+            "Bermuda": "bm", "British Virgin Islands": "vg", "Cayman Islands": "ky", "Cuba": "cu",
+            "Curacao": "cw", "Dominica": "dm", "Dominican Republic": "do", "El Salvador": "sv",
+            "Grenada": "gd", "Guadeloupe": "gp", "Guatemala": "gt", "Martinique": "mq", "Montserrat": "ms",
+            "Nicaragua": "ni", "Puerto Rico": "pr", "Saint Kitts and Nevis": "kn", "Saint Lucia": "lc",
+            "Saint Vincent and the Grenadines": "vc", "Suriname": "sr", "Trinidad and Tobago": "tt",
+            "Turks and Caicos Islands": "tc", "US Virgin Islands": "vi",
+            "Andorra": "ad", "Cyprus": "cy", "Estonia": "ee", "Faroe Islands": "fo", "Gibraltar": "gi",
+            "Liechtenstein": "li", "Lithuania": "lt", "Luxembourg": "lu", "Malta": "mt", "Moldova": "md",
+            "Monaco": "mc", "San Marino": "sm",
+            "Curaçao": "cw", "East Timor": "tl", "Swaziland": "sz"
         };
 
         function getPlayerFlagImg(nationality) {
@@ -1057,6 +1094,7 @@
             if (!listContainer) return;
             listContainer.innerHTML = '<p style="text-align:center;">⏳ Загружаем игроков...</p>';
             if ($("squad-title")) $("squad-title").innerText = 'Офис: ' + currentClubName;
+            window.currentPlayers = null;
             switchTab('office');
 
             try {
@@ -1109,13 +1147,16 @@
                     const val = formatMoney(p.market_value);
 
                     const moraleEmoji = p.morale === 'green' ? '😃' : p.morale === 'yellow' ? '🙂' : p.morale === 'orange' ? '😐' : '☹️';
+                    const injuryBadge = (p.injury_weeks && p.injury_weeks > 0)
+                        ? '<span class="injury-plus" title="' + (p.injury_name || 'Травма') + '">+</span>'
+                        : '';
                     return '<div class="player-row" onclick="openPlayerDetails(' + p.id + ')">' +
                         '<div class="player-info">' +
                         '<div class="player-ovr ' + ovrClass + '">' + p.overall + '</div>' +
                         '<div class="player-pos">' + shortPos + '</div>' +
                         '<div class="player-name-block">' +
-                        '<div class="player-name">' + p.name + '</div>' +
-                        '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет' + 
+                        '<div class="player-name">' + p.name + injuryBadge + '</div>' +
+                        '<div class="player-meta">' + flagImg + ' ' + p.nationality + ' · ' + p.age + ' лет' +
                         '<span class="morale-emoji" title="Настрой">' + moraleEmoji + '</span>' +
                         '<span class="status-dot status-' + (p.fitness || 'green') + '" title="Тонус"></span>' +
                         '</div>' +
@@ -1149,6 +1190,15 @@
             const moraleEmoji = p.morale === 'green' ? '😃' : p.morale === 'yellow' ? '🙂' : p.morale === 'orange' ? '😐' : '☹️';
             if ($("pd-morale")) $("pd-morale").innerHTML = '<span style="font-size:18px; margin-right:6px;">' + moraleEmoji + '</span>' + (moraleMap[p.morale] || "Веселый");
             if ($("pd-fitness")) $("pd-fitness").innerHTML = '<span class="status-dot status-' + (p.fitness || 'green') + '" style="width:12px;height:12px;margin-right:6px;"></span>' + (fitnessMap[p.fitness] || "Зеленый");
+            
+            if ($("pd-injury-wrap") && $("pd-injury")) {
+                if (p.injury_weeks && p.injury_weeks > 0) {
+                    $("pd-injury-wrap").style.display = "block";
+                    $("pd-injury").innerText = (p.injury_name || "Травма") + " (" + p.injury_weeks + " нед.)";
+                } else {
+                    $("pd-injury-wrap").style.display = "none";
+                }
+            }
 
             const altDiv = $("pd-alt");
             if (altDiv) {
@@ -1562,9 +1612,11 @@
                             
                             const logoHtml = getSmallLogo(s.club_name);
                             
+                            const isOwnTeam = (s.club_name === currentClubName);
+                            if (isOwnTeam) rowStyle += " background: rgba(82,168,255,0.12); box-shadow: inset 3px 0 0 #52a8ff;";
                             html += `<tr style="${rowStyle}">
                                 <td class="num">${s.pos}</td>
-                                <td><div style="display:flex; align-items:center;">${logoHtml}<span>${s.club_name}</span></div></td>
+                                <td><div style="display:flex; align-items:center;">${logoHtml}<span class="${isOwnTeam ? 'own-team-text' : ''}">${s.club_name}</span></div></td>
                                 <td class="num">${s.mp}</td>
                                 <td class="num">${s.w}</td>
                                 <td class="num">${s.d}</td>
@@ -1603,8 +1655,13 @@
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
                 else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
 
+                const renderStatRow = (s) => {
+                    const isOwn = (s.team === currentClubName);
+                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.1); padding:2px 6px; border-radius:4px;' : ''}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${s.team}) - <b>${s.val}</b></div>`;
+                };
+
                 if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
-                else $("stat-mvps").innerHTML = stats.mvps.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-mvps").innerHTML = stats.mvps.map(renderStatRow).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => `<div>${s.team} - <b>${s.val}</b></div>`).join("");
@@ -1630,10 +1687,13 @@
                     const score = (m.score1 !== null && m.score2 !== null) ? `${m.score1} : ${m.score2}` : "—";
                     const t1Logo = getSmallLogo(m.team1);
                     const t2Logo = getSmallLogo(m.team2);
-                    html += `<div style="background: #17212b; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
-                        <span style="flex:1; display:flex; justify-content:flex-end; align-items:center; text-align:right; margin-right:8px;">${m.team1} ${t1Logo}</span>
+                    const t1Own = (m.team1 === currentClubName) ? 'own-team-text' : '';
+                    const t2Own = (m.team2 === currentClubName) ? 'own-team-text' : '';
+                    const rowBg = (m.team1 === currentClubName || m.team2 === currentClubName) ? 'background: rgba(82,168,255,0.1);' : 'background: #17212b;';
+                    html += `<div style="${rowBg} border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span class="${t1Own}" style="flex:1; display:flex; justify-content:flex-end; align-items:center; text-align:right; margin-right:8px;">${m.team1} ${t1Logo}</span>
                         <span style="color:#52a8ff; font-weight:bold; min-width:40px; text-align:center;">${score}</span>
-                        <span style="flex:1; display:flex; justify-content:flex-start; align-items:center; margin-left:8px;">${t2Logo} ${m.team2}</span>
+                        <span class="${t2Own}" style="flex:1; display:flex; justify-content:flex-start; align-items:center; margin-left:8px;">${t2Logo} ${m.team2}</span>
                     </div>`;
                 });
                 html += `</div>`;
@@ -2092,7 +2152,7 @@
 
         function autoAssignStartingXI(players) {
             const formation = FORMATIONS[tacticsState.formation];
-            const availablePlayers = players.slice().sort(function(a, b) { return b.overall - a.overall; });
+            const availablePlayers = players.filter(function(p) { return !(p.injury_weeks && p.injury_weeks > 0); }).sort(function(a, b) { return b.overall - a.overall; });
             const assigned = new Set();
             const newXI = [];
 
@@ -2129,6 +2189,17 @@
                     tacticsState.formation = data.formation || "4-3-3 (Линия)";
                     tacticsState.starting_xi = Array.isArray(data.starting_xi) ? data.starting_xi : [];
                     tacticsState.bench = Array.isArray(data.bench) ? data.bench : [];
+                    tacticsState.starting_xi = tacticsState.starting_xi.map(function(id) {
+                        if (id == null) return null;
+                        const p = players.find(function(x) { return x.id === id; });
+                        if (p && p.injury_weeks && p.injury_weeks > 0) return null;
+                        return id;
+                    });
+                    tacticsState.bench = tacticsState.bench.filter(function(id) {
+                        if (id == null) return false;
+                        const p = players.find(function(x) { return x.id === id; });
+                        return !(p && p.injury_weeks && p.injury_weeks > 0);
+                    });
                     tacticsState.captain_id = data.captain_id || null;
                     tacticsState.free_kick_taker_id = data.free_kick_taker_id || null;
                     tacticsState.corner_taker_id = data.corner_taker_id || null;
@@ -2242,6 +2313,9 @@
                 return 4;
             }
             reserve.sort(function(a, b) {
+                const ia = (a.injury_weeks && a.injury_weeks > 0) ? 1 : 0;
+                const ib = (b.injury_weeks && b.injury_weeks > 0) ? 1 : 0;
+                if (ia !== ib) return ia - ib;
                 const fa = getFamilyOrder(a.position), fb = getFamilyOrder(b.position);
                 if (fa !== fb) return fa - fb;
                 return b.overall - a.overall;
@@ -2251,9 +2325,10 @@
             benchList.innerHTML = benchPlayers.map(function(p) {
                 const isSel = selectedBenchPlayerId === p.id;
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
+                const inj = (p.injury_weeks && p.injury_weeks > 0) ? '<span class="injury-plus">+</span>' : '';
                 return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onBenchPlayerClick(' + p.id + ')">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
-                    '<div class="bench-name">' + p.name + '</div>' +
+                    '<div class="bench-name">' + p.name + inj + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
                     '</div>';
             }).join("");
@@ -2261,9 +2336,13 @@
             reserveList.innerHTML = reserve.map(function(p) {
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
                 const isSel = selectedBenchPlayerId === p.id;
-                return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" onclick="onReservePlayerClick(' + p.id + ')">' +
+                const injured = (p.injury_weeks && p.injury_weeks > 0);
+                const inj = injured ? '<span class="injury-plus" title="' + (p.injury_name || 'Травма') + ' (' + p.injury_weeks + ' нед.)">+</span>' : '';
+                const opacity = injured ? 'opacity:0.55;' : '';
+                const clickHandler = injured ? '' : 'onclick="onReservePlayerClick(' + p.id + ')"';
+                return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" ' + clickHandler + ' style="' + opacity + '">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
-                    '<div class="bench-name">' + p.name + '</div>' +
+                    '<div class="bench-name">' + p.name + inj + '</div>' +
                     '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
                     '</div>';
             }).join("");
@@ -2697,6 +2776,7 @@
                         else if (e.type === 'yellow_card') { icon = "🟨"; text = `<b>${e.player}</b>`; }
                         else if (e.type === 'red_card') { icon = "🟥"; text = `<b>${e.player}</b>`; }
                         else if (e.type === 'substitution') { icon = "🔄"; text = `Замена: <b>${e.player}</b> ➡️ <b>${e.assist}</b>`; }
+                        else if (e.type === 'injury') { icon = "🚑"; text = `<b>${e.player}</b> получил травму`; }
                         else { text = e.type; }
                         
                         let logoHtml = '<span style="display:inline-block; width:22px; flex-shrink:0;"></span>';
@@ -2728,8 +2808,15 @@
                     if ($("stat-yellow-away")) $("stat-yellow-away").innerText = m.away_yellow || 0;
                     if ($("stat-red-home")) $("stat-red-home").innerText = m.home_red || 0;
                     if ($("stat-red-away")) $("stat-red-away").innerText = m.away_red || 0;
-                    if ($("stat-freekicks-home")) $("stat-freekicks-home").innerText = m.home_freekicks || 0;
-                    if ($("stat-freekicks-away")) $("stat-freekicks-away").innerText = m.away_freekicks || 0;
+                    if ($("match-added-time")) {
+                        const a1 = m.first_half_added || 0;
+                        const a2 = m.second_half_added || 0;
+                        if (a1 > 0 || a2 > 0) {
+                            $("match-added-time").innerText = "Доп. время: 1-й тайм +" + a1 + "', 2-й тайм +" + a2 + "'";
+                        } else {
+                            $("match-added-time").innerText = "";
+                        }
+                    }
                     if ($("stat-pens-home")) $("stat-pens-home").innerText = m.home_pens || 0;
                     if ($("stat-pens-away")) $("stat-pens-away").innerText = m.away_pens || 0;
                     if ($("stat-corners-home")) $("stat-corners-home").innerText = m.home_corners;
@@ -2781,11 +2868,14 @@
             if ($("btn-mp-away")) $("btn-mp-away").classList.toggle("active", mpActiveTeam === "away");
             
             const players = mpActiveTeam === "home" ? (mpData.home || []) : (mpData.away || []);
+            const teamClubId = mpActiveTeam === "home" ? mpData.home_club_id : mpData.away_club_id;
+            const isMyTeam = teamClubId === currentClubId;
             
             list.innerHTML = players.map(p => {
                 const color = getRatingColor(p.rating);
                 const mvp = p.is_mvp ? getMvpStarSvg() : '';
-                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #2f3b4d;">
+                const highlight = isMyTeam ? 'background: rgba(82,168,255,0.1);' : '';
+                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #2f3b4d; ${highlight}">
                     <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span>${mvp}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="color:#8e9eb5; font-size:11px;">${p.minutes}'</span>
@@ -2832,13 +2922,25 @@
         };
 
         async function initApp() {
-            const hasClub = await checkManager(true);
-            if (hasClub && managerSetupComplete) {
-                if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
-                await loadSquad();
-            } else if (hasClub && !managerSetupComplete) {
-                goToCoachSetup();
-            } else {
+            showScreen("loading");
+            if ($("loading-step")) $("loading-step").innerText = "Загрузка профиля...";
+            
+            try {
+                await new Promise(r => setTimeout(r, 300));
+                if ($("loading-step")) $("loading-step").innerText = "Проверка аккаунта...";
+                
+                const hasClub = await checkManager(true);
+                if (hasClub && managerSetupComplete) {
+                    if ($("loading-step")) $("loading-step").innerText = "Загрузка состава и расписания...";
+                    if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
+                    await loadSquad();
+                } else if (hasClub && !managerSetupComplete) {
+                    if ($("loading-step")) $("loading-step").innerText = "Настройка тренера...";
+                    goToCoachSetup();
+                } else {
+                    showScreen("welcome");
+                }
+            } catch(e) {
                 showScreen("welcome");
             }
             

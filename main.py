@@ -31,6 +31,39 @@ Base = declarative_base()
 
 ADMIN_TELEGRAM_ID = "5020258637"
 
+INJURY_TYPES = [
+    {"name": "Небольшой ушиб", "weight": 25, "min_weeks": 0, "max_weeks": 1},
+    {"name": "Ушиб колена", "weight": 18, "min_weeks": 0, "max_weeks": 1},
+    {"name": "Мышечное повреждение", "weight": 15, "min_weeks": 1, "max_weeks": 3},
+    {"name": "Растяжение связок", "weight": 15, "min_weeks": 1, "max_weeks": 3},
+    {"name": "Повреждение бедра", "weight": 12, "min_weeks": 1, "max_weeks": 3},
+    {"name": "Растяжение приводящей мышцы", "weight": 12, "min_weeks": 2, "max_weeks": 4},
+    {"name": "Повреждение паха", "weight": 10, "min_weeks": 2, "max_weeks": 4},
+    {"name": "Растяжение подколенного сухожилия", "weight": 10, "min_weeks": 2, "max_weeks": 5},
+    {"name": "Повреждение икроножной мышцы", "weight": 8, "min_weeks": 3, "max_weeks": 6},
+    {"name": "Перелом пальца ноги", "weight": 7, "min_weeks": 2, "max_weeks": 4},
+    {"name": "Сотрясение мозга", "weight": 5, "min_weeks": 1, "max_weeks": 3},
+    {"name": "Повреждение лодыжки", "weight": 6, "min_weeks": 2, "max_weeks": 5},
+    {"name": "Перелом носа", "weight": 5, "min_weeks": 1, "max_weeks": 3},
+    {"name": "Инфекция", "weight": 4, "min_weeks": 1, "max_weeks": 2},
+    {"name": "Травма головы", "weight": 4, "min_weeks": 2, "max_weeks": 4},
+    {"name": "Повреждение кисти", "weight": 3, "min_weeks": 3, "max_weeks": 6},
+    {"name": "Вывих плеча", "weight": 3, "min_weeks": 3, "max_weeks": 6},
+    {"name": "Перелом ребра", "weight": 3, "min_weeks": 4, "max_weeks": 6},
+    {"name": "Повреждение мениска", "weight": 2, "min_weeks": 5, "max_weeks": 10},
+    {"name": "Перелом ключицы", "weight": 2, "min_weeks": 6, "max_weeks": 10},
+    {"name": "Перелом плюсневой кости", "weight": 2, "min_weeks": 6, "max_weeks": 12},
+    {"name": "Повреждение связок колена", "weight": 2, "min_weeks": 6, "max_weeks": 12},
+    {"name": "Трещина в кости", "weight": 1, "min_weeks": 8, "max_weeks": 14},
+    {"name": "Разрыв мышцы бедра", "weight": 1, "min_weeks": 8, "max_weeks": 16},
+    {"name": "Повреждение спинного диска", "weight": 1, "min_weeks": 8, "max_weeks": 16},
+    {"name": "Перелом голени", "weight": 1, "min_weeks": 12, "max_weeks": 20},
+    {"name": "Перелом большеберцовой кости", "weight": 1, "min_weeks": 16, "max_weeks": 28},
+    {"name": "Разрыв ахиллова сухожилия", "weight": 1, "min_weeks": 20, "max_weeks": 32},
+    {"name": "Тяжелое повреждение колена", "weight": 1, "min_weeks": 20, "max_weeks": 35},
+    {"name": "Разрыв крестообразных связок", "weight": 1, "min_weeks": 28, "max_weeks": 45}
+]
+
 class Club(Base):
     __tablename__ = "clubs"
     id = Column(Integer, primary_key=True, index=True)
@@ -75,6 +108,7 @@ class Player(Base):
     rating_sum = Column(Float, default=0.0)
     fatigue = Column(Integer, default=0)
     injury_weeks = Column(Integer, default=0)
+    injury_name = Column(String, nullable=True)
 
 class Fixture(Base):
     __tablename__ = "fixtures"
@@ -105,6 +139,8 @@ class Fixture(Base):
     away_xg = Column(Float, default=0.0)
     home_freekicks = Column(Integer, default=0)
     away_freekicks = Column(Integer, default=0)
+    first_half_added = Column(Integer, default=0)
+    second_half_added = Column(Integer, default=0)
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
@@ -250,7 +286,10 @@ def init_db():
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_xg FLOAT DEFAULT 0.0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_freekicks INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_freekicks INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS first_half_added INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS second_half_added INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE match_player_stats ADD COLUMN IF NOT EXISTS is_mvp INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS injury_name VARCHAR;"))
         db.commit()
         
         if not db.query(GameState).first():
@@ -323,12 +362,17 @@ def init_db():
         old_fixture_ids = [
             row[0] for row in db.query(Fixture.id).filter(Fixture.tournament_id.in_(t_ids)).all()
         ]
-        if old_fixture_ids:
+        has_played_eng = db.query(Fixture).filter(
+            Fixture.tournament_id.in_(t_ids),
+            Fixture.is_played == 1
+        ).first() is not None
+
+        if old_fixture_ids and not has_played_eng:
             db.query(MatchEvent).filter(MatchEvent.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
             db.query(MatchPlayerStats).filter(MatchPlayerStats.fixture_id.in_(old_fixture_ids)).delete(synchronize_session=False)
             db.query(Fixture).filter(Fixture.id.in_(old_fixture_ids)).delete(synchronize_session=False)
 
-        if True:
+        if not has_played_eng:
             eng_leagues = ["Premier League", "EFL Championship", "EFL League One", "EFL League Two"]
             eng_clubs = db.query(Club).filter(Club.league.in_(eng_leagues)).all()
             if eng_clubs:
@@ -645,6 +689,7 @@ def get_club_players(club_id: int):
                 "overall": p.overall_rating, "nationality": p.nationality,
                 "market_value": p.market_value or 0, "wage": p.wage or 0, "contract_until": p.contract_until,
                 "alt_positions": alts, "morale": p.morale or "green", "fitness": p.fitness or "green",
+                "injury_weeks": p.injury_weeks or 0, "injury_name": p.injury_name,
                 "pace": p.pace or 50, "shooting": p.shooting or 50, "passing": p.passing or 50,
                 "dribbling": p.dribbling or 50, "defending": p.defending or 50, "physicality": p.physicality or 50,
                 "gk_diving": p.gk_diving or 10, "gk_handling": p.gk_handling or 10, "gk_kicking": p.gk_kicking or 10,
@@ -1387,6 +1432,32 @@ def simulate_match(fixture_id: int, db: Session):
     add_event(90, "end", None)
     used_by_any.update([0, 45, 46, 90])
 
+    xi_ids_h = [p.id for p in h_xi]
+    xi_ids_a = [p.id for p in a_xi]
+    h_bench = db.query(Player).filter(
+        Player.club_id == home.id,
+        ~Player.id.in_(xi_ids_h),
+        Player.injury_weeks == 0
+    ).order_by(Player.overall_rating.desc()).limit(9).all()
+    a_bench = db.query(Player).filter(
+        Player.club_id == away.id,
+        ~Player.id.in_(xi_ids_a),
+        Player.injury_weeks == 0
+    ).order_by(Player.overall_rating.desc()).limit(9).all()
+    
+    h_on_pitch = list(h_xi)
+    a_on_pitch = list(a_xi)
+    h_bench_available = list(h_bench)
+    a_bench_available = list(a_bench)
+    
+    h_subs_off = {}
+    a_subs_off = {}
+    h_subs_on = {}
+    a_subs_on = {}
+    h_subs_used = 0
+    a_subs_used = 0
+    max_subs = 5
+
     total_shots_h = max(2, int((h_att - a_def) * 1.5) + 10)
     total_shots_a = max(2, int((a_att - h_def) * 1.5) + 8)
     h_sot, a_sot = 0, 0
@@ -1449,15 +1520,115 @@ def simulate_match(fixture_id: int, db: Session):
         side = home.id if random.random() < 0.5 else away.id
         p = random.choice(h_players if side == home.id else a_players)
         add_event(pick_minute(20, 80), 'red_card', side, p.id)
-        
-    for _ in range(random.randint(3, 5)):
+    
+    num_injuries = 0
+    if random.random() < 0.55:
+        num_injuries = random.randint(1, 2)
+    
+    for _ in range(num_injuries):
         side = home.id if random.random() < 0.5 else away.id
-        out_p = random.choice(h_players if side == home.id else a_players)
-        in_p = db.query(Player).filter(Player.club_id == side, Player.id != out_p.id).first()
-        add_event(pick_minute(60, 85, is_sub=True), 'substitution', side, out_p.id, in_p.id if in_p else None)
+        if side == home.id:
+            pool = h_on_pitch
+            bench = h_bench_available if h_subs_used < max_subs else []
+        else:
+            pool = a_on_pitch
+            bench = a_bench_available if a_subs_used < max_subs else []
+        
+        if not pool:
+            continue
+        victim = random.choice(pool)
+        
+        total_w = sum(i["weight"] for i in INJURY_TYPES)
+        r = random.uniform(0, total_w)
+        cum = 0
+        chosen = INJURY_TYPES[0]
+        for i in INJURY_TYPES:
+            cum += i["weight"]
+            if r <= cum:
+                chosen = i
+                break
+        
+        weeks = random.randint(chosen["min_weeks"], chosen["max_weeks"])
+        if weeks < 1:
+            weeks = 1
+        
+        inj_min = pick_minute(5, 88)
+        add_event(inj_min, 'injury', side, victim.id)
+        
+        if bench:
+            replacement = random.choice(bench)
+            add_event(inj_min, 'substitution', side, victim.id, replacement.id)
+            
+            if side == home.id:
+                h_subs_off[victim.id] = inj_min
+                h_subs_on[replacement.id] = inj_min
+                h_on_pitch.remove(victim)
+                h_on_pitch.append(replacement)
+                h_bench_available.remove(replacement)
+                h_subs_used += 1
+            else:
+                a_subs_off[victim.id] = inj_min
+                a_subs_on[replacement.id] = inj_min
+                a_on_pitch.remove(victim)
+                a_on_pitch.append(replacement)
+                a_bench_available.remove(replacement)
+                a_subs_used += 1
+        
+        victim.injury_weeks = (victim.injury_weeks or 0) + weeks
+        victim.injury_name = chosen["name"]
+    
+    for _ in range(random.randint(1, 3)):
+        side = home.id if random.random() < 0.5 else away.id
+        if side == home.id:
+            if h_subs_used >= max_subs or not h_on_pitch or not h_bench_available:
+                continue
+            out_p = random.choice(h_on_pitch)
+            in_p = random.choice(h_bench_available)
+            sub_min = pick_minute(60, 85, is_sub=True)
+            add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
+            h_subs_off[out_p.id] = sub_min
+            h_subs_on[in_p.id] = sub_min
+            h_on_pitch.remove(out_p)
+            h_on_pitch.append(in_p)
+            h_bench_available.remove(in_p)
+            h_subs_used += 1
+        else:
+            if a_subs_used >= max_subs or not a_on_pitch or not a_bench_available:
+                continue
+            out_p = random.choice(a_on_pitch)
+            in_p = random.choice(a_bench_available)
+            sub_min = pick_minute(60, 85, is_sub=True)
+            add_event(sub_min, 'substitution', away.id, out_p.id, in_p.id)
+            a_subs_off[out_p.id] = sub_min
+            a_subs_on[in_p.id] = sub_min
+            a_on_pitch.remove(out_p)
+            a_on_pitch.append(in_p)
+            a_bench_available.remove(in_p)
+            a_subs_used += 1
+    
+    total_goals = h_goals + a_goals
+    total_fouls_fixed = random.randint(5, 15) + random.randint(5, 15)
+    num_yellow = sum(1 for e in events if e.event_type == 'yellow_card')
+    num_red = sum(1 for e in events if e.event_type == 'red_card')
+    num_inj = sum(1 for e in events if e.event_type == 'injury')
+    
+    base_1 = 1 + total_goals // 2 + num_yellow // 2 + num_red + num_inj
+    base_2 = 2 + total_goals // 2 + total_fouls_fixed // 8 + num_red * 2 + num_inj * 2
+    added_1st = min(10, max(0, base_1 + random.randint(-1, 1)))
+    added_2nd = min(10, max(0, base_2 + random.randint(-1, 2)))
+    total_match_minutes = 90 + added_1st + added_2nd
 
     all_player_data = []
-    for p in h_xi + a_xi:
+    sub_ids = set(h_subs_on.keys()) | set(a_subs_on.keys())
+    all_participants = list(h_xi) + list(a_xi)
+    for p in h_bench:
+        if p.id in sub_ids:
+            all_participants.append(p)
+    for p in a_bench:
+        if p.id in sub_ids:
+            all_participants.append(p)
+    
+    for p in all_participants:
         p.matches_played = (p.matches_played or 0) + 1
         p.fatigue = min(100, (p.fatigue or 0) + random.randint(20, 35))
         
@@ -1481,17 +1652,33 @@ def simulate_match(fixture_id: int, db: Session):
                 rating += 0.25
         
         rating = round(max(1.0, min(10.0, rating)), 1)
-        all_player_data.append((p, rating))
+        
+        if is_home:
+            if p.id in h_subs_off:
+                minutes = h_subs_off[p.id]
+            elif p.id in h_subs_on:
+                minutes = total_match_minutes - h_subs_on[p.id]
+            else:
+                minutes = total_match_minutes
+        else:
+            if p.id in a_subs_off:
+                minutes = a_subs_off[p.id]
+            elif p.id in a_subs_on:
+                minutes = total_match_minutes - a_subs_on[p.id]
+            else:
+                minutes = total_match_minutes
+        
+        all_player_data.append((p, rating, minutes))
 
     mvp_player = None
     if all_player_data:
-        max_r = max(r for _, r in all_player_data)
-        mvp_candidates = [p for p, r in all_player_data if r == max_r]
+        max_r = max(r for _, r, _ in all_player_data)
+        mvp_candidates = [p for p, r, _ in all_player_data if r == max_r]
         mvp_player = random.choice(mvp_candidates)
 
-    for p, rating in all_player_data:
+    for p, rating, minutes in all_player_data:
         is_mvp = 1 if (mvp_player and p.id == mvp_player.id) else 0
-        mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=90, rating=rating, is_mvp=is_mvp)
+        mp_stat = MatchPlayerStats(fixture_id=fx.id, player_id=p.id, club_id=p.club_id, minutes_played=minutes, rating=rating, is_mvp=is_mvp)
         db.add(mp_stat)
         
     if h_goals > a_goals:
@@ -1518,8 +1705,8 @@ def simulate_match(fixture_id: int, db: Session):
     fx.away_offsides = random.randint(0, 4)
     fx.home_xg = round(h_sot * random.uniform(0.1, 0.4) + h_goals * 0.15, 2)
     fx.away_xg = round(a_sot * random.uniform(0.1, 0.4) + a_goals * 0.15, 2)
-    fx.home_freekicks = random.randint(5, 18)
-    fx.away_freekicks = random.randint(5, 18)
+    fx.first_half_added = added_1st
+    fx.second_half_added = added_2nd
     
     for ev in events: db.add(ev)
     db.flush()
@@ -1662,7 +1849,8 @@ def get_match_details(fixture_id: int):
             "home_corners": fx.home_corners, "away_corners": fx.away_corners,
             "home_offsides": fx.home_offsides, "away_offsides": fx.away_offsides,
             "home_xg": fx.home_xg or 0.0, "away_xg": fx.away_xg or 0.0,
-            "home_freekicks": fx.home_freekicks or 0, "away_freekicks": fx.away_freekicks or 0,
+            "first_half_added": fx.first_half_added or 0,
+            "second_half_added": fx.second_half_added or 0,
             "home_yellow": h_yellow, "away_yellow": a_yellow,
             "home_red": h_red, "away_red": a_red,
             "home_subs": h_subs, "away_subs": a_subs,
