@@ -1688,7 +1688,8 @@ def simulate_match(fixture_id: int, db: Session):
         if pos == "GK": return 1
         return 5
 
-    for _ in range(random.randint(1, 4)):
+    num_yellows = random.choices([0, 1, 2, 3, 4], weights=[0.25, 0.45, 0.2, 0.08, 0.02])[0]
+    for _ in range(num_yellows):
         side = home.id if random.random() < 0.5 else away.id
         pool = h_players if side == home.id else a_players
         if pool:

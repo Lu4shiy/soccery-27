@@ -1522,41 +1522,32 @@
                 
                 container.innerHTML = html;
 
-                let pressTimer;
-                const daysElements = container.querySelectorAll('.cal-day');
-                daysElements.forEach(el => {
-                    const d = el.getAttribute('data-date');
-                    if (!d) return;
-                    
-                    const triggerSim = (e) => {
-                        if (e) e.preventDefault();
-                        tg.showConfirm("Симулировать до " + d + " (не включая)?", function(ok) {
-                            if (!ok) return;
-                            const pwd = prompt("Введите пароль администратора:");
-                            if (pwd === "soccery27admin") {
-                                simulateToDate(d);
-                            } else if (pwd !== null) {
-                                tg.showAlert("❌ Неверный пароль");
+                if (!window.calendarListenersAttached) {
+                    window.calendarListenersAttached = true;
+                    const calContainer = $("calendar-days");
+                    if (calContainer) {
+                        let pressTimer;
+                        const startPress = (e) => {
+                            const cell = e.target.closest('.cal-day');
+                            if (!cell || !cell.dataset.date) return;
+                            pressTimer = window.setTimeout(() => {
+                                window.triggerSim(cell.dataset.date);
+                            }, 600);
+                        };
+                        const endPress = () => { clearTimeout(pressTimer); };
+                        
+                        calContainer.addEventListener('touchstart', startPress, {passive: true});
+                        calContainer.addEventListener('touchend', endPress);
+                        calContainer.addEventListener('touchmove', endPress);
+                        calContainer.addEventListener('contextmenu', (e) => {
+                            const cell = e.target.closest('.cal-day');
+                            if (cell && cell.dataset.date) {
+                                e.preventDefault();
+                                window.triggerSim(cell.dataset.date);
                             }
                         });
-                    };
-
-                    el.addEventListener('contextmenu', triggerSim);
-
-                    el.addEventListener('touchstart', (e) => {
-                        pressTimer = window.setTimeout(() => {
-                            triggerSim(e);
-                        }, 600);
-                    }, {passive: true});
-
-                    el.addEventListener('touchend', (e) => {
-                        clearTimeout(pressTimer);
-                    });
-
-                    el.addEventListener('touchmove', (e) => {
-                        clearTimeout(pressTimer);
-                    });
-                });
+                    }
+                }
             } catch (e) {
                 console.error("Calendar Error:", e);
                 container.innerHTML = "<div style='color:#ff6b6b; grid-column: 1/-1; text-align:center;'>Ошибка загрузки расписания</div>";
@@ -1724,22 +1715,22 @@
                 };
 
                 if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
-                else $("stat-scorers").innerHTML = stats.scorers.map(renderStatRow).join("");
+                else $("stat-scorers").innerHTML = stats.scorers.map(s => renderStatRow(s, false)).join("");
 
                 if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
-                else $("stat-assists").innerHTML = stats.assists.map(renderStatRow).join("");
+                else $("stat-assists").innerHTML = stats.assists.map(s => renderStatRow(s, false)).join("");
 
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
                 else $("stat-rating").innerHTML = stats.rating.map(s => renderStatRow(s, true)).join("");
 
                 if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
-                else $("stat-mvps").innerHTML = stats.mvps.map(renderStatRow).join("");
+                else $("stat-mvps").innerHTML = stats.mvps.map(s => renderStatRow(s, false)).join("");
 
                 if (!stats.yellows || stats.yellows.length === 0) $("stat-yellows").innerHTML = emptyHtml;
-                else $("stat-yellows").innerHTML = stats.yellows.map(renderStatRow).join("");
+                else $("stat-yellows").innerHTML = stats.yellows.map(s => renderStatRow(s, false)).join("");
 
                 if (!stats.reds || stats.reds.length === 0) $("stat-reds").innerHTML = emptyHtml;
-                else $("stat-reds").innerHTML = stats.reds.map(renderStatRow).join("");
+                else $("stat-reds").innerHTML = stats.reds.map(s => renderStatRow(s, false)).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => {
@@ -1890,6 +1881,18 @@
             }
         }
 
+        window.triggerSim = function(d) {
+            tg.showConfirm("Симулировать до " + d + " (не включая)?", function(ok) {
+                if (!ok) return;
+                const pwd = prompt("Введите пароль администратора:");
+                if (pwd === "soccery27admin") {
+                    simulateToDate(d);
+                } else if (pwd !== null) {
+                    tg.showAlert("❌ Неверный пароль");
+                }
+            });
+        };
+
         async function simulateToDate(targetDate) {
             tg.showAlert("⏳ Симуляция...");
             try {
@@ -1898,21 +1901,25 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ telegram_id: userId, password: "soccery27admin", target_date: targetDate })
                 });
-                if (!res.ok) throw new Error("Ошибка");
+                if (!res.ok) throw new Error("Ошибка сервера");
                 const data = await res.json();
+                
+                currentGameDate = data.new_date;
+                await fetchGameTime();
+                await renderCalendar(true);
+                
                 if (data.message) {
                     tg.showAlert(data.message);
                 } else {
                     tg.showAlert("✅ Симуляция завершена!");
                 }
-                await fetchGameTime();
-                await renderCalendar(true);
+                
                 window.currentPlayers = null;
                 if ($("screen-office") && !$("screen-office").classList.contains("hidden")) {
                     await loadSquad();
                 }
             } catch(e) {
-                tg.showAlert("❌ Ошибка симуляции");
+                tg.showAlert("❌ Ошибка симуляции: " + e.message);
             }
         }
 
@@ -2128,6 +2135,7 @@
             formation: "4-3-3 (Линия)", starting_xi: [], bench: [],
             captain_id: null, free_kick_taker_id: null, corner_taker_id: null, penalty_taker_id: null
         };
+        let injured_starters = {};
         let tacticsLoaded = false;
         let selectedSlotIndex = null;
         let selectedBenchPlayerId = null;
@@ -2338,8 +2346,15 @@
                     tacticsState.formation = data.formation || "4-3-3 (Линия)";
                     tacticsState.starting_xi = Array.isArray(data.starting_xi) ? data.starting_xi : [];
                     tacticsState.bench = Array.isArray(data.bench) ? data.bench : [];
-                    tacticsState.starting_xi = tacticsState.starting_xi.map(function(id) {
-                        return id != null ? id : null;
+                    injured_starters = {};
+                    tacticsState.starting_xi = tacticsState.starting_xi.map(function(id, idx) {
+                        if (id == null) return null;
+                        const p = players.find(function(x) { return x.id === id; });
+                        if (p && (p.injury_weeks > 0 || p.injury_days > 0 || p.suspension_matches > 0)) {
+                            injured_starters[idx] = id;
+                            return null;
+                        }
+                        return id;
                     });
                     tacticsState.bench = tacticsState.bench.filter(function(id) {
                         return id != null;
@@ -2453,7 +2468,8 @@
             const all = window.currentPlayers || [];
             
             const benchPlayers = tacticsState.bench.map(id => getPlayerById(id)).filter(Boolean);
-            const reserve = all.filter(function(p) { return !xiSet.has(p.id) && !benchSet.has(p.id); });
+            const injuredReserve = Object.values(injured_starters).map(id => getPlayerById(id)).filter(Boolean);
+            const reserve = all.filter(function(p) { return !xiSet.has(p.id) && !benchSet.has(p.id) && !injuredReserve.some(ir => ir.id === p.id); });
 
             function getFamilyOrder(pos) {
                 const p = (pos || "").toLowerCase();
@@ -2484,17 +2500,32 @@
                     '</div>';
             }).join("");
 
-            reserveList.innerHTML = reserve.map(function(p) {
+            const allReserve = [...injuredReserve, ...reserve];
+            reserveList.innerHTML = allReserve.map(function(p) {
                 const ovrCls = p.overall >= 75 ? 'ovr-gold' : p.overall >= 65 ? 'ovr-silver' : 'ovr-bronze';
                 const isSel = selectedBenchPlayerId === p.id;
                 const injured = (p.injury_weeks > 0 || p.injury_days > 0 || p.suspension_matches > 0);
-                const inj = injured ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;" title="Недоступен">✚</span>' : '';
-                const opacity = injured ? 'opacity:0.55;' : '';
-                const clickHandler = injured ? '' : 'onclick="onReservePlayerClick(' + p.id + ')"';
+                const isInjStarter = injuredReserve.some(ir => ir.id === p.id);
+                const disableClick = injured || isInjStarter;
+                
+                let posLabel = shortPosOf(p.position);
+                if (isInjStarter) {
+                    for (const idx in injured_starters) {
+                        if (injured_starters[idx] === p.id) {
+                            const slot = FORMATIONS[tacticsState.formation][idx];
+                            posLabel += ' (возврат в ' + (slot ? slot.role : '?') + ')';
+                            break;
+                        }
+                    }
+                }
+
+                const inj = (injured || isInjStarter) ? '<span style="color:#e74c3c; font-weight:bold; flex-shrink:0;" title="Травма">✚</span>' : '';
+                const opacity = disableClick ? 'opacity:0.55;' : '';
+                const clickHandler = disableClick ? '' : 'onclick="onReservePlayerClick(' + p.id + ')"';
                 return '<div class="bench-card ' + (isSel ? 'selected' : '') + '" ' + clickHandler + ' style="' + opacity + '">' +
                     '<div class="ovr-mini ' + ovrCls + '">' + p.overall + '</div>' +
-                    '<div class="bench-name" style="display:flex; align-items:center; gap:4px; overflow:hidden;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + p.name + '</span>' + inj + '</div>' +
-                    '<div class="bench-pos">' + shortPosOf(p.position) + '</div>' +
+                    '<div class="bench-name" style="display:flex; align-items:center; gap:4px; overflow:hidden;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + posLabel + '">' + p.name + '</span>' + inj + '</div>' +
+                    '<div class="bench-pos" style="font-size:9px;">' + posLabel + '</div>' +
                     '</div>';
             }).join("");
         }
@@ -2759,13 +2790,19 @@
 
         async function doSaveTactics() {
             try {
+                const save_xi = [...tacticsState.starting_xi];
+                for (const idx in injured_starters) {
+                    if (save_xi[idx] == null) {
+                        save_xi[idx] = injured_starters[idx];
+                    }
+                }
                 const res = await fetch(API_BASE + '/api/tactics', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         telegram_id: userId,
                         formation: tacticsState.formation,
-                        starting_xi: tacticsState.starting_xi,
+                        starting_xi: save_xi,
                         bench: tacticsState.bench,
                         captain_id: tacticsState.captain_id,
                         free_kick_taker_id: tacticsState.free_kick_taker_id,
