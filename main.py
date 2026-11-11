@@ -1004,7 +1004,7 @@ def get_match_players(fixture_id: int):
                 if e.event_type == 'own_goal': p_events[e.player_id]["own_goals"] += 1
                 if e.event_type == 'yellow_card': p_events[e.player_id]["yellow"] += 1
                 if e.event_type == 'red_card': p_events[e.player_id]["red"] += 1
-            if e.assist_id:
+            if e.event_type in ('goal', 'penalty_goal') and e.assist_id:
                 if e.assist_id not in p_events: p_events[e.assist_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0}
                 p_events[e.assist_id]["assists"] += 1
 
@@ -1106,6 +1106,30 @@ def get_stats(tournament_id: int):
             if p:
                 club = db.query(Club).filter_by(id=p.club_id).first()
                 mvps.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
+        
+        yellows_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type == 'yellow_card'
+        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
+
+        yellows = []
+        for pid, count in yellows_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                yellows.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
+
+        reds_q = db.query(MatchEvent.player_id, func.count(MatchEvent.id)).filter(
+            MatchEvent.fixture_id.in_(fx_ids),
+            MatchEvent.event_type == 'red_card'
+        ).group_by(MatchEvent.player_id).order_by(func.count(MatchEvent.id).desc()).limit(10).all()
+
+        reds = []
+        for pid, count in reds_q:
+            p = db.query(Player).filter_by(id=pid).first()
+            if p:
+                club = db.query(Club).filter_by(id=p.club_id).first()
+                reds.append({"player": p.name, "team": club.name if club else "—", "nationality": p.nationality, "val": count})
             
         cs_dict = {}
         for f in fixtures:
@@ -1118,7 +1142,7 @@ def get_stats(tournament_id: int):
             if c: clean_sheets.append({"team": c.name, "val": count})
         clean_sheets.sort(key=lambda x: x["val"], reverse=True)
 
-        return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "mvps": mvps, "clean_sheets": clean_sheets[:10]}
+        return {"scorers": scorers, "assists": assists, "rating": avg_ratings, "mvps": mvps, "yellows": yellows, "reds": reds, "clean_sheets": clean_sheets[:10]}
     finally:
         db.close()
 
@@ -1889,7 +1913,7 @@ def advance_game_date(db, days_to_add):
             """))
             db.execute(text("""
                 UPDATE players
-                SET injury_weeks = injury_weeks - 1, injury_days = 7
+                SET injury_weeks = injury_weeks - 1, injury_days = 6
                 WHERE injury_days = 0 AND injury_weeks > 0
             """))
             db.execute(text("""

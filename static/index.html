@@ -479,6 +479,10 @@
                 <div id="stat-rating" style="font-size: 12px; margin-bottom: 15px;"></div>
                 <h4 style="color: #52a8ff; margin-bottom: 5px;">MVP матчей</h4>
                 <div id="stat-mvps" style="font-size: 12px; margin-bottom: 15px;"></div>
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Желтые карточки</h4>
+                <div id="stat-yellows" style="font-size: 12px; margin-bottom: 15px;"></div>
+                <h4 style="color: #52a8ff; margin-bottom: 5px;">Красные карточки</h4>
+                <div id="stat-reds" style="font-size: 12px; margin-bottom: 15px;"></div>
                 <h4 style="color: #52a8ff; margin-bottom: 5px;">Сухие матчи (команды)</h4>
                 <div id="stat-clean-sheets" style="font-size: 12px;"></div>
             </div>
@@ -1452,13 +1456,13 @@
             renderCalendar();
         };
 
-        async function renderCalendar() {
+        async function renderCalendar(silent = false) {
             const months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
             if ($("cal-title")) $("cal-title").innerText = months[calMonth - 1] + " " + calYear;
             
             const container = $("calendar-days");
             if (!container) return;
-            container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
+            if (!silent) container.innerHTML = "<div style='color:#8e9eb5; grid-column: 1/-1;'>Загрузка...</div>";
             
             try {
                 let url = `${API_BASE}/api/game/schedule?year=${calYear}&month=${calMonth}`;
@@ -1662,21 +1666,27 @@
                 const emptyHtml = "<div style='color:#8e9eb5; font-size:12px;'>Данные отсутствуют</div>";
 
                 if (!stats.scorers || stats.scorers.length === 0) $("stat-scorers").innerHTML = emptyHtml;
-                else $("stat-scorers").innerHTML = stats.scorers.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-scorers").innerHTML = stats.scorers.map(renderStatRow).join("");
 
                 if (!stats.assists || stats.assists.length === 0) $("stat-assists").innerHTML = emptyHtml;
-                else $("stat-assists").innerHTML = stats.assists.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-assists").innerHTML = stats.assists.map(renderStatRow).join("");
 
                 if (!stats.rating || stats.rating.length === 0) $("stat-rating").innerHTML = emptyHtml;
-                else $("stat-rating").innerHTML = stats.rating.map(s => `<div>${getPlayerFlagImg(s.nationality || '')} ${s.player} (${s.team}) - <b>${s.val}</b></div>`).join("");
+                else $("stat-rating").innerHTML = stats.rating.map(renderStatRow).join("");
 
                 const renderStatRow = (s) => {
                     const isOwn = (s.team === currentClubName);
-                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${s.team}) - <b>${s.val}</b></div>`;
+                    return `<div style="${isOwn ? 'background: rgba(82,168,255,0.15); padding:4px 8px; border-radius:4px; margin-bottom:2px;' : 'padding:4px 8px;'}">${getPlayerFlagImg(s.nationality || '')} <span class="${isOwn ? 'own-team-text' : ''}">${s.player}</span> (${getSmallLogo(s.team)} ${s.team}) - <b>${s.val}</b></div>`;
                 };
 
                 if (!stats.mvps || stats.mvps.length === 0) $("stat-mvps").innerHTML = emptyHtml;
                 else $("stat-mvps").innerHTML = stats.mvps.map(renderStatRow).join("");
+
+                if (!stats.yellows || stats.yellows.length === 0) $("stat-yellows").innerHTML = emptyHtml;
+                else $("stat-yellows").innerHTML = stats.yellows.map(renderStatRow).join("");
+
+                if (!stats.reds || stats.reds.length === 0) $("stat-reds").innerHTML = emptyHtml;
+                else $("stat-reds").innerHTML = stats.reds.map(renderStatRow).join("");
 
                 if (!stats.clean_sheets || stats.clean_sheets.length === 0) $("stat-clean-sheets").innerHTML = emptyHtml;
                 else $("stat-clean-sheets").innerHTML = stats.clean_sheets.map(s => {
@@ -1772,23 +1782,51 @@
                 tg.showAlert("❌ Неверный пароль");
                 return;
             }
+            
+            tg.showAlert("⏳ Симуляция началась...");
+            
             try {
-                const res = await fetch(API_BASE + endpoint, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ telegram_id: userId, password: password })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    tg.showAlert("✅ " + successMsg);
-                    await fetchGameTime();
-                    if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
-                        renderCalendar();
+                if (endpoint === '/api/admin/advance-month' || endpoint === '/api/admin/advance-week') {
+                    let days = 1;
+                    let curr = new Date(currentGameDate);
+                    if (endpoint === '/api/admin/advance-month') {
+                        let target = new Date(curr.getFullYear(), curr.getMonth() + 1, 0);
+                        days = Math.floor((target - curr) / (1000 * 60 * 60 * 24));
+                        if (days <= 0) days = 1;
+                    } else {
+                        let daysToSunday = 6 - curr.getDay();
+                        days = daysToSunday <= 0 ? 7 : daysToSunday;
                     }
-                    window.currentPlayers = null;
+
+                    for (let i = 0; i < days; i++) {
+                        const res = await fetch(API_BASE + '/api/admin/advance-day', {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ telegram_id: userId, password: password })
+                        });
+                        if (!res.ok) throw new Error("Ошибка симуляции");
+                        await fetchGameTime();
+                        if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
+                            await renderCalendar(true);
+                        }
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
                 } else {
-                    tg.showAlert("❌ " + (data.detail || "Ошибка"));
+                    const res = await fetch(API_BASE + endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ telegram_id: userId, password: password })
+                    });
+                    if (!res.ok) throw new Error("Ошибка симуляции");
                 }
+                
+                tg.showAlert("✅ " + successMsg);
+                await fetchGameTime();
+                if ($("center-schedule") && !$("center-schedule").classList.contains("hidden")) {
+                    await renderCalendar(true);
+                }
+                window.currentPlayers = null;
+                await loadSquad();
             } catch (e) {
                 tg.showAlert("❌ Сетевая ошибка");
             }
@@ -2931,7 +2969,7 @@
                 if (p.red > 0) icons += `🟥 `;
                 
                 return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #2f3b4d; ${highlight}">
-                    <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span>${mvp} <span style="margin-left:4px; font-size:12px;">${icons}</span></span>
+                    <span style="flex:1;">${p.name} <span style="color:#8e9eb5; font-size:10px;">${shortPosOf(p.position)}</span> <span style="margin-left:4px; font-size:12px;">${icons}</span>${mvp}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="color:#8e9eb5; font-size:11px;">${p.minutes}'</span>
                         <span style="background:${color}; color:#fff; font-weight:bold; padding:2px 8px; border-radius:4px; min-width:40px; text-align:center; font-size:12px;">${p.rating.toFixed(1)}</span>
@@ -2976,6 +3014,22 @@
             if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
         };
 
+        async function preloadLogos() {
+            try {
+                const res = await fetch(API_BASE + '/api/clubs');
+                const clubs = await res.json();
+                const leagues = new Set(clubs.map(c => c.league));
+                let promises = [];
+                leagues.forEach(l => {
+                    if(l) promises.push(new Promise(r => { let img = new Image(); img.onload = r; img.onerror = r; img.src = '/static/logos/leagues/' + slugify(l) + '.png'; }));
+                });
+                clubs.forEach(c => {
+                    promises.push(new Promise(r => { let img = new Image(); img.onload = r; img.onerror = r; img.src = '/static/logos/clubs/' + slugify(c.name) + '.png'; }));
+                });
+                await Promise.all(promises);
+            } catch(e) { console.error(e); }
+        }
+
         async function initApp() {
             showScreen("loading");
             if ($("loading-step")) $("loading-step").innerText = "Загрузка профиля...";
@@ -2986,6 +3040,8 @@
                 
                 const hasClub = await checkManager(true);
                 if (hasClub && managerSetupComplete) {
+                    if ($("loading-step")) $("loading-step").innerText = "Загрузка логотипов и ресурсов...";
+                    await preloadLogos();
                     if ($("loading-step")) $("loading-step").innerText = "Загрузка состава и расписания...";
                     if ($("bottom-nav")) $("bottom-nav").classList.remove("hidden");
                     await loadSquad();
