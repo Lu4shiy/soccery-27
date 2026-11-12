@@ -1626,12 +1626,12 @@ def advance_cup_bracket(fx, db):
             round_number=next_round,
             match_index=next_match_index
         ).first()
-            if next_fx:
-                if fx.match_index % 2 == 0:
-                    next_fx.home_club_id = winner_id
-                else:
-                    next_fx.away_club_id = winner_id
-        db.flush()
+        if next_fx:
+            if fx.match_index % 2 == 0:
+                next_fx.home_club_id = winner_id
+            else:
+                next_fx.away_club_id = winner_id
+    db.flush()
 
 def simulate_match(fixture_id: int, db: Session):
     fx = db.query(Fixture).filter_by(id=fixture_id).first()
@@ -1783,14 +1783,24 @@ def simulate_match(fixture_id: int, db: Session):
         db.commit()
         return
     
+    def pick_scorer(players):
+        weights = [(p.shooting or 50) + (p.pace or 50) * 0.5 + (p.dribbling or 50) * 0.2 for p in players]
+        return random.choices(players, weights=weights, k=1)[0]
+
+    def pick_assister(players, scorer):
+        pool = [p for p in players if p.id != scorer.id]
+        if not pool: return None
+        weights = [(p.passing or 50) + (p.dribbling or 50) * 0.5 for p in pool]
+        return random.choices(pool, weights=weights, k=1)[0]
+
     for _ in range(total_shots_h):
         if random.random() < 0.4:
             h_sot += 1
             if random.random() < 0.35:
                 h_goals += 1
                 minute = pick_minute()
-                scorer = random.choice(h_players)
-                assist = random.choice([p for p in h_players if p.id != scorer.id]) if random.random() < 0.65 else None
+                scorer = pick_scorer(h_players)
+                assist = pick_assister(h_players, scorer) if random.random() < 0.65 else None
                 add_event(minute, 'goal', home.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
                 match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
@@ -1804,8 +1814,8 @@ def simulate_match(fixture_id: int, db: Session):
             if random.random() < 0.30:
                 a_goals += 1
                 minute = pick_minute()
-                scorer = random.choice(a_players)
-                assist = random.choice([p for p in a_players if p.id != scorer.id]) if random.random() < 0.65 else None
+                scorer = pick_scorer(a_players)
+                assist = pick_assister(a_players, scorer) if random.random() < 0.65 else None
                 add_event(minute, 'goal', away.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
                 match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
@@ -1972,14 +1982,6 @@ def simulate_match(fixture_id: int, db: Session):
         if h_subs_used >= max_subs: break
         out_p, in_p = pick_substitute(h_on_pitch, h_bench_available, h_subs_off)
         if not out_p or not in_p: break
-        sub_min = pick_minute(60, 85, is_sub=True)
-        add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
-        h_subs_off[out_p.id] = sub_min
-        h_subs_on[in_p.id] = sub_min
-        h_on_pitch.remove(out_p)
-        h_on_pitch.append(in_p)
-        h_bench_available.remove(in_p)
-        h_subs_used += 1
         sub_min = pick_minute(60, 85, is_sub=True)
         add_event(sub_min, 'substitution', home.id, out_p.id, in_p.id)
         h_subs_off[out_p.id] = sub_min
