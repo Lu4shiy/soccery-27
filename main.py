@@ -115,6 +115,7 @@ class Player(Base):
     consecutive_yellows = Column(Integer, default=0)
     potential = Column(Integer, default=85)
     growth_progress = Column(Integer, default=0)
+    season_start_ovr = Column(Integer, nullable=True)
 
 class Fixture(Base):
     __tablename__ = "fixtures"
@@ -436,7 +437,9 @@ def init_db():
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS consecutive_yellows INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS potential INTEGER DEFAULT 85;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS growth_progress INTEGER DEFAULT 0;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS season_start_ovr INTEGER;"))
         db.execute(text("UPDATE players SET potential = LEAST(99, overall_rating + (random() * 10)::int) WHERE potential = 85;"))
+        db.execute(text("UPDATE players SET season_start_ovr = overall_rating WHERE season_start_ovr IS NULL;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS has_extra_time INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_penalties INTEGER;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_penalties INTEGER;"))
@@ -1082,7 +1085,7 @@ def get_schedule(year: int, month: int, club_id: int = None):
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/standings")
-def get_standings(tournament_id: int):
+def get_standings(tournament_id: int, season: str = None):
     db = Session(engine) 
     try:
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
@@ -1092,8 +1095,10 @@ def get_standings(tournament_id: int):
         if not clubs:
             clubs = db.query(Club).filter(Club.league == tour.name).all()
             
-        state = db.query(GameState).first()
-        season_start_year = int(state.season.split("/")[0])
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        season_start_year = int(season.split("/")[0])
         start_str = f"{season_start_year}-07-01"
         end_str = f"{season_start_year+1}-06-30"
         fixtures = db.query(Fixture).filter(
@@ -1197,14 +1202,16 @@ def get_match_players(fixture_id: int):
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/stats")
-def get_stats(tournament_id: int):
+def get_stats(tournament_id: int, season: str = None):
     db = Session(engine)
     try:
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: return {"scorers": [], "assists": [], "rating": [], "mvps": [], "yellows": [], "reds": [], "clean_sheets": []}
         
-        state = db.query(GameState).first()
-        season_start_year = int(state.season.split("/")[0])
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        season_start_year = int(season.split("/")[0])
         start_str = f"{season_start_year}-07-01"
         end_str = f"{season_start_year+1}-06-30"
         fixtures = db.query(Fixture).filter(
@@ -1306,14 +1313,16 @@ def get_stats(tournament_id: int):
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/bracket")
-def get_bracket(tournament_id: int):
+def get_bracket(tournament_id: int, season: str = None):
     db = Session(engine)
     try:
         tour = db.query(Tournament).filter_by(id=tournament_id).first()
         if not tour: raise HTTPException(status_code=404, detail="Турнир не найден")
         
-        state = db.query(GameState).first()
-        season_start_year = int(state.season.split("/")[0])
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        season_start_year = int(season.split("/")[0])
         start_str = f"{season_start_year}-07-01"
         end_str = f"{season_start_year+1}-06-30"
         fixtures = db.query(Fixture).filter(
@@ -2438,6 +2447,7 @@ def advance_game_date(db, days_to_add):
                     Player.rating_sum: 0.0, Player.consecutive_yellows: 0, 
                     Player.suspension_matches: 0, Player.fatigue: 0,
                     Player.training_program_id: None, Player.training_started_at: None,
+                    Player.season_start_ovr: Player.overall_rating,
                     Player.age: Player.age + 1
                 }, synchronize_session=False)
                 
@@ -2494,9 +2504,10 @@ def advance_game_date(db, days_to_add):
             if curr.weekday() == 6:
                 all_players = db.query(Player).all()
                 for p in all_players:
+                    decline_age = 33 + (p.id % 3)
+                    growth_chance = 0
                     if p.age < 24: growth_chance = 0.05
                     elif p.age <= 29: growth_chance = 0.01
-                    else: growth_chance = -0.03
                         
                     if p.training_program_id:
                         prog = db.query(TrainingProgram).filter_by(id=p.training_program_id).first()
@@ -2510,17 +2521,19 @@ def advance_game_date(db, days_to_add):
                                         if hasattr(p, stat):
                                             setattr(p, stat, min(99, getattr(p, stat) + 1))
                                             
-                    if p.overall_rating < (p.potential or 99) and random.random() < growth_chance:
+                    if p.age < 30 and p.overall_rating < (p.potential or 99) and random.random() < growth_chance:
                         stats_pool = ["pace", "shooting", "passing", "dribbling", "defending", "physicality"]
                         if "Goalkeeper" in p.position or p.position == "GK":
                             stats_pool = ["gk_reflexes", "gk_handling", "gk_positioning", "gk_diving"]
                         chosen_stat = random.choice(stats_pool)
                         setattr(p, chosen_stat, min(99, getattr(p, chosen_stat) + 1))
-                    elif p.age > 29 and random.random() < abs(growth_chance):
-                        stats_pool = ["pace", "physicality"]
-                        chosen_stat = random.choice(stats_pool)
-                        setattr(p, chosen_stat, max(1, getattr(p, chosen_stat) - 1))
-                        
+                    elif p.age >= decline_age and random.random() < 0.15:
+                        new_ovr = recalculate_overall(p)
+                        if new_ovr > ((p.season_start_ovr or p.overall_rating) - 9):
+                            stats_pool = ["pace", "physicality"]
+                            chosen_stat = random.choice(stats_pool)
+                            setattr(p, chosen_stat, max(1, getattr(p, chosen_stat) - 1))
+                            
                     new_ovr = recalculate_overall(p)
                     if new_ovr != p.overall_rating:
                         p.overall_rating = new_ovr
@@ -2561,11 +2574,13 @@ def advance_month(req: dict):
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/rounds")
-def get_tournament_rounds(tournament_id: int):
+def get_tournament_rounds(tournament_id: int, season: str = None):
     db = Session(engine)
     try:
-        state = db.query(GameState).first()
-        season_start_year = int(state.season.split("/")[0])
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        season_start_year = int(season.split("/")[0])
         start_str = f"{season_start_year}-07-01"
         end_str = f"{season_start_year+1}-06-30"
         rounds = db.query(Fixture.round_number).filter(
@@ -2578,11 +2593,13 @@ def get_tournament_rounds(tournament_id: int):
         db.close()
 
 @app.get("/api/tournaments/{tournament_id}/rounds/{round_number}")
-def get_round_matches(tournament_id: int, round_number: int):
+def get_round_matches(tournament_id: int, round_number: int, season: str = None):
     db = Session(engine)
     try:
-        state = db.query(GameState).first()
-        season_start_year = int(state.season.split("/")[0])
+        if not season:
+            state = db.query(GameState).first()
+            season = state.season if state else "2026/27"
+        season_start_year = int(season.split("/")[0])
         start_str = f"{season_start_year}-07-01"
         end_str = f"{season_start_year+1}-06-30"
         fixtures = db.query(Fixture).filter(

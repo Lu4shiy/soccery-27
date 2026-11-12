@@ -724,6 +724,7 @@
         let currentGameDate = "2026-08-01";
         let currentSeason = "2026/27";
         let nextAdvanceAt = null;
+        let currentTourSeason = "current";
 
         const STAT_NAMES = {
             "gk_reflexes": "Реакция", "gk_diving": "Прыжок", "gk_handling": "Хватка",
@@ -1596,6 +1597,7 @@
         }
 
         window.loadTournamentsList = async function(mode) {
+            currentTourSeason = mode;
             document.querySelectorAll('#tour-season-toggle .sc-tab').forEach(el => el.classList.remove('active'));
             if (mode === 'current') {
                 if ($("tab-season-current")) $("tab-season-current").classList.add("active");
@@ -1671,12 +1673,18 @@
                 let brData = null;
                 let stats = { scorers: [], assists: [], rating: [], mvps: [], yellows: [], reds: [], clean_sheets: [] };
 
-                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/standings`); if (r.ok) stData = await r.json(); } catch(e) {}
-                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/rounds`); if (r.ok) rounds = await r.json(); } catch(e) {}
-                if (stData.type === "Cup") {
-                    try { const r = await fetch(API_BASE + `/api/tournaments/${id}/bracket`); if (r.ok) brData = await r.json(); } catch(e) {}
+                let sParam = "";
+                if (currentTourSeason === 'past') {
+                    const startYr = parseInt(currentSeason.split("/")[0]) - 1;
+                    sParam = "?season=" + startYr + "/" + (startYr+1);
                 }
-                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/stats`); if (r.ok) stats = await r.json(); } catch(e) {}
+
+                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/standings` + sParam); if (r.ok) stData = await r.json(); } catch(e) {}
+                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/rounds` + sParam); if (r.ok) rounds = await r.json(); } catch(e) {}
+                if (stData.type === "Cup") {
+                    try { const r = await fetch(API_BASE + `/api/tournaments/${id}/bracket` + sParam); if (r.ok) brData = await r.json(); } catch(e) {}
+                }
+                try { const r = await fetch(API_BASE + `/api/tournaments/${id}/stats` + sParam); if (r.ok) stats = await r.json(); } catch(e) {}
 
                 const tourType = stData.type || "League";
                 const firstTab = document.querySelectorAll('.sc-tab')[0];
@@ -1848,8 +1856,15 @@
             const container = $("tour-round-details");
             if (!container) return;
             container.innerHTML = "Загрузка...";
+            
+            let sParam = "";
+            if (currentTourSeason === 'past') {
+                const startYr = parseInt(currentSeason.split("/")[0]) - 1;
+                sParam = "?season=" + startYr + "/" + (startYr+1);
+            }
+            
             try {
-                const res = await fetch(API_BASE + `/api/tournaments/${tourId}/rounds/${roundNum}`);
+                const res = await fetch(API_BASE + `/api/tournaments/${tourId}/rounds/${roundNum}` + sParam);
                 const matches = await res.json();
                 
                 let html = `<h4 style="color:#52a8ff; margin-bottom:10px;">Тур ${roundNum}</h4>`;
