@@ -116,6 +116,7 @@ class Player(Base):
     potential = Column(Integer, default=85)
     growth_progress = Column(Integer, default=0)
     season_start_ovr = Column(Integer, nullable=True)
+    original_data = Column(String, nullable=True)
 
 class Fixture(Base):
     __tablename__ = "fixtures"
@@ -438,8 +439,10 @@ def init_db():
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS potential INTEGER DEFAULT 85;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS growth_progress INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS season_start_ovr INTEGER;"))
+        db.execute(text("ALTER TABLE players ADD COLUMN IF NOT EXISTS original_data VARCHAR;"))
         db.execute(text("UPDATE players SET potential = LEAST(99, overall_rating + (random() * 10)::int) WHERE potential = 85;"))
         db.execute(text("UPDATE players SET season_start_ovr = overall_rating WHERE season_start_ovr IS NULL;"))
+        db.execute(text("UPDATE players SET original_data = json_build_object('age', age, 'overall_rating', overall_rating, 'market_value', market_value, 'wage', wage, 'pace', pace, 'shooting', shooting, 'passing', passing, 'dribbling', dribbling, 'defending', defending, 'physicality', physicality, 'gk_diving', gk_diving, 'gk_handling', gk_handling, 'gk_kicking', gk_kicking, 'gk_positioning', gk_positioning, 'gk_reflexes', gk_reflexes)::text WHERE original_data IS NULL;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS has_extra_time INTEGER DEFAULT 0;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS home_penalties INTEGER;"))
         db.execute(text("ALTER TABLE fixtures ADD COLUMN IF NOT EXISTS away_penalties INTEGER;"))
@@ -1393,7 +1396,36 @@ def reset_game(req: dict):
             db.execute(text("DELETE FROM fixtures"))
             db.execute(text("DELETE FROM tactics"))
             db.execute(text("DELETE FROM managers"))
-            db.execute(text("DELETE FROM players"))
+            db.execute(text("DELETE FROM trophies"))
+            db.execute(text("DELETE FROM club_tournaments"))
+            db.execute(text("UPDATE clubs SET league = original_league"))
+            db.commit()
+            
+            players = db.query(Player).all()
+            for p in players:
+                if p.original_data:
+                    try:
+                        orig = json.loads(p.original_data)
+                        for k, v in orig.items():
+                            setattr(p, k, v)
+                    except Exception:
+                        pass
+                p.goals = 0
+                p.assists = 0
+                p.matches_played = 0
+                p.rating_sum = 0.0
+                p.fatigue = 0
+                p.injury_weeks = 0
+                p.injury_days = 0
+                p.injury_name = None
+                p.fitness = "green"
+                p.morale = "green"
+                p.consecutive_yellows = 0
+                p.suspension_matches = 0
+                p.training_program_id = None
+                p.training_started_at = None
+                p.growth_progress = 0
+                p.season_start_ovr = p.overall_rating
             db.commit()
             
             state = db.query(GameState).first()
@@ -2870,7 +2902,36 @@ async def cmd_admin_reset(message: types.Message):
             db.execute(text("DELETE FROM fixtures"))
             db.execute(text("DELETE FROM tactics"))
             db.execute(text("DELETE FROM managers"))
-            db.execute(text("DELETE FROM players"))
+            db.execute(text("DELETE FROM trophies"))
+            db.execute(text("DELETE FROM club_tournaments"))
+            db.execute(text("UPDATE clubs SET league = original_league"))
+            db.commit()
+            
+            players = db.query(Player).all()
+            for p in players:
+                if p.original_data:
+                    try:
+                        orig = json.loads(p.original_data)
+                        for k, v in orig.items():
+                            setattr(p, k, v)
+                    except Exception:
+                        pass
+                p.goals = 0
+                p.assists = 0
+                p.matches_played = 0
+                p.rating_sum = 0.0
+                p.fatigue = 0
+                p.injury_weeks = 0
+                p.injury_days = 0
+                p.injury_name = None
+                p.fitness = "green"
+                p.morale = "green"
+                p.consecutive_yellows = 0
+                p.suspension_matches = 0
+                p.training_program_id = None
+                p.training_started_at = None
+                p.growth_progress = 0
+                p.season_start_ovr = p.overall_rating
             db.commit()
             
             state = db.query(GameState).first()
@@ -2900,6 +2961,9 @@ def fix_db_999():
             p_dict = {k: v for k, v in p.__dict__.items() if not k.startswith('_')}
             backup_players.append(p_dict)
         
+        db.execute(text("DELETE FROM match_events"))
+        db.execute(text("DELETE FROM match_player_stats"))
+        db.execute(text("DELETE FROM tactics"))
         db.query(Player).delete()
         db.commit()
         
@@ -2915,15 +2979,23 @@ def fix_db_999():
                 if row.get('league') in ['UEFA Champions League', 'FIFA World Cup', 'European Championship']: continue
                 if not row.get('club'): continue
                 
+                try:
+                    pid = int(row['player_id'])
+                except:
+                    continue
+                    
+                if pid in csv_player_ids: continue
+                csv_player_ids.add(pid)
+                
                 club_name = str(row['club']).strip()
                 club = db.query(Club).filter_by(name=club_name).first()
                 if not club:
-                    club = Club(name=club_name, league=str(row['league']).strip())
+                    club = Club(name=club_name, league=str(row.get('league', 'Unknown')).strip())
                     db.add(club)
                     db.commit()
                     db.refresh(club)
                 
-                name = str(row['common_name']).strip() if row.get('common_name') else f"{row['first_name']} {row['last_name']}".strip()
+                name = str(row['common_name']).strip() if row.get('common_name') else f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
                 age = 0
                 if row.get('birthdate'):
                     try: age = 2026 - datetime.strptime(row['birthdate'], '%d-%m-%Y').year
@@ -2934,9 +3006,6 @@ def fix_db_999():
                     try: return int(val)
                     except: return 0
                     
-                pid = int(row['player_id'])
-                csv_player_ids.add(pid)
-                
                 p = Player(
                     player_id=pid,
                     name=name, position=str(row.get('position', 'CM')), overall_rating=int(row.get('overall_rating', 50)),
@@ -2952,8 +3021,11 @@ def fix_db_999():
                 count += 1
         db.commit()
         
+        added_backup_ids = set()
         for b in backup_players:
-            if b['player_id'] not in csv_player_ids:
+            pid = b['player_id']
+            if pid not in csv_player_ids and pid not in added_backup_ids:
+                added_backup_ids.add(pid)
                 del b['id']
                 if 'original_data' in b: del b['original_data']
                 db.add(Player(**b))
