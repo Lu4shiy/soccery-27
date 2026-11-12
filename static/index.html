@@ -3104,10 +3104,22 @@
                                 rName = poRounds[m.round_number] || rName;
                             }
                         }
-                        if (m.leg === 1) {
-                            tourDisplay += " - " + rName + " (1-й матч)";
-                        } else if (m.leg === 2) {
-                            tourDisplay += " - " + rName + " (2-й матч)";
+                        let isTwoLegged = false;
+                        if (m.tournament === "EFL Cup" || m.tournament === "Carabao Cup") {
+                            isTwoLegged = (m.round_number === 6 || m.round_number === 7);
+                        } else if (m.tournament === "EFL Championship Playoffs") {
+                            isTwoLegged = (m.round_number === 2 || m.round_number === 3);
+                        } else if (m.tournament === "EFL League One Playoffs" || m.tournament === "EFL League Two Playoffs") {
+                            isTwoLegged = (m.round_number === 1 || m.round_number === 2);
+                        }
+                        if (isTwoLegged) {
+                            if (m.leg === 1) {
+                                tourDisplay += " - " + rName + " (1-й матч)";
+                            } else if (m.leg === 2) {
+                                tourDisplay += " - " + rName + " (2-й матч)";
+                            } else {
+                                tourDisplay += " - " + rName;
+                            }
                         } else {
                             tourDisplay += " - " + rName;
                         }

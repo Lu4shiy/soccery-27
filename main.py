@@ -1393,13 +1393,8 @@ def reset_game(req: dict):
             db.execute(text("DELETE FROM fixtures"))
             db.execute(text("DELETE FROM tactics"))
             db.execute(text("DELETE FROM managers"))
+            db.execute(text("DELETE FROM players"))
             db.commit()
-            
-            db.query(Player).update({
-                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-                Player.fitness: "green", Player.morale: "green"
-            }, synchronize_session=False)
             
             state = db.query(GameState).first()
             if state:
@@ -1522,15 +1517,7 @@ def reset_career_api(req: AdminActionRequest):
             db.execute(text("DELETE FROM managers"))
             db.execute(text("DELETE FROM trophies"))
             db.execute(text("DELETE FROM club_tournaments"))
-            db.query(Player).update({
-                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-                Player.injury_days: 0, Player.injury_name: None,
-                Player.fitness: "green", Player.morale: "green",
-                Player.consecutive_yellows: 0, Player.suspension_matches: 0,
-                Player.training_program_id: None, Player.training_started_at: None,
-                Player.growth_progress: 0
-            }, synchronize_session=False)
+            db.execute(text("DELETE FROM players"))
             db.execute(text("UPDATE clubs SET league = original_league"))
             state = db.query(GameState).first()
             if state:
@@ -1609,7 +1596,10 @@ def advance_cup_bracket(fx, db):
             elif agg_away > agg_home:
                 winner_id = fx.home_club_id
             else:
-                winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
+                if fx.home_penalties is not None and fx.away_penalties is not None:
+                    winner_id = fx.home_club_id if fx.home_penalties > fx.away_penalties else fx.away_club_id
+                else:
+                    winner_id = fx.home_club_id if random.random() < 0.5 else fx.away_club_id
 
             final_fx = db.query(Fixture).filter_by(
                 tournament_id=fx.tournament_id,
@@ -2023,7 +2013,7 @@ def simulate_match(fixture_id: int, db: Session):
         a_subs_used += 1
     
     tour = db.query(Tournament).filter_by(id=fx.tournament_id).first()
-    if tour and tour.type in ["Cup", "SuperCup"] and h_goals == a_goals:
+    if tour and tour.type in ["Cup", "SuperCup"]:
         is_two_legged = False
         if tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number in [6, 7]:
             is_two_legged = True
@@ -2034,7 +2024,8 @@ def simulate_match(fixture_id: int, db: Session):
 
         trigger_et_pens = False
         if not is_two_legged:
-            trigger_et_pens = True
+            if h_goals == a_goals:
+                trigger_et_pens = True
         elif fx.leg == 2:
             leg1 = db.query(Fixture).filter_by(tournament_id=fx.tournament_id, round_number=fx.round_number-1, match_index=fx.match_index, leg=1).first()
             if leg1 and leg1.is_played:
@@ -2866,13 +2857,8 @@ async def cmd_admin_reset(message: types.Message):
             db.execute(text("DELETE FROM fixtures"))
             db.execute(text("DELETE FROM tactics"))
             db.execute(text("DELETE FROM managers"))
+            db.execute(text("DELETE FROM players"))
             db.commit()
-            
-            db.query(Player).update({
-                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
-                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
-                Player.fitness: "green", Player.morale: "green"
-            }, synchronize_session=False)
             
             state = db.query(GameState).first()
             if state:
