@@ -2208,6 +2208,66 @@ def simulate_match(fixture_id: int, db: Session):
                 season_str = state.season if state else "2026/27"
                 if not db.query(Trophy).filter_by(club_id=winner_id, tournament_name=tour.name, season=season_str).first():
                     db.add(Trophy(club_id=winner_id, tournament_name=tour.name, season=season_str))
+                if tour.name == "FA Cup":
+                    shield_tour = db.query(Tournament).filter_by(name="FA Community Shield").first()
+                    pl_tour = db.query(Tournament).filter_by(name="Premier League").first()
+                    if shield_tour and pl_tour:
+                        season_start_year = int(season_str.split("/")[0])
+                        season_end_year = season_start_year + 1
+                        pl_clubs = db.query(Club).filter(Club.league == "Premier League").all()
+                        pl_fixtures = db.query(Fixture).filter(
+                            Fixture.tournament_id == pl_tour.id,
+                            Fixture.is_played == 1,
+                            Fixture.date >= f"{season_start_year}-07-01",
+                            Fixture.date <= f"{season_end_year}-06-30"
+                        ).all()
+                        pl_stats = {c.id: {"club": c, "pts": 0, "gd": 0, "gf": 0} for c in pl_clubs}
+                        for pf in pl_fixtures:
+                            if pf.home_club_id in pl_stats and pf.away_club_id in pl_stats:
+                                h_s = pl_stats[pf.home_club_id]
+                                a_s = pl_stats[pf.away_club_id]
+                                h_s["gf"] += pf.home_goals
+                                a_s["gf"] += pf.away_goals
+                                h_s["gd"] += pf.home_goals - pf.away_goals
+                                a_s["gd"] += pf.away_goals - pf.home_goals
+                                if pf.home_goals > pf.away_goals: h_s["pts"] += 3
+                                elif pf.home_goals < pf.away_goals: a_s["pts"] += 3
+                                else:
+                                    h_s["pts"] += 1
+                                    a_s["pts"] += 1
+                        pl_sorted = sorted(pl_stats.values(), key=lambda x: (-x["pts"], -x["gd"], -x["gf"]))
+                        if pl_sorted and pl_sorted[0]["pts"] > 0:
+                            pl_winner_id = pl_sorted[0]["club"].id
+                            shield_date = f"{season_end_year}-06-09"
+                            existing_shield = db.query(Fixture).filter(
+                                Fixture.tournament_id == shield_tour.id,
+                                Fixture.date >= f"{season_start_year}-07-01",
+                                Fixture.date <= f"{season_end_year}-06-30"
+                            ).first()
+                            if existing_shield:
+                                existing_shield.home_club_id = pl_winner_id
+                                existing_shield.away_club_id = winner_id
+                                existing_shield.date = shield_date
+                                existing_shield.is_played = 0
+                                existing_shield.home_goals = None
+                                existing_shield.away_goals = None
+                                existing_shield.home_penalties = None
+                                existing_shield.away_penalties = None
+                                existing_shield.has_extra_time = 0
+                            else:
+                                db.add(Fixture(
+                                    date=shield_date,
+                                    tournament_id=shield_tour.id,
+                                    round_number=1,
+                                    match_index=0,
+                                    leg=1,
+                                    home_club_id=pl_winner_id,
+                                    away_club_id=winner_id,
+                                    is_played=0
+                                ))
+                            for cid in [pl_winner_id, winner_id]:
+                                if not db.query(ClubTournament).filter_by(club_id=cid, tournament_id=shield_tour.id, season=season_str).first():
+                                    db.add(ClubTournament(club_id=cid, tournament_id=shield_tour.id, season=season_str))
 
     fx.home_goals = h_goals
     fx.away_goals = a_goals
