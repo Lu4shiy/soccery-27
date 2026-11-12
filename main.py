@@ -1517,8 +1517,19 @@ def reset_career_api(req: AdminActionRequest):
             db.execute(text("DELETE FROM managers"))
             db.execute(text("DELETE FROM trophies"))
             db.execute(text("DELETE FROM club_tournaments"))
-            db.execute(text("DELETE FROM players"))
             db.execute(text("UPDATE clubs SET league = original_league"))
+            db.commit()
+            
+            db.query(Player).update({
+                Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
+                Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
+                Player.injury_days: 0, Player.injury_name: None,
+                Player.fitness: "green", Player.morale: "green",
+                Player.consecutive_yellows: 0, Player.suspension_matches: 0,
+                Player.training_program_id: None, Player.training_started_at: None,
+                Player.growth_progress: 0, Player.season_start_ovr: Player.overall_rating
+            }, synchronize_session=False)
+            
             state = db.query(GameState).first()
             if state:
                 state.current_date = "2026-08-01"
@@ -2036,9 +2047,11 @@ def simulate_match(fixture_id: int, db: Session):
 
         if trigger_et_pens:
             fx.has_extra_time = 1
-            if random.random() < 0.25: h_goals += 1
-            if random.random() < 0.25: a_goals += 1
-            if h_goals == a_goals:
+            et_h = 1 if random.random() < 0.25 else 0
+            et_a = 1 if random.random() < 0.25 else 0
+            h_goals += et_h
+            a_goals += et_a
+            if et_h == et_a:
                 fx.home_penalties = random.randint(3, 6)
                 fx.away_penalties = random.randint(3, 6)
                 while fx.home_penalties == fx.away_penalties:
