@@ -1525,12 +1525,25 @@
                         const tourShort = (d.tournament_name || "").substring(0, 4);
                         let scoreStr = '';
                         if (d.is_played) {
-                            scoreStr = `<div style="font-size:10px; font-weight:bold; color:#fff;">${d.home_goals}-${d.away_goals}</div>`;
+                            let scoreText = `${d.home_goals}-${d.away_goals}`;
+                            if (d.home_penalties !== null && d.away_penalties !== null) {
+                                scoreText += ` (${d.home_penalties}-${d.away_penalties})`;
+                            }
+                            scoreStr = `<div style="font-size:10px; font-weight:bold; color:#fff; white-space:nowrap;">${scoreText}</div>`;
                             const myGoals = d.is_home ? d.home_goals : d.away_goals;
                             const oppGoals = d.is_home ? d.away_goals : d.home_goals;
                             if (myGoals > oppGoals) cls += " win";
-                            else if (myGoals === oppGoals) cls += " draw";
-                            else cls += " loss";
+                            else if (myGoals < oppGoals) cls += " loss";
+                            else {
+                                if (d.home_penalties !== null) {
+                                    const myPens = d.is_home ? d.home_penalties : d.away_penalties;
+                                    const oppPens = d.is_home ? d.away_penalties : d.home_penalties;
+                                    if (myPens > oppPens) cls += " win";
+                                    else cls += " loss";
+                                } else {
+                                    cls += " draw";
+                                }
+                            }
                         }
                         inner += `<div class="cal-match-info" onclick="openMatchDetails(${d.fixture_id}, 'schedule')" style="cursor:pointer;" title="${d.tournament_name || ''}: ${d.opponent_name || ''}">
                                     <div class="cal-tour">${tourShort}</div>
@@ -1963,6 +1976,7 @@
             tg.showAlert("⏳ Симуляция началась...");
             
             let daysSimulated = 0;
+            let failCount = 0;
             while (curr <= target) {
                 try {
                     const res = await fetch(API_BASE + '/api/admin/advance-day', {
@@ -1970,7 +1984,13 @@
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ telegram_id: userId, password: "soccery27admin" })
                     });
-                    if (!res.ok) throw new Error("Ошибка симуляции");
+                    if (!res.ok) {
+                        failCount++;
+                        if (failCount > 3) throw new Error("Сервер не отвечает (Ошибка 500)");
+                        await new Promise(r => setTimeout(r, 1000));
+                        continue;
+                    }
+                    failCount = 0;
                     const data = await res.json();
                     
                     const oldDate = currentGameDate;

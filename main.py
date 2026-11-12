@@ -366,13 +366,16 @@ def generate_season_fixtures(db, base_year):
         db.commit()
         
     season_str = f"{base_year}/{base_year+1}"
+    ct_data = []
     for c in eng_clubs:
         for t_name in [c.league, "FA Cup", "EFL Cup"]:
             t = db.query(Tournament).filter_by(name=t_name).first()
             if t:
                 existing_ct = db.query(ClubTournament).filter_by(club_id=c.id, tournament_id=t.id, season=season_str).first()
                 if not existing_ct:
-                    db.add(ClubTournament(club_id=c.id, tournament_id=t.id, season=season_str))
+                    ct_data.append({"club_id": c.id, "tournament_id": t.id, "season": season_str})
+    if ct_data:
+        db.bulk_insert_mappings(ClubTournament, ct_data)
     db.commit()
 
 def get_double_round_robin(clubs):
@@ -1055,7 +1058,8 @@ def get_schedule(year: int, month: int, club_id: int = None):
                 entry = {
                     "date": date_str, "type": "match", "fixture_id": f.id,
                     "is_played": f.is_played, "tournament_name": tour.name if tour else "Товарищеский",
-                    "opponent_name": opp.name if opp else "Соперник", "is_home": is_home
+                    "opponent_name": opp.name if opp else "Соперник", "is_home": is_home,
+                    "home_penalties": f.home_penalties, "away_penalties": f.away_penalties
                 }
                 if f.is_played:
                     entry["home_goals"] = f.home_goals
@@ -1144,7 +1148,7 @@ def get_match_players(fixture_id: int):
         for e in events:
             if e.player_id:
                 if e.player_id not in p_events: p_events[e.player_id] = {"goals": 0, "assists": 0, "own_goals": 0, "yellow": 0, "red": 0, "penalty_miss": 0}
-                if e.event_type == 'goal': p_events[e.player_id]["goals"] += 1
+                if e.event_type in ('goal', 'penalty_goal'): p_events[e.player_id]["goals"] += 1
                 if e.event_type == 'own_goal': p_events[e.player_id]["own_goals"] += 1
                 if e.event_type == 'yellow_card': p_events[e.player_id]["yellow"] += 1
                 if e.event_type == 'red_card': p_events[e.player_id]["red"] += 1
@@ -1507,11 +1511,16 @@ def reset_career_api(req: AdminActionRequest):
             db.execute(text("DELETE FROM fixtures"))
             db.execute(text("DELETE FROM tactics"))
             db.execute(text("DELETE FROM managers"))
+            db.execute(text("DELETE FROM trophies"))
+            db.execute(text("DELETE FROM club_tournaments"))
             db.query(Player).update({
                 Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
                 Player.rating_sum: 0.0, Player.fatigue: 0, Player.injury_weeks: 0,
                 Player.injury_days: 0, Player.injury_name: None,
-                Player.fitness: "green", Player.morale: "green"
+                Player.fitness: "green", Player.morale: "green",
+                Player.consecutive_yellows: 0, Player.suspension_matches: 0,
+                Player.training_program_id: None, Player.training_started_at: None,
+                Player.growth_progress: 0
             }, synchronize_session=False)
             db.execute(text("UPDATE clubs SET league = original_league"))
             state = db.query(GameState).first()
@@ -2169,6 +2178,28 @@ def simulate_match(fixture_id: int, db: Session):
     h_sot = max(h_sot, h_goals)
     a_sot = max(a_sot, a_goals)
         
+    if tour and tour.type == "Cup":
+        is_final = False
+        if tour.name == "FA Cup" and fx.round_number == 7: is_final = True
+        elif tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number == 8: is_final = True
+        elif "Playoffs" in tour.name:
+            if tour.name == "EFL Championship Playoffs" and fx.round_number == 4: is_final = True
+            elif tour.name in ["EFL League One Playoffs", "EFL League Two Playoffs"] and fx.round_number == 3: is_final = True
+        
+        if is_final:
+            winner_id = None
+            if fx.home_penalties is not None and fx.away_penalties is not None:
+                winner_id = fx.home_club_id if fx.home_penalties > fx.away_penalties else fx.away_club_id
+            else:
+                winner_id = fx.home_club_id if h_goals > a_goals else fx.away_club_id
+                if h_goals == a_goals: winner_id = None
+            
+            if winner_id:
+                state = db.query(GameState).first()
+                season_str = state.season if state else "2026/27"
+                if not db.query(Trophy).filter_by(club_id=winner_id, tournament_name=tour.name, season=season_str).first():
+                    db.add(Trophy(club_id=winner_id, tournament_name=tour.name, season=season_str))
+
     fx.home_goals = h_goals
     fx.away_goals = a_goals
     fx.is_played = 1
@@ -2396,7 +2427,11 @@ def advance_game_date(db, days_to_add):
                 populate_playoffs(db, curr.year - 1)
 
             if curr.month == 7 and curr.day == 1:
-                process_season_end(db, curr.year - 1)
+                try:
+                    process_season_end(db, curr.year - 1)
+                except Exception as e:
+                    print("Season end error:", e)
+                    db.rollback()
                 
                 db.query(Player).update({
                     Player.goals: 0, Player.assists: 0, Player.matches_played: 0,
@@ -2407,7 +2442,11 @@ def advance_game_date(db, days_to_add):
                 }, synchronize_session=False)
                 
                 state.season = f"{curr.year}/{curr.year+1}"
-                generate_season_fixtures(db, curr.year)
+                try:
+                    generate_season_fixtures(db, curr.year)
+                except Exception as e:
+                    print("Season generate error:", e)
+                    db.rollback()
 
             db.execute(text("""
                 UPDATE players
