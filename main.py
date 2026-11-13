@@ -2981,6 +2981,19 @@ async def cmd_admin_reset(message: types.Message):
         finally:
             db.close()
 
+CLUB_NAME_MAPPING = {
+    "Man Utd": "Manchester United", "Newcastle Utd": "Newcastle United", "Nott'm Forest": "Nottingham Forest",
+    "Spurs": "Tottenham", "Leverkusen": "Bayer 04 Leverkusen", "Frankfurt": "Eintracht Frankfurt",
+    "OL": "Olympique Lyonnais", "OM": "Olympique Marseille", "Latium": "Lazio",
+    "Milano FC": "AC Milan", "Lombardia FC": "Inter", "Bergamo Calcio": "Atalanta",
+    "LAFC": "Los Angeles FC", "Whitecaps FC": "Vancouver Whitecaps FC", "Sounders FC": "Seattle Sounders FC",
+    "Red Bulls": "New York Red Bulls", "R. Union St.-G.": "Union Saint-Gilloise", "R. Oviedo": "Real Oviedo",
+    "Univ. Craiova": "Universitatea Craiova", "Royal Antwerp FC": "Royal Antwerpen FC", "Carrarese Calcio": "Carrarese",
+    "Düsseldorf": "Fortuna Düsseldorf", "R. Valladolid CF": "Real Valladolid CF", "SS Juve Stabia": "Juve Stabia",
+    "St. Pats": "St. Patrick's Athletic", "Dijon Football Côte d’Or": "Dijon FCO", "Club Len": "Club Leon",
+    "Havre AC": "Le Havre AC"
+}
+
 @app.get("/api/admin/fix-db-999")
 def fix_db_999():
     import csv
@@ -3020,6 +3033,7 @@ def fix_db_999():
                 csv_player_ids.add(pid)
                 
                 club_name = str(row['club']).strip()
+                club_name = CLUB_NAME_MAPPING.get(club_name, club_name)
                 club = db.query(Club).filter_by(name=club_name).first()
                 if not club:
                     club = Club(name=club_name, league=str(row.get('league', 'Unknown')).strip())

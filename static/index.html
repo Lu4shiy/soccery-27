@@ -1447,9 +1447,10 @@
             el.innerText = String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
         }
 
-        if ($("btn-open-schedule")) $("btn-open-schedule").onclick = function() {
+        if ($("btn-open-schedule")) $("btn-open-schedule").onclick = async function() {
             if ($("center-main-menu")) $("center-main-menu").classList.add("hidden");
             if ($("center-schedule")) $("center-schedule").classList.remove("hidden");
+            await fetchGameTime();
             renderCalendar();
         };
 
