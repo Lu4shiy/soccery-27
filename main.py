@@ -655,15 +655,17 @@ def recalculate_market_value(player: Player) -> int:
     age = player.age
     ovr = player.overall_rating
     pot = player.potential or ovr
-    base = int((ovr ** 4) / 5)
-    if age <= 21: age_mult = 2.0
-    elif age <= 24: age_mult = 1.5
-    elif age <= 27: age_mult = 1.2
+    base = (ovr ** 3) * 150
+    
+    if age <= 21: age_mult = 1.5
+    elif age <= 24: age_mult = 1.3
+    elif age <= 27: age_mult = 1.1
     elif age <= 30: age_mult = 1.0
-    elif age <= 33: age_mult = 0.8
-    elif age <= 35: age_mult = 0.6
-    else: age_mult = 0.4
-    pot_bonus = max(0, pot - ovr) * 100000
+    elif age <= 33: age_mult = 0.9
+    elif age <= 35: age_mult = 0.7
+    else: age_mult = 0.5
+    
+    pot_bonus = max(0, pot - ovr) * 500000
     return int((base * age_mult) + pot_bonus)
 
 def apply_training_if_done(player: Player, db: Session) -> bool:
@@ -1723,7 +1725,10 @@ def simulate_match(fixture_id: int, db: Session):
     def get_xi(club_id):
         t = db.query(Tactic).join(Manager).filter(Manager.club_id == club_id).first()
         if not t or not t.starting_xi:
-            return db.query(Player).filter_by(club_id=club_id, injury_weeks=0, injury_days=0, suspension_matches=0).order_by(Player.overall_rating.desc()).limit(11).all()
+            players = db.query(Player).filter_by(club_id=club_id).order_by(Player.overall_rating.desc()).limit(11).all()
+            if not players:
+                players = db.query(Player).filter_by(club_id=club_id).limit(11).all()
+            return players
             
         xi_ids = json.loads(t.starting_xi or "[]")
         bench_ids = json.loads(t.bench or "[]") if t.bench else []
