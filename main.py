@@ -1433,6 +1433,7 @@ def reset_game(req: dict):
                 p.training_started_at = None
                 p.growth_progress = 0
                 p.season_start_ovr = p.overall_rating
+                p.alt_positions = "[]"
             db.commit()
             
             state = db.query(GameState).first()
@@ -2943,6 +2944,7 @@ async def cmd_admin_reset(message: types.Message):
                 p.training_started_at = None
                 p.growth_progress = 0
                 p.season_start_ovr = p.overall_rating
+                p.alt_positions = "[]"
             db.commit()
             
             state = db.query(GameState).first()
@@ -3097,7 +3099,8 @@ def fix_db_999():
         for p in db.query(Player).all():
             orig = {
                 'age': p.age, 'overall_rating': p.overall_rating, 'market_value': p.market_value,
-                'wage': p.wage, 'pace': p.pace, 'shooting': p.shooting, 'passing': p.passing,
+                'wage': p.wage, 'contract_until': p.contract_until,
+                'pace': p.pace, 'shooting': p.shooting, 'passing': p.passing,
                 'dribbling': p.dribbling, 'defending': p.defending, 'physicality': p.physicality,
                 'gk_diving': p.gk_diving, 'gk_handling': p.gk_handling, 'gk_kicking': p.gk_kicking,
                 'gk_positioning': p.gk_positioning, 'gk_reflexes': p.gk_reflexes
