@@ -2960,6 +2960,158 @@ async def cmd_admin_reset(message: types.Message):
         finally:
             db.close()
 
+@app.get("/api/admin/fix-db-999")
+def fix_db_999():
+    import csv
+    from datetime import datetime
+    import random
+    db = Session(engine)
+    try:
+        backup_players = []
+        for p in db.query(Player).all():
+            p_dict = {k: v for k, v in p.__dict__.items() if not k.startswith('_')}
+            backup_players.append(p_dict)
+        
+        db.execute(text("DELETE FROM match_events"))
+        db.execute(text("DELETE FROM match_player_stats"))
+        db.execute(text("DELETE FROM tactics"))
+        db.query(Player).delete()
+        db.commit()
+        
+        if not os.path.exists("players.csv"):
+            return {"status": "error", "message": "players.csv not found on server!"}
+            
+        count = 0
+        csv_player_ids = set()
+        with open("players.csv", "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('gender') != "Men's Football": continue
+                if row.get('league') in ['UEFA Champions League', 'FIFA World Cup', 'European Championship']: continue
+                if not row.get('club'): continue
+                
+                try:
+                    pid = int(row['player_id'])
+                except:
+                    continue
+                    
+                if pid in csv_player_ids: continue
+                csv_player_ids.add(pid)
+                
+                club_name = str(row['club']).strip()
+                club = db.query(Club).filter_by(name=club_name).first()
+                if not club:
+                    club = Club(name=club_name, league=str(row.get('league', 'Unknown')).strip())
+                    db.add(club)
+                    db.commit()
+                    db.refresh(club)
+                
+                name = str(row['common_name']).strip() if row.get('common_name') else f"{row.get('first_name', '')} {row.get('last_name', '')}".strip()
+                age = 0
+                if row.get('birthdate'):
+                    try: age = 2026 - datetime.strptime(row['birthdate'], '%d-%m-%Y').year
+                    except: pass
+                    
+                def get_val(col):
+                    val = row.get(col)
+                    try: return int(val)
+                    except: return 0
+                    
+                p = Player(
+                    player_id=pid,
+                    name=name, position=str(row.get('position', 'CM')), overall_rating=int(row.get('overall_rating', 50)),
+                    age=age, nationality=str(row.get('nationality', 'Unknown')), club_id=club.id,
+                    preferred_foot=str(row.get('preferred_foot', 'Right')),
+                    pace=get_val('pace'), shooting=get_val('shooting'), passing=get_val('passing'),
+                    dribbling=get_val('dribbling'), defending=get_val('defending'), physicality=get_val('physicality'),
+                    gk_diving=get_val('goalkeeping_diving'), gk_handling=get_val('goalkeeping_handling'),
+                    gk_kicking=get_val('goalkeeping_kicking'), gk_positioning=get_val('goalkeeping_positioning'),
+                    gk_reflexes=get_val('goalkeeping_reflexes')
+                )
+                db.add(p)
+                count += 1
+        db.commit()
+        
+        added_backup_ids = set()
+        for b in backup_players:
+            pid = b['player_id']
+            if pid not in csv_player_ids and pid not in added_backup_ids:
+                added_backup_ids.add(pid)
+                del b['id']
+                if 'original_data' in b: del b['original_data']
+                db.add(Player(**b))
+        db.commit()
+        
+        players_with_clubs = db.query(Player, Club).join(Club, Player.club_id == Club.id).all()
+        for p, club in players_with_clubs:
+            ovr = p.overall_rating or 50
+            age = p.age or 25
+            pos = p.position or ""
+            
+            base_val = int((ovr ** 4) / 5)
+            
+            l = club.league.lower() if club.league else ""
+            if "premier league" in l or "laliga" in l or "la liga" in l: mult_league = 1.5
+            elif "bundesliga" in l or "serie a" in l or "ligue 1" in l: mult_league = 1.2
+            elif "championship" in l or "eredivisie" in l or "portugal" in l or "mls" in l or "saudi" in l: mult_league = 0.7
+            else: mult_league = 0.2
+
+            if "Goalkeeper" in pos: mult_pos = 0.4
+            elif "Back" in pos: mult_pos = 1.0
+            elif "Midfield" in pos: mult_pos = 1.1
+            else: mult_pos = 1.3 
+
+            if age <= 21: mult_age = 2.0
+            elif age <= 24: mult_age = 1.5
+            elif age <= 27: mult_age = 1.2
+            elif age <= 30: mult_age = 1.0
+            elif age <= 33: mult_age = 0.8
+            elif age <= 35: mult_age = 0.6
+            else: mult_age = 0.4
+
+            market_value = int(base_val * mult_league * mult_pos * mult_age)
+            market_value = max(10000, round(market_value / 10000) * 10000)
+
+            base_wage_k = ((max(60, ovr) - 50) ** 3) * 2
+            random.seed(p.id)
+            wage_variance = random.uniform(0.85, 1.15)
+            wage_pos_mult = 0.7 if "Goalkeeper" in pos else 1.0
+            
+            wage_k = int(base_wage_k * mult_league * wage_variance * wage_pos_mult)
+            wage = max(1, wage_k) * 1000 
+            wage = round(wage / 500) * 500
+
+            if age <= 20: years_left = random.randint(4, 5)
+            elif age <= 23: years_left = random.randint(3, 4)
+            elif age <= 27: years_left = random.randint(2, 4)
+            elif age <= 30: years_left = random.randint(2, 3)
+            else: years_left = random.randint(1, 2)
+                
+            contract_until = f"{2026 + years_left}-06-30"
+
+            p.market_value = market_value
+            p.wage = wage
+            p.contract_until = contract_until
+        db.commit()
+        
+        for p in db.query(Player).all():
+            orig = {
+                'age': p.age, 'overall_rating': p.overall_rating, 'market_value': p.market_value,
+                'wage': p.wage, 'pace': p.pace, 'shooting': p.shooting, 'passing': p.passing,
+                'dribbling': p.dribbling, 'defending': p.defending, 'physicality': p.physicality,
+                'gk_diving': p.gk_diving, 'gk_handling': p.gk_handling, 'gk_kicking': p.gk_kicking,
+                'gk_positioning': p.gk_positioning, 'gk_reflexes': p.gk_reflexes
+            }
+            p.original_data = json.dumps(orig)
+        db.commit()
+        
+        return {"status": "ok", "message": "Database completely rebuilt and original_data updated!"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
 async def start_bot():
     try:
         await bot.delete_webhook(drop_pending_updates=True)
