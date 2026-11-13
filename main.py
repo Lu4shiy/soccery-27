@@ -2993,7 +2993,7 @@ def fix_db_999():
                 if not row.get('club'): continue
                 
                 try:
-                    pid = int(row['player_id'])
+                    pid = int(float(row['player_id']))
                 except:
                     continue
                     
@@ -3016,12 +3016,12 @@ def fix_db_999():
                     
                 def get_val(col):
                     val = row.get(col)
-                    try: return int(val)
+                    try: return int(float(val))
                     except: return 0
                     
                 p = Player(
                     player_id=pid,
-                    name=name, position=str(row.get('position', 'CM')), overall_rating=int(row.get('overall_rating', 50)),
+                    name=name, position=str(row.get('position', 'CM')), overall_rating=int(float(row.get('overall_rating', 50))),
                     age=age, nationality=str(row.get('nationality', 'Unknown')), club_id=club.id,
                     preferred_foot=str(row.get('preferred_foot', 'Right')),
                     pace=get_val('pace'), shooting=get_val('shooting'), passing=get_val('passing'),
@@ -3036,7 +3036,10 @@ def fix_db_999():
         
         added_backup_ids = set()
         for b in backup_players:
-            pid = b['player_id']
+            try:
+                pid = int(b['player_id'])
+            except:
+                continue
             if pid not in csv_player_ids and pid not in added_backup_ids:
                 added_backup_ids.add(pid)
                 del b['id']
