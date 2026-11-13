@@ -103,13 +103,8 @@ def restore_original_database():
         age = p.age or 25
         pos = p.position or ""
         
-        if ovr >= 70:
-            base_val = ((ovr - 50) ** 3) * 1000
-            if ovr >= 85: base_val *= 1.1
-        else:
-            base_val = ((max(0, ovr - 40)) ** 3) * 30
-            if base_val < 5000: base_val = 5000
-
+        base_val = int((ovr ** 4) / 5)
+        
         l = club.league.lower() if club.league else ""
         if "premier league" in l or "laliga" in l or "la liga" in l: mult_league = 1.5
         elif "bundesliga" in l or "serie a" in l or "ligue 1" in l: mult_league = 1.2
@@ -121,12 +116,13 @@ def restore_original_database():
         elif "Midfield" in pos: mult_pos = 1.1
         else: mult_pos = 1.3 
 
-        if age <= 20: mult_age = 1.6
-        elif age <= 25: mult_age = 1.2
-        elif age <= 28: mult_age = 1.0
-        elif age <= 31: mult_age = 0.6
-        elif age <= 34: mult_age = 0.25
-        else: mult_age = 0.05
+        if age <= 21: mult_age = 2.0
+        elif age <= 24: mult_age = 1.5
+        elif age <= 27: mult_age = 1.2
+        elif age <= 30: mult_age = 1.0
+        elif age <= 33: mult_age = 0.8
+        elif age <= 35: mult_age = 0.6
+        else: mult_age = 0.4
 
         market_value = int(base_val * mult_league * mult_pos * mult_age)
         market_value = max(10000, round(market_value / 10000) * 10000)

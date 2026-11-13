@@ -642,13 +642,14 @@ def recalculate_market_value(player: Player) -> int:
     age = player.age
     ovr = player.overall_rating
     pot = player.potential or ovr
-    base = (ovr ** 3) * 10
+    base = int((ovr ** 4) / 5)
     if age <= 21: age_mult = 2.0
     elif age <= 24: age_mult = 1.5
     elif age <= 27: age_mult = 1.2
-    elif age <= 30: age_mult = 0.9
-    elif age <= 33: age_mult = 0.5
-    else: age_mult = 0.2
+    elif age <= 30: age_mult = 1.0
+    elif age <= 33: age_mult = 0.8
+    elif age <= 35: age_mult = 0.6
+    else: age_mult = 0.4
     pot_bonus = max(0, pot - ovr) * 100000
     return int((base * age_mult) + pot_bonus)
 
@@ -656,8 +657,10 @@ def apply_training_if_done(player: Player, db: Session) -> bool:
     if not player.training_program_id or not player.training_started_at: return False
     prog = db.query(TrainingProgram).filter_by(id=player.training_program_id).first()
     if not prog: return False
+    state = db.query(GameState).first()
+    current_game_date = datetime.strptime(state.current_date, "%Y-%m-%d") if state else datetime.utcnow()
     end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
-    if datetime.utcnow() < end_date: return False
+    if current_game_date < end_date: return False
 
     if prog.stat_boosts:
         boosts = json.loads(prog.stat_boosts)
@@ -840,8 +843,10 @@ def start_training(req: StartTrainingRequest):
         if player.training_program_id: raise HTTPException(status_code=400, detail="Игрок уже на тренировке")
         prog = db.query(TrainingProgram).filter_by(id=req.program_id).first()
         if not prog: raise HTTPException(status_code=404, detail="Программа не найдена")
+        state = db.query(GameState).first()
+        game_date_str = state.current_date if state else "2026-08-01"
         player.training_program_id = prog.id
-        player.training_started_at = datetime.utcnow()
+        player.training_started_at = datetime.strptime(game_date_str, "%Y-%m-%d")
         db.commit()
         end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
         return {"status": "ok", "program_name": prog.name, "end_date": end_date.isoformat()}
@@ -858,8 +863,10 @@ def training_status(player_id: int):
         if not player.training_program_id: return {"active": False}
         prog = db.query(TrainingProgram).filter_by(id=player.training_program_id).first()
         if not prog: return {"active": False}
+        state = db.query(GameState).first()
+        current_game_date = datetime.strptime(state.current_date, "%Y-%m-%d") if state else datetime.utcnow()
         end_date = player.training_started_at + timedelta(weeks=prog.duration_weeks)
-        weeks_left = max(0, (end_date - datetime.utcnow()).days // 7)
+        weeks_left = max(0, (end_date - current_game_date).days // 7)
         return {"active": True, "program_name": prog.name, "weeks_left": weeks_left, "end_date": end_date.isoformat()}
     finally:
         db.close()
@@ -1825,21 +1832,21 @@ def simulate_match(fixture_id: int, db: Session):
     total_shots_a = max(2, int((a_att - h_def) * 1.5) + 8)
     h_sot, a_sot = 0, 0
     
-    h_players = [p for p in h_xi if normalize_pos(p.position) != "GK"]
-    a_players = [p for p in a_xi if normalize_pos(p.position) != "GK"]
-    if not h_players or not a_players:
+    if not h_xi or not a_xi:
         fx.is_played = 1
         fx.home_goals = 0
         fx.away_goals = 0
         db.commit()
         return
     
-    def pick_scorer(players):
-        weights = [(p.shooting or 50) + (p.pace or 50) * 0.5 + (p.dribbling or 50) * 0.2 for p in players]
-        return random.choices(players, weights=weights, k=1)[0]
+    def pick_scorer(on_pitch):
+        field_players = [p for p in on_pitch if normalize_pos(p.position) != "GK"]
+        if not field_players: return random.choice(on_pitch)
+        weights = [(p.shooting or 50) + (p.pace or 50) * 0.5 + (p.dribbling or 50) * 0.2 for p in field_players]
+        return random.choices(field_players, weights=weights, k=1)[0]
 
-    def pick_assister(players, scorer):
-        pool = [p for p in players if p.id != scorer.id]
+    def pick_assister(on_pitch, scorer):
+        pool = [p for p in on_pitch if p.id != scorer.id and normalize_pos(p.position) != "GK"]
         if not pool: return None
         weights = [(p.passing or 50) + (p.dribbling or 50) * 0.5 for p in pool]
         return random.choices(pool, weights=weights, k=1)[0]
@@ -1850,8 +1857,8 @@ def simulate_match(fixture_id: int, db: Session):
             if random.random() < 0.35:
                 h_goals += 1
                 minute = pick_minute()
-                scorer = pick_scorer(h_players)
-                assist = pick_assister(h_players, scorer) if random.random() < 0.65 else None
+                scorer = pick_scorer(h_on_pitch)
+                assist = pick_assister(h_on_pitch, scorer) if random.random() < 0.65 else None
                 add_event(minute, 'goal', home.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
                 match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
@@ -1865,8 +1872,8 @@ def simulate_match(fixture_id: int, db: Session):
             if random.random() < 0.30:
                 a_goals += 1
                 minute = pick_minute()
-                scorer = pick_scorer(a_players)
-                assist = pick_assister(a_players, scorer) if random.random() < 0.65 else None
+                scorer = pick_scorer(a_on_pitch)
+                assist = pick_assister(a_on_pitch, scorer) if random.random() < 0.65 else None
                 add_event(minute, 'goal', away.id, scorer.id, assist.id if assist else None)
                 scorer.goals = (scorer.goals or 0) + 1
                 match_goals[scorer.id] = match_goals.get(scorer.id, 0) + 1
@@ -1880,12 +1887,15 @@ def simulate_match(fixture_id: int, db: Session):
         tactic_a = db.query(Tactic).join(Manager).filter(Manager.club_id == away.id).first()
         pen_taker = tactic_h.penalty_taker_id if side == home.id and tactic_h else (tactic_a.penalty_taker_id if side == away.id and tactic_a else None)
         
-        pool = h_players if side == home.id else a_players
+        on_pitch = h_on_pitch if side == home.id else a_on_pitch
+        field_players = [p for p in on_pitch if normalize_pos(p.position) != "GK"]
+        if not field_players: field_players = on_pitch
+
         if pen_taker:
-            scorer = next((p for p in (h_xi if side == home.id else a_xi) if p.id == pen_taker), None)
-            if not scorer or scorer not in pool: scorer = random.choice(pool)
+            scorer = next((p for p in on_pitch if p.id == pen_taker), None)
+            if not scorer or scorer not in field_players: scorer = random.choice(field_players)
         else:
-            scorer = random.choice(pool)
+            scorer = random.choice(field_players)
             
         minute = pick_minute()
         is_goal = random.random() < 0.75
@@ -1908,13 +1918,14 @@ def simulate_match(fixture_id: int, db: Session):
 
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
-        defenders = [p for p in (a_xi if side == home.id else h_xi) if normalize_pos(p.position) in ["CB", "LB", "RB", "LWB", "RWB"]]
+        on_pitch = a_on_pitch if side == home.id else h_on_pitch
+        defenders = [p for p in on_pitch if normalize_pos(p.position) in ["CB", "LB", "RB", "LWB", "RWB"]]
         if defenders:
             scorer = random.choice(defenders)
             minute = pick_minute()
             if side == home.id: h_goals += 1
             else: a_goals += 1
-            add_event(minute, 'own_goal', scorer.club_id, scorer.id)
+            add_event(minute, 'own_goal', side, scorer.id)
             match_own_goals[scorer.id] = match_own_goals.get(scorer.id, 0) + 1
 
     def get_card_weight(p):
@@ -1929,19 +1940,19 @@ def simulate_match(fixture_id: int, db: Session):
     num_yellows = random.choices([0, 1, 2, 3, 4], weights=[0.25, 0.45, 0.2, 0.08, 0.02])[0]
     for _ in range(num_yellows):
         side = home.id if random.random() < 0.5 else away.id
-        pool = h_players if side == home.id else a_players
-        if pool:
-            weights = [get_card_weight(p) for p in pool]
-            p = random.choices(pool, weights=weights, k=1)[0]
+        on_pitch = h_on_pitch if side == home.id else a_on_pitch
+        if on_pitch:
+            weights = [get_card_weight(p) for p in on_pitch]
+            p = random.choices(on_pitch, weights=weights, k=1)[0]
             add_event(pick_minute(10, 85), 'yellow_card', side, p.id)
             match_yellow[p.id] = match_yellow.get(p.id, 0) + 1
         
     if random.random() < 0.05:
         side = home.id if random.random() < 0.5 else away.id
-        pool = h_players if side == home.id else a_players
-        if pool:
-            weights = [get_card_weight(p) for p in pool]
-            p = random.choices(pool, weights=weights, k=1)[0]
+        on_pitch = h_on_pitch if side == home.id else a_on_pitch
+        if on_pitch:
+            weights = [get_card_weight(p) for p in on_pitch]
+            p = random.choices(on_pitch, weights=weights, k=1)[0]
             add_event(pick_minute(20, 80), 'red_card', side, p.id)
             match_red[p.id] = match_red.get(p.id, 0) + 1
     
