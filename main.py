@@ -2406,6 +2406,7 @@ def populate_playoffs(db, year):
             db.commit()
 
 def process_season_end(db, year):
+    fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
     def get_league_standings(league_name):
         tour = db.query(Tournament).filter_by(name=league_name).first()
         if not tour: return []
@@ -2511,7 +2512,6 @@ def process_season_end(db, year):
 
     db.commit()
 
-    fa_cup = db.query(Tournament).filter_by(name="FA Cup").first()
     shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
     if fa_cup and shield and len(pl_standings) > 0:
         fa_final = db.query(Fixture).filter_by(tournament_id=fa_cup.id, round_number=7).first()
