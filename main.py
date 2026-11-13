@@ -341,6 +341,19 @@ def generate_season_fixtures(db, base_year):
                 fixtures_data.append({"date": dates[5].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 6, "match_index": i, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
             fixtures_data.append({"date": dates[6].strftime("%Y-%m-%d"), "tournament_id": cup.id, "round_number": 7, "match_index": 0, "home_club_id": 9999, "away_club_id": 9999, "is_played": 0})
 
+    shield = db.query(Tournament).filter_by(name="FA Community Shield").first()
+    if shield:
+        fixtures_data.append({
+            "date": f"{base_year+1}-06-09",
+            "tournament_id": shield.id,
+            "round_number": 1,
+            "match_index": 0,
+            "leg": 1,
+            "home_club_id": 9999,
+            "away_club_id": 9999,
+            "is_played": 0
+        })
+
     po_champ = db.query(Tournament).filter_by(name="EFL Championship Playoffs").first()
     po_l1 = db.query(Tournament).filter_by(name="EFL League One Playoffs").first()
     po_l2 = db.query(Tournament).filter_by(name="EFL League Two Playoffs").first()
@@ -2235,10 +2248,11 @@ def simulate_match(fixture_id: int, db: Session):
     h_sot = max(h_sot, h_goals)
     a_sot = max(a_sot, a_goals)
         
-    if tour and tour.type == "Cup":
+    if tour and tour.type in ["Cup", "SuperCup"]:
         is_final = False
         if tour.name == "FA Cup" and fx.round_number == 7: is_final = True
         elif tour.name in ["Carabao Cup", "EFL Cup"] and fx.round_number == 8: is_final = True
+        elif tour.name == "FA Community Shield": is_final = True
         elif "Playoffs" in tour.name:
             if tour.name == "EFL Championship Playoffs" and fx.round_number == 4: is_final = True
             elif tour.name in ["EFL League One Playoffs", "EFL League Two Playoffs"] and fx.round_number == 3: is_final = True
