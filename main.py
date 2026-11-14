@@ -1679,7 +1679,13 @@ def advance_cup_bracket(fx, db):
                 db.flush()
         return
 
-    if fx.home_penalties is not None and fx.away_penalties is not None:
+    if fx.home_club_id == 9999 and fx.away_club_id == 9999:
+        return
+    elif fx.home_club_id == 9999:
+        winner_id = fx.away_club_id
+    elif fx.away_club_id == 9999:
+        winner_id = fx.home_club_id
+    elif fx.home_penalties is not None and fx.away_penalties is not None:
         winner_id = fx.home_club_id if fx.home_penalties > fx.away_penalties else fx.away_club_id
     else:
         winner_id = fx.home_club_id if (fx.home_goals or 0) > (fx.away_goals or 0) else fx.away_club_id
@@ -1707,15 +1713,15 @@ def advance_cup_bracket(fx, db):
                 next_fx.away_club_id = winner_id
     db.flush()
 
-def simulate_match(fixture_id: int, db: Session):
-    fx = db.query(Fixture).filter_by(id=fixture_id).first()
+def simulate_match(fx: Fixture, db: Session):
     if not fx or fx.is_played: return
         
     if fx.home_club_id == 9999 or fx.away_club_id == 9999:
         fx.is_played = 1
         fx.home_goals = 0
         fx.away_goals = 0
-        db.commit()
+        db.flush()
+        advance_cup_bracket(fx, db)
         return
             
     home = db.query(Club).filter_by(id=fx.home_club_id).first()
@@ -1861,7 +1867,7 @@ def simulate_match(fixture_id: int, db: Session):
     def pick_scorer(on_pitch):
         field_players = [p for p in on_pitch if normalize_pos(p.position) != "GK"]
         if not field_players: return random.choice(on_pitch)
-        weights = [(p.shooting or 50) + (p.pace or 50) * 0.5 + (p.dribbling or 50) * 0.2 for p in field_players]
+        weights = [((p.shooting or 50) ** 2) + (p.pace or 50) * 0.5 for p in field_players]
         return random.choices(field_players, weights=weights, k=1)[0]
 
     def pick_assister(on_pitch, scorer):
@@ -2604,7 +2610,7 @@ def advance_game_date(db, days_to_add):
             fixtures = db.query(Fixture).filter(Fixture.date == date_str, Fixture.is_played == 0).all()
             for fx in fixtures:
                 try:
-                    simulate_match(fx.id, db)
+                    simulate_match(fx, db)
                 except Exception as e:
                     print(f"Match simulation failed for fixture {fx.id}: {e}")
                     db.rollback()
